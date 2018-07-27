@@ -60,7 +60,11 @@ class SSDPProtocol(DatagramProtocol):
 
     def handle_datagram(self, datagram, address):
         if address[0] == self.router:
-            server_info = self.parse_ssdp_response(datagram)
+            try:
+                server_info = self.parse_ssdp_response(datagram)
+            except:
+                log.exception("error parsing response: %s", datagram.encode('hex'))
+                raise
             if server_info:
                 log.info("received reply (%i bytes) to SSDP request (%fs)", len(datagram),
                          self._reactor.seconds() - self._start)
