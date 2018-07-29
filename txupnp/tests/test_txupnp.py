@@ -48,22 +48,22 @@ def test(ext_port=4446, int_port=4446, proto='UDP', timeout=1):
 
 
 @defer.inlineCallbacks
-def run_tests(timeout=1):
+def run_tests():
+    if len(sys.argv) > 1:
+        log.setLevel(logging.DEBUG)
+        timeout = int(sys.argv[1])
+    else:
+        timeout = 1
     for p in ['UDP']:
         yield test(proto=p, timeout=timeout)
 
 
-def main(timeout):
-    d = run_tests(timeout)
+def main():
+    d = run_tests()
     d.addErrback(log.exception)
     d.addBoth(lambda _: reactor.callLater(0, reactor.stop))
     reactor.run()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        log.setLevel(logging.DEBUG)
-        timeout = int(sys.argv[1])
-    else:
-        timeout = 1
-    main(timeout)
+    main()
