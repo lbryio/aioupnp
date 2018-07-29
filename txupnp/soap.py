@@ -46,7 +46,7 @@ class SOAPServiceManager(object):
         if self._command_runners and not self._selected_runner in self._command_runners:
             self._selected_runner = list(self._command_runners.keys())[0]
         if not self._command_runners:
-            raise UPnPError("not devices found")
+            raise UPnPError("no devices found")
         return self._command_runners[self._selected_runner]
 
     def get_available_runners(self):
