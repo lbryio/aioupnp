@@ -24,13 +24,16 @@ class SOAPServiceManager(object):
         )
         locations = []
         for server_info in server_infos:
-            if server_info['st'] not in self._command_runners:
+            if 'st' in server_info and server_info['st'] not in self._command_runners:
                 locations.append(server_info['location'])
                 gateway = Gateway(**server_info)
                 yield gateway.discover_services()
                 command_runner = SCPDCommandRunner(gateway)
                 yield command_runner.discover_commands()
                 self._command_runners[gateway.urn.decode()] = command_runner
+            elif 'st' not in server_info:
+                log.error("don't know how to handle gateway: %s", server_info)
+                continue
         defer.returnValue(len(self._command_runners))
 
     def set_runner(self, urn):
