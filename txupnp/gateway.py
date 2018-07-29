@@ -58,7 +58,7 @@ class RootDevice(object):
 
 
 class Gateway(object):
-    def __init__(self, usn, ext, server, location, cache_control, date, st):
+    def __init__(self, usn, server, location, st, cache_control="", date="", ext=""):
         self.usn = usn.encode()
         self.ext = ext.encode()
         self.server = server.encode()
