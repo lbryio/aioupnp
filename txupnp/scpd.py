@@ -170,7 +170,8 @@ class SCPDCommandRunner(object):
             [i['name'] for i in arg_dicts if i['direction'] == 'out']
         )
 
-    def _register_command(self, action_info, service_type):
+    def __register_command(self, action_info, service_type):
+
         func_info = self._soap_function_info(action_info)
         command = _SCPDCommand(self._gateway.base_address, self._gateway.port,
                                self._gateway.base_address + self._gateway.get_service(service_type).control_path.encode(),
@@ -184,7 +185,13 @@ class SCPDCommandRunner(object):
             command._process_result = _return_types(*current._return_types)(command._process_result)
         setattr(command, "__doc__", current.__doc__)
         setattr(self, command.method, command)
-        # log.info("registered %s::%s", service_type, action_info['name'])
+        log.info("registered %s %s", service_type, action_info['name'])
+
+    def _register_command(self, action_info, service_type):
+        try:
+            return self.__register_command(action_info, service_type)
+        except Exception as err:
+            log.error("failed to setup command for %s\n%s", service_type, action_info)
 
     @staticmethod
     @return_types(none)
