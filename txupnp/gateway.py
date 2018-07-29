@@ -54,14 +54,15 @@ class RootDevice(object):
             log.exception("failed to decode xml")
             log.error(xml_string)
             log.info(binascii.hexlify(xml_string))
-            return
+            root = {}
         self.spec_version = root.get(SPEC_VERSION)
-        self.url_base = root["URLBase"]
+        self.url_base = root.get("URLBase")
         self.devices = []
         self.services = []
-        root_device = Device(self, **(root["device"]))
-        self.devices.append(root_device)
-        log.info("finished setting up root device. %i devices and %i services", len(self.devices), len(self.services))
+        if root:
+            root_device = Device(self, **(root["device"]))
+            self.devices.append(root_device)
+            log.info("finished setting up root device. %i devices and %i services", len(self.devices), len(self.services))
 
 
 class Gateway(object):
