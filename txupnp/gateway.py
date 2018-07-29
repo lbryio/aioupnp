@@ -51,7 +51,8 @@ class RootDevice(object):
         try:
             root = flatten_keys(etree_to_dict(ElementTree.fromstring(xml_string)), "{%s}" % DEVICE)[ROOT]
         except Exception as err:
-            log.exception("failed to decode xml: %s\n%s", err, xml_string)
+            if xml_string:
+                log.exception("failed to decode xml: %s\n%s", err, xml_string)
             root = {}
         self.spec_version = root.get(SPEC_VERSION)
         self.url_base = root.get("URLBase")
@@ -81,10 +82,9 @@ class Gateway(object):
         log.info("querying %s", self.location)
         response = yield treq.get(self.location)
         response_xml = yield response.content()
-        if response_xml:
-            self._device = RootDevice(response_xml)
-            if not self._device.devices or not self._device.services:
-                log.error("failed to parse device: \n%s", response_xml)
+        self._device = RootDevice(response_xml)
+        if not self._device.devices or not self._device.services:
+            log.error("failed to parse device: \n%s", response_xml)
 
     @property
     def services(self):
