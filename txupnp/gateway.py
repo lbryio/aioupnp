@@ -51,9 +51,7 @@ class RootDevice(object):
         try:
             root = flatten_keys(etree_to_dict(ElementTree.fromstring(xml_string)), "{%s}" % DEVICE)[ROOT]
         except Exception as err:
-            log.exception("failed to decode xml")
-            log.error(xml_string)
-            log.info(binascii.hexlify(xml_string.encode()))
+            log.exception("failed to decode xml: %s\n%s", err, xml_string)
             root = {}
         self.spec_version = root.get(SPEC_VERSION)
         self.url_base = root.get("URLBase")
