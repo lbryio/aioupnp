@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import OrderedDict
 from twisted.internet import defer
@@ -129,19 +130,22 @@ class SCPDResponse(object):
 class SCPDCommandRunner(object):
     def __init__(self, gateway):
         self._gateway = gateway
-        self._unsupported_actions = []
-        self._scpd_responses = []
+        self._unsupported_actions = {}
+        self._registered_commands = {}
 
     @defer.inlineCallbacks
     def _discover_commands(self, service):
         scpd_url = self._gateway.base_address + service.scpd_path.encode()
         response = yield treq.get(scpd_url)
         content = yield response.content()
-        scpd_response = SCPDResponse(scpd_url,
-                                     response.headers, content)
-        self._scpd_responses.append(scpd_response)
-        for action_dict in scpd_response.get_action_list():
-            self._register_command(action_dict, service.service_type)
+        try:
+            scpd_response = SCPDResponse(scpd_url,
+                                         response.headers, content)
+            for action_dict in scpd_response.get_action_list():
+                self._register_command(action_dict, service.service_type)
+        except Exception as err:
+            log.exception("failed to parse scpd response (%s) from %s\nheaders:\n%s\ncontent\n%s",
+                          err, scpd_url, response.headers, content)
         defer.returnValue(None)
 
     @defer.inlineCallbacks
@@ -151,6 +155,7 @@ class SCPDCommandRunner(object):
             if not service:
                 continue
             yield self._discover_commands(service)
+        log.debug(self.debug_commands())
 
     @staticmethod
     def _soap_function_info(action_dict):
@@ -171,27 +176,33 @@ class SCPDCommandRunner(object):
         )
 
     def __register_command(self, action_info, service_type):
-
         func_info = self._soap_function_info(action_info)
         command = _SCPDCommand(self._gateway.base_address, self._gateway.port,
                                self._gateway.base_address + self._gateway.get_service(service_type).control_path.encode(),
                                self._gateway.get_service(service_type).service_id.encode(), *func_info)
-        if not hasattr(self, command.method):
-            self._unsupported_actions.append(action_info)
-            print(("# send this to jack!\n\n@staticmethod\ndef %s(" % func_info[0]) + ("" if not func_info[1] else ", ".join(func_info[1])) + ("):\n    \"\"\"Returns (%s)\"\"\"\n    raise NotImplementedError()\n\n" % ("None" if not func_info[2] else ", ".join(func_info[2]))))
-            return
         current = getattr(self, command.method)
         if hasattr(current, "_return_types"):
             command._process_result = _return_types(*current._return_types)(command._process_result)
         setattr(command, "__doc__", current.__doc__)
         setattr(self, command.method, command)
+        self._registered_commands[command.method] = service_type
         log.debug("registered %s %s", service_type, action_info['name'])
+        return True
 
     def _register_command(self, action_info, service_type):
         try:
             return self.__register_command(action_info, service_type)
         except Exception as err:
+            s = self._unsupported_actions.get(service_type, [])
+            s.append((action_info, err))
+            self._unsupported_actions[service_type] = s
             log.error("failed to setup command for %s\n%s", service_type, action_info)
+
+    def debug_commands(self):
+        return json.dumps({
+            'available': self._registered_commands,
+            'failed': self._unsupported_actions
+        }, indent=2)
 
     @staticmethod
     @return_types(none)
