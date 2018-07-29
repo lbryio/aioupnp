@@ -4,6 +4,7 @@ from txupnp.util import get_lan_info
 from txupnp.ssdp import SSDPFactory
 from txupnp.scpd import SCPDCommandRunner
 from txupnp.gateway import Gateway
+from txupnp.fault import UPnPError
 from txupnp.constants import GATEWAY_SCHEMA
 
 log = logging.getLogger(__name__)
@@ -42,8 +43,10 @@ class SOAPServiceManager(object):
         self._command_runners = urn
 
     def get_runner(self):
-        if self._selected_runner and self._command_runners and self._selected_runner not in self._command_runners:
-            self._selected_runner = self._command_runners.keys()[0]
+        if self._command_runners and not self._selected_runner in self._command_runners:
+            self._selected_runner = list(self._command_runners.keys())[0]
+        if not self._command_runners:
+            raise UPnPError("not devices found")
         return self._command_runners[self._selected_runner]
 
     def get_available_runners(self):

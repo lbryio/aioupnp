@@ -9,13 +9,29 @@ log = logging.getLogger(__name__)
 
 
 def parse_http_fields(content_lines):
-    return {
-        (k.lower().rstrip(":".encode()).replace("-".encode(), "_".encode())).decode(): v.decode()
-        for k, v in {
-            l.split(": ".encode())[0]: "".encode().join(l.split(": ".encode())[1:])
-            for l in content_lines
-        }.items() if k
-    }
+    def flatten(s, lower=True):
+        r = s.rstrip(":").rstrip(" ").lstrip(" ").replace("-", "_")
+        if lower:
+            return r.lower()
+        return r
+
+    result = {}
+    for l in content_lines:
+        split = l.decode().split(":")
+        if split and split[0]:
+            k = split[0]
+            v = ":".join(split[1:])
+            result[flatten(k)] = flatten(v, lower=False)
+    return result
+
+    #
+    # return {
+    #     (k.lower().rstrip(":".encode()).replace("-".encode(), "_".encode())).decode(): v.decode()
+    #     for k, v in {
+    #         l.split(": ".encode())[0]: "".encode().join(l.split(": ".encode())[1:])
+    #
+    #     }.items() if k
+    # }
 
 
 def parse_ssdp_request(operation, port, protocol, content_lines):

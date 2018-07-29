@@ -91,5 +91,5 @@ class Gateway(object):
 
     def get_service(self, service_type):
         for service in self._device.services:
-            if service.service_type == service_type:
+            if service.service_type.lower() == service_type.lower():
                 return service
