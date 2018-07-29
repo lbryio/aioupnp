@@ -19,7 +19,7 @@ class UPnP(object):
     def commands(self):
         return self.soap_manager.get_runner()
 
-    def m_search(self, address, ttl=30, max_devices=2):
+    def m_search(self, address, timeout=30, max_devices=2):
         """
         Perform a HTTP over UDP M-SEARCH query
 
@@ -31,12 +31,12 @@ class UPnP(object):
             'usn': <usn>
         }, ...]
         """
-        return self.soap_manager.sspd_factory.m_search(address, ttl=ttl, max_devices=max_devices)
+        return self.soap_manager.sspd_factory.m_search(address, timeout=timeout, max_devices=max_devices)
 
     @defer.inlineCallbacks
-    def discover(self, ttl=30, max_devices=2):
+    def discover(self, timeout=1, max_devices=1):
         try:
-            yield self.soap_manager.discover_services(ttl=ttl, max_devices=max_devices)
+            yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
         except defer.TimeoutError:
             log.warning("failed to find upnp gateway")
             defer.returnValue(False)

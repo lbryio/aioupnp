@@ -1,4 +1,4 @@
-import binascii
+import json
 import logging
 from twisted.internet import defer
 import treq
@@ -18,6 +18,15 @@ class Service(object):
         self.control_path = controlURL
         self.subscribe_path = eventSubURL
         self.scpd_path = SCPDURL
+
+    def get_info(self):
+        return {
+            "service_type": self.service_type,
+            "service_id": self.service_id,
+            "control_path": self.control_path,
+            "subscribe_path": self.subscribe_path,
+            "scpd_path": self.scpd_path
+        }
 
 
 class Device(object):
@@ -45,6 +54,17 @@ class Device(object):
         devices = [Device(self._root_device, **deviceList[k]) for k in deviceList]
         self._root_device.devices.extend(devices)
 
+    def get_info(self):
+        return {
+            'device_type': self.device_type,
+            'friendly_name': self.friendly_name,
+            'manufacturers': self.manufacturer,
+            'model_name': self.model_name,
+            'model_number': self.model_number,
+            'serial_number': self.serial_number,
+            'udn': self.udn
+        }
+
 
 class RootDevice(object):
     def __init__(self, xml_string):
@@ -61,7 +81,7 @@ class RootDevice(object):
         if root:
             root_device = Device(self, **(root["device"]))
             self.devices.append(root_device)
-            log.info("finished setting up root device. %i devices and %i services", len(self.devices), len(self.services))
+            log.info("finished setting up root gateway. %i devices and %i services", len(self.devices), len(self.services))
 
 
 class Gateway(object):
@@ -77,14 +97,41 @@ class Gateway(object):
         self.port = int(BASE_PORT_REGEX.findall(self.location)[0])
         self._device = None
 
+    def debug_device(self):
+        def default_byte(x):
+            if isinstance(x, bytes):
+                return x.decode()
+            return x
+
+        devices = []
+        for device in self._device.devices:
+            info = device.get_info()
+            devices.append(info)
+        services = []
+        for service in self._device.services:
+            info = service.get_info()
+            services.append(info)
+        return json.dumps({
+            'root_url': self.base_address,
+            'gateway_xml_url': self.location,
+            'usn': self.usn,
+            'devices': devices,
+            'services': services
+        }, indent=2, default=default_byte)
+
     @defer.inlineCallbacks
     def discover_services(self):
         log.info("querying %s", self.location)
         response = yield treq.get(self.location)
         response_xml = yield response.content()
-        self._device = RootDevice(response_xml)
-        if not self._device.devices or not self._device.services:
-            log.error("failed to parse device: \n%s", response_xml)
+        if not response_xml:
+            log.error("service sent an empty reply\n%s", self.debug_device())
+        try:
+            self._device = RootDevice(response_xml)
+        except Exception as err:
+            log.error("error parsing gateway: %s\n%s\n\n%s", err, self.debug_device(), response_xml)
+            self._device = RootDevice("")
+        log.debug("finished setting up gateway:\n%s", self.debug_device())
 
     @property
     def services(self):

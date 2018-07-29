@@ -1,3 +1,4 @@
+import sys
 import logging
 from twisted.internet import reactor, defer
 from txupnp.upnp import UPnP
@@ -7,10 +8,12 @@ log = logging.getLogger("txupnp")
 
 
 @defer.inlineCallbacks
-def test(ext_port=4446, int_port=4446, proto='UDP'):
+def test(ext_port=4446, int_port=4446, proto='UDP', timeout=1):
     u = UPnP(reactor)
-    found = yield u.discover()
-    assert found, "M-SEARCH failed to find gateway"
+    found = yield u.discover(timeout=timeout)
+    if not found:
+        print("failed to find gateway")
+        defer.returnValue(None)
     external_ip = yield u.get_external_ip()
     assert external_ip, "Failed to get the external IP"
     log.info(external_ip)
@@ -45,17 +48,22 @@ def test(ext_port=4446, int_port=4446, proto='UDP'):
 
 
 @defer.inlineCallbacks
-def run_tests():
-    for p in ['UDP', 'TCP']:
-        yield test(proto=p)
+def run_tests(timeout=1):
+    for p in ['UDP']:
+        yield test(proto=p, timeout=timeout)
 
 
-def main():
-    d = run_tests()
+def main(timeout):
+    d = run_tests(timeout)
     d.addErrback(log.exception)
     d.addBoth(lambda _: reactor.callLater(0, reactor.stop))
     reactor.run()
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        log.setLevel(logging.DEBUG)
+        timeout = int(sys.argv[1])
+    else:
+        timeout = 1
+    main(timeout)

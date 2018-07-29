@@ -14,14 +14,14 @@ class SOAPServiceManager(object):
     def __init__(self, reactor):
         self._reactor = reactor
         self.iface_name, self.router_ip, self.lan_address = get_lan_info()
-        self.sspd_factory = SSDPFactory(self.lan_address, self._reactor)
+        self.sspd_factory = SSDPFactory(self._reactor, self.lan_address, self.router_ip)
         self._command_runners = {}
         self._selected_runner = GATEWAY_SCHEMA
 
     @defer.inlineCallbacks
-    def discover_services(self, address=None, ttl=30, max_devices=2):
+    def discover_services(self, address=None, timeout=30, max_devices=1):
         server_infos = yield self.sspd_factory.m_search(
-            address or self.router_ip, ttl=ttl, max_devices=max_devices
+            address or self.router_ip, timeout=timeout, max_devices=max_devices
         )
         locations = []
         for server_info in server_infos:

@@ -87,7 +87,7 @@ class _SCPDCommand(object):
         xml_response = yield response.content()
         response = self.extract_response(self.extract_body(xml_response))
         if not response:
-            log.error("empty response to %s\n%s", self.method, xml_response)
+            log.debug("empty response to %s\n%s", self.method, xml_response)
         defer.returnValue(response)
 
     @staticmethod
@@ -155,7 +155,7 @@ class SCPDCommandRunner(object):
     @staticmethod
     def _soap_function_info(action_dict):
         if not action_dict.get('argumentList'):
-            log.warning("don't know how to handle argument list: %s", action_dict)
+            log.debug("don't know how to handle argument list: %s", action_dict)
             return (
                 action_dict['name'],
                 [],
@@ -185,7 +185,7 @@ class SCPDCommandRunner(object):
             command._process_result = _return_types(*current._return_types)(command._process_result)
         setattr(command, "__doc__", current.__doc__)
         setattr(self, command.method, command)
-        log.info("registered %s %s", service_type, action_info['name'])
+        log.debug("registered %s %s", service_type, action_info['name'])
 
     def _register_command(self, action_info, service_type):
         try:
