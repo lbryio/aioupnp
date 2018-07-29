@@ -53,7 +53,7 @@ class RootDevice(object):
         except Exception as err:
             log.exception("failed to decode xml")
             log.error(xml_string)
-            log.info(binascii.hexlify(xml_string))
+            log.info(binascii.hexlify(xml_string.encode()))
             root = {}
         self.spec_version = root.get(SPEC_VERSION)
         self.url_base = root.get("URLBase")
