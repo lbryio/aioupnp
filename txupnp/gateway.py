@@ -82,8 +82,10 @@ class Gateway(object):
     def discover_services(self):
         log.info("querying %s", self.location)
         response = yield treq.get(self.location)
-        response_xml = yield response.text()
+        response_xml = yield response.content()
         self._device = RootDevice(response_xml)
+        if not self._device.devices or not self._device.services:
+            log.error("failed to parse device: \n%s", response_xml)
 
     @property
     def services(self):

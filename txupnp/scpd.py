@@ -155,6 +155,7 @@ class SCPDCommandRunner(object):
     @staticmethod
     def _soap_function_info(action_dict):
         if not action_dict.get('argumentList'):
+            log.warning("don't know how to handle argument list: %s", action_dict)
             return (
                 action_dict['name'],
                 [],
