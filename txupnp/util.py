@@ -81,3 +81,5 @@ def return_types(*types):
 
 
 none_or_str = lambda x: None if not x or x == 'None' else str(x)
+
+none = lambda _: None

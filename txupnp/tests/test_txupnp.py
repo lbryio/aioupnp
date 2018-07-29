@@ -7,7 +7,7 @@ log = logging.getLogger("txupnp")
 
 
 @defer.inlineCallbacks
-def test(ext_port=4446, int_port=4445, proto='UDP'):
+def test(ext_port=4446, int_port=4446, proto='UDP'):
     u = UPnP(reactor)
     found = yield u.discover()
     assert found, "M-SEARCH failed to find gateway"
@@ -36,6 +36,12 @@ def test(ext_port=4446, int_port=4445, proto='UDP'):
     else:
         log.error("failed to tear down redirect")
         raise AssertionError()
+    r = yield u.get_rsip_nat_status()
+    log.info(r)
+    r = yield u.get_status_info()
+    log.info(r)
+    r = yield u.get_connection_type_info()
+    log.info(r)
 
 
 @defer.inlineCallbacks

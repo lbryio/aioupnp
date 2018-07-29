@@ -1,13 +1,13 @@
 import logging
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from twisted.internet import defer
 from twisted.web.client import Agent, HTTPConnectionPool
 import treq
 from treq.client import HTTPClient
 from xml.etree import ElementTree
-from txupnp.util import etree_to_dict, flatten_keys, return_types, _return_types, none_or_str
-from txupnp.fault import handle_fault
-from txupnp.constants import POST, ENVELOPE, BODY, XML_VERSION, WAN_IP_KEY, SERVICE_KEY, SSDP_IP_ADDRESS
+from txupnp.util import etree_to_dict, flatten_keys, return_types, _return_types, none_or_str, none
+from txupnp.fault import handle_fault, UPnPError
+from txupnp.constants import POST, ENVELOPE, BODY, XML_VERSION, IP_SCHEMA, SERVICE, SSDP_IP_ADDRESS, DEVICE, ROOT, service_types
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class _SCPDCommand(object):
         self.param_names = param_names
         self.returns = returns
 
-    def extract_body(self, xml_response, service_key=WAN_IP_KEY):
+    def extract_body(self, xml_response, service_key=IP_SCHEMA):
         content_dict = etree_to_dict(ElementTree.fromstring(xml_response))
         envelope = content_dict[ENVELOPE]
         return flatten_keys(envelope[BODY], "{%s}" % service_key)
@@ -64,9 +64,8 @@ class _SCPDCommand(object):
         if '%sResponse' % self.method in body:
             response_key = '%sResponse' % self.method
         else:
-            1/0
-            return
-
+            log.error(body.keys())
+            raise UPnPError("unknown response fields")
         response = body[response_key]
         extracted_response = tuple([response[n] for n in self.returns])
         if len(extracted_response) == 1:
@@ -81,8 +80,7 @@ class _SCPDCommand(object):
             ('Host', ('%s:%i' % (SSDP_IP_ADDRESS, self.service_port))),
             ('Content-Type', 'text/xml'),
             ('Content-Length', len(soap_body))
-        )
-        )
+        ))
         response = yield self._http_client.request(
             POST, url=self.control_url, data=soap_body, headers=headers
         )
@@ -107,20 +105,50 @@ class _SCPDCommand(object):
         defer.returnValue(result)
 
 
-class SCPDCommandManager(object):
-    def __init__(self, upnp):
-        self._upnp = upnp
+class SCPDResponse(object):
+    def __init__(self, url, headers, content):
+        self.url = url
+        self.headers = headers
+        self.content = content
+
+    def get_element_tree(self):
+        return ElementTree.fromstring(self.content)
+
+    def get_element_dict(self, service_key):
+        return flatten_keys(etree_to_dict(self.get_element_tree()), "{%s}" % service_key)
+
+    def get_action_list(self):
+        return self.get_element_dict(SERVICE)["scpd"]["actionList"]["action"]
+
+    def get_device_info(self):
+        return self.get_element_dict(DEVICE)[ROOT]
+
+
+class SCPDCommandRunner(object):
+    def __init__(self, gateway):
+        self._gateway = gateway
+        self._unsupported_actions = []
+        self._scpd_responses = []
+
+    @defer.inlineCallbacks
+    def _discover_commands(self, service):
+        scpd_url = self._gateway.base_address + service.scpd_path.encode()
+        response = yield treq.get(scpd_url)
+        content = yield response.content()
+        scpd_response = SCPDResponse(scpd_url,
+                                     response.headers, content)
+        self._scpd_responses.append(scpd_response)
+        for action_dict in scpd_response.get_action_list():
+            self._register_command(action_dict, service.service_type)
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def discover_commands(self):
-        response = yield treq.get(self._upnp.wan_ip.scpd_url)
-        content = yield response.content()
-        tree = ElementTree.fromstring(content)
-        actions = flatten_keys(etree_to_dict(tree), "{%s}" % SERVICE_KEY)["scpd"]["actionList"]["action"]
-        for action_dict in actions:
-            self._register_command(action_dict)
-        log.info("registered %i commands", len(actions))
-        defer.returnValue(None)
+        for service_type in service_types:
+            service = self._gateway.get_service(service_type)
+            if not service:
+                continue
+            yield self._discover_commands(service)
 
     @staticmethod
     def _soap_function_info(action_dict):
@@ -139,24 +167,31 @@ class SCPDCommandManager(object):
             [i['name'] for i in arg_dicts if i['direction'] == 'out']
         )
 
-    def _register_command(self, action_info):
-        command = _SCPDCommand(self._upnp.gateway_ip, self._upnp.gateway_port, self._upnp.wan_ip.control_url,
-                               self._upnp.wan_ip.service_id, *self._soap_function_info(action_info))
+    def _register_command(self, action_info, service_type):
+        func_info = self._soap_function_info(action_info)
+        command = _SCPDCommand(self._gateway.base_address, self._gateway.port,
+                               self._gateway.base_address + self._gateway.get_service(service_type).control_path.encode(),
+                               self._gateway.get_service(service_type).service_id.encode(), *func_info)
         if not hasattr(self, command.method):
-            raise NotImplementedError(command.method)
+            self._unsupported_actions.append(action_info)
+            print(("# send this to jack!\n\n@staticmethod\ndef %s(" % func_info[0]) + ("" if not func_info[1] else ", ".join(func_info[1])) + ("):\n    \"\"\"Returns (%s)\"\"\"\n    raise NotImplementedError()\n\n" % ("None" if not func_info[2] else ", ".join(func_info[2]))))
+            return
         current = getattr(self, command.method)
         if hasattr(current, "_return_types"):
             command._process_result = _return_types(*current._return_types)(command._process_result)
         setattr(command, "__doc__", current.__doc__)
         setattr(self, command.method, command)
+        # log.info("registered %s::%s", service_type, action_info['name'])
 
     @staticmethod
+    @return_types(none)
     def AddPortMapping(NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
                        NewEnabled, NewPortMappingDescription, NewLeaseDuration):
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(bool, bool)
     def GetNATRSIPStatus():
         """Returns (NewRSIPAvailable, NewNATEnabled)"""
         raise NotImplementedError()
@@ -177,36 +212,83 @@ class SCPDCommandManager(object):
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(none)
     def SetConnectionType(NewConnectionType):
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(str)
     def GetExternalIPAddress():
         """Returns (NewExternalIPAddress)"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(str, str)
     def GetConnectionTypeInfo():
         """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(str, str, int)
     def GetStatusInfo():
         """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(none)
     def ForceTermination():
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(none)
     def DeletePortMapping(NewRemoteHost, NewExternalPort, NewProtocol):
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
+    @return_types(none)
     def RequestConnection():
         """Returns None"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetCommonLinkProperties():
+        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetTotalBytesSent():
+        """Returns (NewTotalBytesSent)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetTotalBytesReceived():
+        """Returns (NewTotalBytesReceived)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetTotalPacketsSent():
+        """Returns (NewTotalPacketsSent)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetTotalPacketsReceived():
+        """Returns (NewTotalPacketsReceived)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def X_GetICSStatistics():
+        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetDefaultConnectionService():
+        """Returns (NewDefaultConnectionService)"""
+        raise NotImplementedError()
+
+    @staticmethod
+    def SetDefaultConnectionService(NewDefaultConnectionService):
+        """Returns (None)"""
         raise NotImplementedError()
