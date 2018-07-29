@@ -1,3 +1,4 @@
+import binascii
 import logging
 from twisted.internet import defer
 import treq
@@ -47,7 +48,13 @@ class Device(object):
 
 class RootDevice(object):
     def __init__(self, xml_string):
-        root = flatten_keys(etree_to_dict(ElementTree.fromstring(xml_string)), "{%s}" % DEVICE)[ROOT]
+        try:
+            root = flatten_keys(etree_to_dict(ElementTree.fromstring(xml_string)), "{%s}" % DEVICE)[ROOT]
+        except Exception as err:
+            log.exception("failed to decode xml")
+            log.error(xml_string)
+            log.info(binascii.hexlify(xml_string))
+            return
         self.spec_version = root.get(SPEC_VERSION)
         self.url_base = root["URLBase"]
         self.devices = []
