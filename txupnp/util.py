@@ -49,15 +49,6 @@ def get_lan_info():
     return iface_name, gateway_address, lan_addr
 
 
-def find_inner_service_info(service, name):
-    if isinstance(service, dict):
-        return service
-    for s in service:
-        if name == s['serviceType']:
-            return s
-    raise IndexError(name)
-
-
 def _return_types(*types):
     def _return_types_wrapper(fn):
         @functools.wraps(fn)

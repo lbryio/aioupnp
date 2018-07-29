@@ -86,6 +86,8 @@ class _SCPDCommand(object):
         )
         xml_response = yield response.content()
         response = self.extract_response(self.extract_body(xml_response))
+        if not response:
+            log.error("empty response to %s\n%s", self.method, xml_response)
         defer.returnValue(response)
 
     @staticmethod
