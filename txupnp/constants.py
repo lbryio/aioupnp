@@ -25,6 +25,8 @@ service_types = [
 SSDP_IP_ADDRESS = '239.255.255.250'
 SSDP_PORT = 1900
 SSDP_DISCOVER = "ssdp:discover"
+SSDP_ALL = "ssdp:all"
+
 M_SEARCH_TEMPLATE = "\r\n".join([
     "M-SEARCH * HTTP/1.1",
     "HOST: {}:{}",

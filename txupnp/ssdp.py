@@ -3,7 +3,7 @@ import binascii
 from twisted.internet import defer
 from twisted.internet.protocol import DatagramProtocol
 from txupnp.fault import UPnPError
-from txupnp.constants import GATEWAY_SCHEMA, M_SEARCH_TEMPLATE, SSDP_DISCOVER, SSDP_IP_ADDRESS, SSDP_PORT
+from txupnp.constants import GATEWAY_SCHEMA, M_SEARCH_TEMPLATE, SSDP_DISCOVER, SSDP_IP_ADDRESS, SSDP_PORT, SSDP_ALL
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class SSDPProtocol(DatagramProtocol):
         return self._sem.run(self.do_start)
 
     def send_m_search(self):
-        data = M_SEARCH_TEMPLATE.format(self.ssdp_address, self.ssdp_port, GATEWAY_SCHEMA, SSDP_DISCOVER, self.ttl)
+        data = M_SEARCH_TEMPLATE.format(self.ssdp_address, self.ssdp_port, GATEWAY_SCHEMA, SSDP_ALL, self.ttl)
         try:
             log.info("sending m-search (%i bytes) to %s:%i", len(data), self.ssdp_address, self.ssdp_port)
             self.transport.write(data.encode(), (self.ssdp_address, self.ssdp_port))
