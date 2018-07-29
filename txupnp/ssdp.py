@@ -289,6 +289,8 @@ class SSDPFactory(object):
             d.addTimeout(timeout, self._reactor)
             found_cb = gather(d, max_devices)
             self.protocol.discover_callbacks[address] = found_cb, d
+            for st in [SSDP_ALL, SSDP_ROOT_DEVICE, GATEWAY_SCHEMA, GATEWAY_SCHEMA.lower()]:
+                self.protocol.send_m_search(service=st)
         try:
             server_infos = yield d
         except defer.TimeoutError:
