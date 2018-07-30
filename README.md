@@ -4,7 +4,11 @@
 
 ## Installation
 
-`pip install txupnp`
+```
+git clone https://github.com/lbryio/txupnp.git
+cd txupnp
+pip install -e .
+```
 
 ## Usage
 
