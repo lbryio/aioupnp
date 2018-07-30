@@ -14,7 +14,7 @@ pip install -e .
 
 `txupnp-cli --help`
 
-`txupnp-cli --command=debug` to get getway debugging information
+`txupnp-cli --command=debug` to get gateway debugging information
 
 `txupnp-cli --command=list_mappings` to show redirects
 
