@@ -2,6 +2,7 @@ import re
 import functools
 from collections import defaultdict
 import netifaces
+from twisted.internet import defer
 
 DEVICE_ELEMENT_REGEX = re.compile("^\{urn:schemas-upnp-org:device-\d-\d\}device$")
 BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
@@ -74,3 +75,18 @@ def return_types(*types):
 none_or_str = lambda x: None if not x or x == 'None' else str(x)
 
 none = lambda _: None
+
+
+@defer.inlineCallbacks
+def DeferredDict(d, consumeErrors=False):
+    keys = []
+    dl = []
+    response = {}
+    for k, v in d.items():
+        keys.append(k)
+        dl.append(v)
+    results = yield defer.DeferredList(dl, consumeErrors=consumeErrors)
+    for k, (success, result) in zip(keys, results):
+        if success:
+            response[k] = result
+    defer.returnValue(response)

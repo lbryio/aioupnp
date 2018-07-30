@@ -1,4 +1,3 @@
-import json
 import logging
 from collections import OrderedDict
 from twisted.internet import defer
@@ -8,7 +7,8 @@ from treq.client import HTTPClient
 from xml.etree import ElementTree
 from txupnp.util import etree_to_dict, flatten_keys, return_types, _return_types, none_or_str, none
 from txupnp.fault import handle_fault, UPnPError
-from txupnp.constants import POST, ENVELOPE, BODY, XML_VERSION, IP_SCHEMA, SERVICE, SSDP_IP_ADDRESS, DEVICE, ROOT, service_types
+from txupnp.constants import IP_SCHEMA, SERVICE, SSDP_IP_ADDRESS, DEVICE, ROOT, service_types, ENVELOPE, XML_VERSION
+from txupnp.constants import BODY, POST
 
 log = logging.getLogger(__name__)
 
@@ -40,13 +40,13 @@ def get_soap_body(service_name, method, param_names, **kwargs):
 
 class _SCPDCommand(object):
     def __init__(self, gateway_address, service_port, control_url, service_id, method, param_names, returns,
-                 reactor=None):
+                 reactor=None, connection_pool=None, agent=None, http_client=None):
         if not reactor:
             from twisted.internet import reactor
         self._reactor = reactor
-        self._pool = HTTPConnectionPool(reactor)
-        self.agent = Agent(reactor, connectTimeout=1)
-        self._http_client = HTTPClient(self.agent, data_to_body_producer=StringProducer)
+        self._pool = connection_pool or HTTPConnectionPool(reactor)
+        self.agent = agent or Agent(reactor, connectTimeout=1)
+        self._http_client = http_client or HTTPClient(self.agent, data_to_body_producer=StringProducer)
         self.gateway_address = gateway_address
         self.service_port = service_port
         self.control_url = control_url
@@ -128,10 +128,14 @@ class SCPDResponse(object):
 
 
 class SCPDCommandRunner(object):
-    def __init__(self, gateway):
+    def __init__(self, gateway, reactor):
         self._gateway = gateway
         self._unsupported_actions = {}
         self._registered_commands = {}
+        self._reactor = reactor
+        self._agent = Agent(reactor, connectTimeout=1)
+        self._http_client = HTTPClient(self._agent, data_to_body_producer=StringProducer)
+        self._connection_pool = HTTPConnectionPool(reactor)
 
     @defer.inlineCallbacks
     def _discover_commands(self, service):
@@ -175,11 +179,12 @@ class SCPDCommandRunner(object):
             [i['name'] for i in arg_dicts if i['direction'] == 'out']
         )
 
-    def __register_command(self, action_info, service_type):
-        func_info = self._soap_function_info(action_info)
+    def _patch_command(self, action_info, service_type):
+        name, inputs, outputs = self._soap_function_info(action_info)
         command = _SCPDCommand(self._gateway.base_address, self._gateway.port,
                                self._gateway.base_address + self._gateway.get_service(service_type).control_path.encode(),
-                               self._gateway.get_service(service_type).service_id.encode(), *func_info)
+                               self._gateway.get_service(service_type).service_id.encode(), name, inputs, outputs,
+                               self._reactor, self._connection_pool, self._agent, self._http_client)
         current = getattr(self, command.method)
         if hasattr(current, "_return_types"):
             command._process_result = _return_types(*current._return_types)(command._process_result)
@@ -191,7 +196,7 @@ class SCPDCommandRunner(object):
 
     def _register_command(self, action_info, service_type):
         try:
-            return self.__register_command(action_info, service_type)
+            return self._patch_command(action_info, service_type)
         except Exception as err:
             s = self._unsupported_actions.get(service_type, [])
             s.append((action_info, err))
@@ -199,10 +204,10 @@ class SCPDCommandRunner(object):
             log.error("failed to setup command for %s\n%s", service_type, action_info)
 
     def debug_commands(self):
-        return json.dumps({
+        return {
             'available': self._registered_commands,
             'failed': self._unsupported_actions
-        }, indent=2)
+        }
 
     @staticmethod
     @return_types(none)

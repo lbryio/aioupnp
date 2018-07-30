@@ -29,7 +29,7 @@ class SOAPServiceManager(object):
                 locations.append(server_info['location'])
                 gateway = Gateway(**server_info)
                 yield gateway.discover_services()
-                command_runner = SCPDCommandRunner(gateway)
+                command_runner = SCPDCommandRunner(gateway, self._reactor)
                 yield command_runner.discover_commands()
                 self._command_runners[gateway.urn.decode()] = command_runner
             elif 'st' not in server_info:
@@ -51,3 +51,12 @@ class SOAPServiceManager(object):
 
     def get_available_runners(self):
         return self._command_runners.keys()
+
+    def debug(self):
+        results = []
+        for runner in self._command_runners.values():
+            gateway = runner._gateway
+            info = gateway.debug_device()
+            info.update(runner.debug_commands())
+            results.append(info)
+        return results

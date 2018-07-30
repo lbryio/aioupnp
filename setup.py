@@ -1,16 +1,24 @@
+import os
 from setuptools import setup, find_packages
+from txupnp import __version__, __name__, __email__, __author__, __license__
 
 console_scripts = [
-    'test-txupnp = txupnp.tests.test_txupnp:main',
+    'txupnp-cli = txupnp.cli:main',
 ]
 
+package_name = "txupnp"
+base_dir = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(base_dir, 'README.md'), 'rb') as f:
+    long_description = f.read().decode('utf-8')
+
 setup(
-    name="txupnp",
-    version="0.0.1",
-    author="Jack Robison",
-    author_email="jackrobison@lbry.io",
+    name=__name__,
+    version=__version__,
+    author=__author__,
+    author_email=__email__,
     description="UPnP for twisted",
-    license='MIT',
+    long_description=long_description,
+    license=__license__,
     packages=find_packages(),
     entry_points={'console_scripts': console_scripts},
     install_requires=[

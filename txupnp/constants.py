@@ -5,8 +5,8 @@ XML_VERSION = "<?xml version=\"1.0\"?>"
 FAULT = "{http://schemas.xmlsoap.org/soap/envelope/}Fault"
 ENVELOPE = "{http://schemas.xmlsoap.org/soap/envelope/}Envelope"
 BODY = "{http://schemas.xmlsoap.org/soap/envelope/}Body"
-SOAP_ENCODING = "http://schemas.xmlsoap.org/soap/encoding/"
-SOAP_ENVELOPE = "http://schemas.xmlsoap.org/soap/envelope"
+
+
 CONTROL = 'urn:schemas-upnp-org:control-1-0'
 SERVICE = 'urn:schemas-upnp-org:service-1-0'
 DEVICE = 'urn:schemas-upnp-org:device-1-0'
@@ -20,17 +20,17 @@ service_types = [
     WAN_SCHEMA,
     LAYER_SCHEMA,
     IP_SCHEMA,
+    CONTROL,
+    SERVICE,
+    DEVICE,
 ]
 
 SSDP_IP_ADDRESS = '239.255.255.250'
 SSDP_PORT = 1900
+SSDP_HOST = "%s:%i" % (SSDP_IP_ADDRESS, SSDP_PORT)
 SSDP_DISCOVER = "ssdp:discover"
 SSDP_ALL = "ssdp:all"
-
-M_SEARCH_TEMPLATE = "\r\n".join([
-    "M-SEARCH * HTTP/1.1",
-    "HOST: {}:{}",
-    "ST: {}",
-    "MAN: \"{}\"",
-    "MX: {}\r\n\r\n",
-])
+SSDP_BYEBYE = "ssdp:byebye"
+SSDP_UPDATE = "ssdp:update"
+SSDP_ROOT_DEVICE = "upnp:rootdevice"
+line_separator = "\r\n"

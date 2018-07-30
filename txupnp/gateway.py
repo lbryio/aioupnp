@@ -1,4 +1,3 @@
-import json
 import logging
 from twisted.internet import defer
 import treq
@@ -81,7 +80,7 @@ class RootDevice(object):
         if root:
             root_device = Device(self, **(root["device"]))
             self.devices.append(root_device)
-            log.info("finished setting up root gateway. %i devices and %i services", len(self.devices), len(self.services))
+            log.debug("finished setting up root gateway. %i devices and %i services", len(self.devices), len(self.services))
 
 
 class Gateway(object):
@@ -98,11 +97,6 @@ class Gateway(object):
         self._device = None
 
     def debug_device(self):
-        def default_byte(x):
-            if isinstance(x, bytes):
-                return x.decode()
-            return x
-
         devices = []
         for device in self._device.devices:
             info = device.get_info()
@@ -111,17 +105,17 @@ class Gateway(object):
         for service in self._device.services:
             info = service.get_info()
             services.append(info)
-        return json.dumps({
+        return {
             'root_url': self.base_address,
             'gateway_xml_url': self.location,
             'usn': self.usn,
             'devices': devices,
             'services': services
-        }, indent=2, default=default_byte)
+        }
 
     @defer.inlineCallbacks
     def discover_services(self):
-        log.info("querying %s", self.location)
+        log.debug("querying %s", self.location)
         response = yield treq.get(self.location)
         response_xml = yield response.content()
         if not response_xml:
