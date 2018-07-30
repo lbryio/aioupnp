@@ -13,9 +13,13 @@ pip install -e .
 ## Usage
 
 `txupnp-cli --help`
+
 `txupnp-cli --command=debug` to get getway debugging information
+
 `txupnp-cli --command=list_mappings` to show redirects
+
 `txupnp-cli --debug` to turn on very verbose logging
+
 
 ## License
 
