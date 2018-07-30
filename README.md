@@ -8,7 +8,10 @@
 
 ## Usage
 
-To run the test script, `test-txupnp`. This will attempt to find the gateway and will try to set up and tear down an external redirect.
+`txupnp-cli --help`
+`txupnp-cli --command=debug` to get getway debugging information
+`txupnp-cli --command=list_mappings` to show redirects
+`txupnp-cli --debug` to turn on very verbose logging
 
 ## License
 
