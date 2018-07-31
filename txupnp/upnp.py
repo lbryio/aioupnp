@@ -3,15 +3,18 @@ import json
 from twisted.internet import defer
 from txupnp.fault import UPnPError
 from txupnp.soap import SOAPServiceManager
+from txupnp.scpd import UPnPFallback
 from txupnp.util import DeferredDict
 
 log = logging.getLogger(__name__)
 
 
 class UPnP(object):
-    def __init__(self, reactor):
+    def __init__(self, reactor, miniupnpc_fallback=True):
         self._reactor = reactor
+        self._miniupnpc_fallback = miniupnpc_fallback
         self.soap_manager = SOAPServiceManager(reactor)
+        self.miniupnpc_runner = None
 
     @property
     def lan_address(self):
@@ -22,6 +25,8 @@ class UPnP(object):
         try:
             return self.soap_manager.get_runner()
         except UPnPError as err:
+            if self._miniupnpc_fallback and self.miniupnpc_runner:
+                return self.miniupnpc_runner
             log.warning("upnp is not available: %s", err)
 
     def m_search(self, address, timeout=30, max_devices=2):
@@ -44,11 +49,20 @@ class UPnP(object):
             yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
             found = True
         except defer.TimeoutError:
-            log.warning("failed to find upnp gateway")
             found = False
         finally:
             if not keep_listening:
                 self.soap_manager.sspd_factory.disconnect()
+        if not self.commands:
+            log.debug("trying miniupnpc fallback")
+            fallback = UPnPFallback()
+            success = yield fallback.discover()
+            if success:
+                log.info("successfully started miniupnpc fallback")
+                self.miniupnpc_runner = fallback
+                found = True
+        if not found:
+            log.warning("failed to find upnp gateway")
         defer.returnValue(found)
 
     def get_external_ip(self):

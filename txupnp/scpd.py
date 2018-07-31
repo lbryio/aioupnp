@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from twisted.internet import defer
+from twisted.internet import defer, threads
 from twisted.web.client import Agent, HTTPConnectionPool
 import treq
 from treq.client import HTTPClient
@@ -316,5 +316,127 @@ class SCPDCommandRunner(object):
 
     @staticmethod
     def SetDefaultConnectionService(NewDefaultConnectionService):
+        """Returns (None)"""
+        raise NotImplementedError()
+
+
+class UPnPFallback(object):
+    def __init__(self):
+        try:
+            import miniupnpc
+            self._upnp = miniupnpc.UPnP()
+            self.available = True
+        except ImportError:
+            self._upnp = None
+            self.available = False
+
+    @defer.inlineCallbacks
+    def discover(self):
+        if not self.available:
+            raise NotImplementedError()
+        devices = yield threads.deferToThread(self._upnp.discover)
+        if devices:
+            device_url = yield threads.deferToThread(self._upnp.selectigd)
+        else:
+            device_url = None
+
+        defer.returnValue(devices > 0)
+
+    @return_types(none)
+    def AddPortMapping(self, NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
+                       NewEnabled, NewPortMappingDescription, NewLeaseDuration):
+        """Returns None"""
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.addportmapping, NewExternalPort, NewProtocol, NewInternalPort,
+                                     NewInternalClient, NewPortMappingDescription, NewLeaseDuration)
+
+    def GetNATRSIPStatus(self):
+        """Returns (NewRSIPAvailable, NewNATEnabled)"""
+        raise NotImplementedError()
+
+    @return_types(none_or_str, int, str, int, str, bool, str, int)
+    def GetGenericPortMappingEntry(self, NewPortMappingIndex):
+        """
+        Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
+                 NewPortMappingDescription, NewLeaseDuration)
+        """
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.getgenericportmapping, NewPortMappingIndex)
+
+    @return_types(int, str, bool, str, int)
+    def GetSpecificPortMappingEntry(self, NewRemoteHost, NewExternalPort, NewProtocol):
+        """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.getspecificportmapping, NewExternalPort, NewProtocol)
+
+    def SetConnectionType(self, NewConnectionType):
+        """Returns None"""
+        raise NotImplementedError()
+
+    @return_types(str)
+    def GetExternalIPAddress(self):
+        """Returns (NewExternalIPAddress)"""
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.externalipaddress)
+
+    def GetConnectionTypeInfo(self):
+        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
+        raise NotImplementedError()
+
+    @return_types(str, str, int)
+    def GetStatusInfo(self):
+        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.statusinfo)
+
+    def ForceTermination(self):
+        """Returns None"""
+        raise NotImplementedError()
+
+    @return_types(none)
+    def DeletePortMapping(self, NewRemoteHost, NewExternalPort, NewProtocol):
+        """Returns None"""
+        if not self.available:
+            raise NotImplementedError()
+        return threads.deferToThread(self._upnp.deleteportmapping, NewExternalPort, NewProtocol)
+
+    def RequestConnection(self):
+        """Returns None"""
+        raise NotImplementedError()
+
+    def GetCommonLinkProperties(self):
+        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
+        raise NotImplementedError()
+
+    def GetTotalBytesSent(self):
+        """Returns (NewTotalBytesSent)"""
+        raise NotImplementedError()
+
+    def GetTotalBytesReceived(self):
+        """Returns (NewTotalBytesReceived)"""
+        raise NotImplementedError()
+
+    def GetTotalPacketsSent(self):
+        """Returns (NewTotalPacketsSent)"""
+        raise NotImplementedError()
+
+    def GetTotalPacketsReceived(self):
+        """Returns (NewTotalPacketsReceived)"""
+        raise NotImplementedError()
+
+    def X_GetICSStatistics(self):
+        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
+        raise NotImplementedError()
+
+    def GetDefaultConnectionService(self):
+        """Returns (NewDefaultConnectionService)"""
+        raise NotImplementedError()
+
+    def SetDefaultConnectionService(self, NewDefaultConnectionService):
         """Returns (None)"""
         raise NotImplementedError()
