@@ -102,12 +102,12 @@ class Device(CaseInsensitive):
                 if isinstance(kw, dict):
                     d = Device(devices, services, **kw)
                     devices.append(d)
-                else:
-                    if len(kw) == 1 and isinstance(kw[0], dict):
-                        d = Device(devices, services, **kw[0])
+                elif isinstance(kw, list):
+                    for _inner_kw in kw:
+                        d = Device(devices, services, **_inner_kw)
                         devices.append(d)
-                    else:
-                        log.warning("failed to parse device:\n%s", kw)
+                else:
+                    log.warning("failed to parse device:\n%s", kw)
 
 
 class Gateway(object):
