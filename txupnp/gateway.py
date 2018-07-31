@@ -1,90 +1,120 @@
 import logging
 from twisted.internet import defer
 import treq
+import re
 from xml.etree import ElementTree
-from txupnp.util import etree_to_dict, flatten_keys
+from txupnp.util import etree_to_dict, flatten_keys, get_dict_val_case_insensitive
 from txupnp.util import BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from txupnp.constants import DEVICE, ROOT
 from txupnp.constants import SPEC_VERSION
 
 log = logging.getLogger(__name__)
 
+service_type_pattern = re.compile(
+    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\})"
+)
 
-class Service(object):
-    def __init__(self, serviceType, serviceId, SCPDURL, eventSubURL, controlURL):
-        self.service_type = serviceType
-        self.service_id = serviceId
-        self.control_path = controlURL
-        self.subscribe_path = eventSubURL
-        self.scpd_path = SCPDURL
+xml_root_sanity_pattern = re.compile(
+    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))"
+)
 
-    def get_info(self):
+
+class CaseInsensitive(object):
+    def __init__(self, **kwargs):
+        not_evaluated = {}
+        for k, v in kwargs.items():
+            if k.startswith("_"):
+                not_evaluated[k] = v
+                continue
+            try:
+                getattr(self, k)
+                setattr(self, k, v)
+            except AttributeError as err:
+                not_evaluated[k] = v
+        if not_evaluated:
+            log.error("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
+
+    def _get_attr_name(self, case_insensitive):
+        for k, v in self.__dict__.items():
+            if k.lower() == case_insensitive.lower():
+                return k
+
+    def __getattr__(self, item):
+        if item in self.__dict__:
+            return self.__dict__[item]
+        for k, v in self.__class__.__dict__.items():
+            if k.lower() == item.lower():
+                if k not in self.__dict__:
+                    self.__dict__[k] = v
+                return v
+        raise AttributeError(item)
+
+    def __setattr__(self, item, value):
+        if item in self.__dict__:
+            self.__dict__[item] = value
+            return
+        to_update = None
+        for k, v in self.__dict__.items():
+            if k.lower() == item.lower():
+                to_update = k
+                break
+        self.__dict__[to_update or item] = value
+
+    def as_dict(self):
         return {
-            "service_type": self.service_type,
-            "service_id": self.service_id,
-            "control_path": self.control_path,
-            "subscribe_path": self.subscribe_path,
-            "scpd_path": self.scpd_path
+            k: v for k, v in self.__dict__.items() if not k.startswith("_") and not callable(v)
         }
 
 
-class Device(object):
-    def __init__(self, _root_device, deviceType=None, friendlyName=None, manufacturer=None, manufacturerURL=None,
-                 modelDescription=None, modelName=None, modelNumber=None, modelURL=None, serialNumber=None,
-                 UDN=None, serviceList=None, deviceList=None, **kwargs):
-        serviceList = serviceList or {}
-        deviceList = deviceList or {}
-        self._root_device = _root_device
-        self.device_type = deviceType
-        self.friendly_name = friendlyName
-        self.manufacturer = manufacturer
-        self.manufacturer_url = manufacturerURL
-        self.model_description = modelDescription
-        self.model_name = modelName
-        self.model_number = modelNumber
-        self.model_url = modelURL
-        self.serial_number = serialNumber
-        self.udn = UDN
-        services = serviceList["service"]
-        if isinstance(services, dict):
-            services = [services]
-        services = [Service(**service) for service in services]
-        self._root_device.services.extend(services)
-        devices = [Device(self._root_device, **deviceList[k]) for k in deviceList]
-        self._root_device.devices.extend(devices)
-
-    def get_info(self):
-        return {
-            'device_type': self.device_type,
-            'friendly_name': self.friendly_name,
-            'manufacturers': self.manufacturer,
-            'model_name': self.model_name,
-            'model_number': self.model_number,
-            'serial_number': self.serial_number,
-            'udn': self.udn
-        }
+class Service(CaseInsensitive):
+    serviceType = None
+    serviceId = None
+    controlURL = None
+    eventSubURL = None
+    SCPDURL = None
 
 
-class RootDevice(object):
-    def __init__(self, xml_string):
-        try:
-            root = flatten_keys(etree_to_dict(ElementTree.fromstring(xml_string)), "{%s}" % DEVICE)[ROOT]
-        except Exception as err:
-            if xml_string:
-                log.exception("failed to decode xml: %s\n%s", err, xml_string)
-            root = {}
-        self.spec_version = root.get(SPEC_VERSION)
-        self.url_base = root.get("URLBase")
-        self.devices = []
-        self.services = []
-        if root:
-            root_device = Device(self, **(root["device"]))
-            self.devices.append(root_device)
-            log.debug("finished setting up root gateway. %i devices and %i services", len(self.devices), len(self.services))
+class Device(CaseInsensitive):
+    serviceList = None
+    deviceList = None
+    deviceType = None
+    friendlyName = None
+    manufacturer = None
+    manufacturerURL = None
+    modelDescription = None
+    modelName = None
+    modelNumber = None
+    modelURL = None
+    serialNumber = None
+    udn = None
+    presentationURL = None
+    iconList = None
+
+    def __init__(self, devices, services, **kwargs):
+        super(Device, self).__init__(**kwargs)
+        if self.serviceList and "service" in self.serviceList:
+            new_services = self.serviceList["service"]
+            if isinstance(new_services, dict):
+                new_services = [new_services]
+            services.extend([Service(**service) for service in new_services])
+        if self.deviceList:
+            devices.extend([Device(devices, services, **kw) for kw in self.deviceList.values()])
 
 
 class Gateway(object):
-    def __init__(self, usn, server, location, st, cache_control="", date="", ext=""):
+    def __init__(self, **kwargs):
+        flattened = {
+            k.lower(): v for k, v in kwargs.items()
+        }
+        usn = flattened["usn"]
+        server = flattened["server"]
+        location = flattened["location"]
+        st = flattened["st"]
+
+        cache_control = flattened.get("cache_control") or flattened.get("cache-control") or ""
+        date = flattened.get("date", "")
+        ext = flattened.get("ext", "")
+
         self.usn = usn.encode()
         self.ext = ext.encode()
         self.server = server.encode()
@@ -92,54 +122,79 @@ class Gateway(object):
         self.cache_control = cache_control.encode()
         self.date = date.encode()
         self.urn = st.encode()
+
         self.base_address = BASE_ADDRESS_REGEX.findall(self.location)[0]
         self.port = int(BASE_PORT_REGEX.findall(self.location)[0])
-        self._device = None
+        self.xml_response = None
+        self.spec_version = None
+        self.url_base = None
 
-    def debug_device(self):
-        devices = []
-        for device in self._device.devices:
-            info = device.get_info()
-            devices.append(info)
-        services = []
-        for service in self._device.services:
-            info = service.get_info()
-            services.append(info)
-        return {
-            'root_url': self.base_address,
-            'gateway_xml_url': self.location,
+        self._device = None
+        self._devices = []
+        self._services = []
+
+    def debug_device(self, include_xml=False, include_services=True):
+        r = {
+            'server': self.server,
+            'urlBase': self.url_base,
+            'location': self.location,
+            "specVersion": self.spec_version,
             'usn': self.usn,
-            'devices': devices,
-            'services': services
+            'urn': self.urn,
         }
+        if include_xml:
+            r['xml_response'] = self.xml_response
+        if include_services:
+            r['services'] = [service.as_dict() for service in self._services]
+
+        return r
 
     @defer.inlineCallbacks
     def discover_services(self):
         log.debug("querying %s", self.location)
         response = yield treq.get(self.location)
-        response_xml = yield response.content()
-        if not response_xml:
+        self.xml_response = yield response.content()
+        if not self.xml_response:
             log.error("service sent an empty reply\n%s", self.debug_device())
-        try:
-            self._device = RootDevice(response_xml)
-        except Exception as err:
-            log.error("error parsing gateway: %s\n%s\n\n%s", err, self.debug_device(), response_xml)
-            self._device = RootDevice("")
+        xml_dict = etree_to_dict(ElementTree.fromstring(self.xml_response))
+        schema_key = DEVICE
+        root = ROOT
+        if len(xml_dict) > 1:
+            log.warning(xml_dict.keys())
+        for k in xml_dict.keys():
+            m = xml_root_sanity_pattern.findall(k)
+            if len(m) == 3 and m[1][0] and m[2][5]:
+                schema_key = m[1][0]
+                root = m[2][5]
+                break
+
+        flattened_xml = flatten_keys(xml_dict, "{%s}" % schema_key)[root]
+        self.spec_version = get_dict_val_case_insensitive(flattened_xml, SPEC_VERSION)
+        self.url_base = get_dict_val_case_insensitive(flattened_xml, "urlbase")
+
+        if flattened_xml:
+            self._device = Device(
+                self._devices, self._services, **get_dict_val_case_insensitive(flattened_xml, "device")
+            )
+            log.debug("finished setting up root gateway. %i devices and %i services", len(self.devices),
+                          len(self.services))
+        else:
+            self._device = Device(self._devices, self._services)
         log.debug("finished setting up gateway:\n%s", self.debug_device())
 
     @property
     def services(self):
         if not self._device:
             return {}
-        return {service.service_type: service for service in self._device.services}
+        return {service.serviceType: service for service in self._services}
 
     @property
     def devices(self):
         if not self._device:
             return {}
-        return {device.udn: device for device in self._device.devices}
+        return {device.udn: device for device in self._devices}
 
     def get_service(self, service_type):
-        for service in self._device.services:
-            if service.service_type.lower() == service_type.lower():
+        for service in self._services:
+            if service.serviceType.lower() == service_type.lower():
                 return service

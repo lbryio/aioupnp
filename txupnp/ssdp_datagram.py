@@ -6,6 +6,22 @@ from txupnp.constants import line_separator
 log = logging.getLogger(__name__)
 
 
+_ssdp_datagram_patterns = {
+    'host': (re.compile("^(?i)(host):(.*)$"), str),
+    'st': (re.compile("^(?i)(st):(.*)$"), str),
+    'man': (re.compile("^(?i)(man):|(\"(.*)\")$"), str),
+    'mx': (re.compile("^(?i)(mx):(.*)$"), int),
+    'nt': (re.compile("^(?i)(nt):(.*)$"), str),
+    'nts': (re.compile("^(?i)(nts):(.*)$"), str),
+    'usn': (re.compile("^(?i)(usn):(.*)$"), str),
+    'location': (re.compile("^(?i)(location):(.*)$"), str),
+    'cache_control': (re.compile("^(?i)(cache-control):(.*)$"), str),
+    'server': (re.compile("^(?i)(server):(.*)$"), str),
+}
+
+_vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
+
+
 class SSDPDatagram(object):
     _M_SEARCH = "M-SEARCH"
     _NOTIFY = "NOTIFY"
@@ -23,20 +39,9 @@ class SSDPDatagram(object):
         _OK: "m-search response"
     }
 
-    _vendor_field_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
+    _vendor_field_pattern = _vendor_pattern
 
-    _patterns = {
-        'host': (re.compile("^(?i)(host):(.*)$"), str),
-        'st': (re.compile("^(?i)(st):(.*)$"), str),
-        'man': (re.compile("^(?i)(man):|(\"(.*)\")$"), str),
-        'mx': (re.compile("^(?i)(mx):(.*)$"), int),
-        'nt': (re.compile("^(?i)(nt):(.*)$"), str),
-        'nts': (re.compile("^(?i)(nts):(.*)$"), str),
-        'usn': (re.compile("^(?i)(usn):(.*)$"), str),
-        'location': (re.compile("^(?i)(location):(.*)$"), str),
-        'cache_control': (re.compile("^(?i)(cache-control):(.*)$"), str),
-        'server': (re.compile("^(?i)(server):(.*)$"), str),
-    }
+    _patterns = _ssdp_datagram_patterns
 
     _required_fields = {
         _M_SEARCH: [

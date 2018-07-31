@@ -5,7 +5,7 @@ from txupnp.ssdp import SSDPFactory
 from txupnp.scpd import SCPDCommandRunner
 from txupnp.gateway import Gateway
 from txupnp.fault import UPnPError
-from txupnp.constants import GATEWAY_SCHEMA
+from txupnp.constants import UPNP_ORG_IGD
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class SOAPServiceManager(object):
         self.iface_name, self.router_ip, self.lan_address = get_lan_info()
         self.sspd_factory = SSDPFactory(self._reactor, self.lan_address, self.router_ip)
         self._command_runners = {}
-        self._selected_runner = GATEWAY_SCHEMA
+        self._selected_runner = UPNP_ORG_IGD
 
     @defer.inlineCallbacks
     def discover_services(self, address=None, timeout=30, max_devices=1):
@@ -57,6 +57,21 @@ class SOAPServiceManager(object):
         for runner in self._command_runners.values():
             gateway = runner._gateway
             info = gateway.debug_device()
-            info.update(runner.debug_commands())
+            commands = runner.debug_commands()
+            service_result = []
+            for service in info['services']:
+                service_commands = []
+                unavailable = []
+                for command, service_type in commands['available'].items():
+                    if service['serviceType'] == service_type:
+                        service_commands.append(command)
+                for command, service_type in commands['failed'].items():
+                    if service['serviceType'] == service_type:
+                        unavailable.append(command)
+                services_with_commands = dict(service)
+                services_with_commands['available_commands'] = service_commands
+                services_with_commands['unavailable_commands'] = unavailable
+                service_result.append(services_with_commands)
+            info['services'] = service_result
             results.append(info)
         return results

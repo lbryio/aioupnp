@@ -2,7 +2,7 @@ import logging
 import binascii
 from twisted.internet import defer
 from twisted.internet.protocol import DatagramProtocol
-from txupnp.constants import GATEWAY_SCHEMA, SSDP_DISCOVER, SSDP_IP_ADDRESS, SSDP_PORT, service_types
+from txupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER, SSDP_IP_ADDRESS, SSDP_PORT, service_types
 from txupnp.constants import SSDP_HOST
 from txupnp.fault import UPnPError
 from txupnp.ssdp_datagram import SSDPDatagram
@@ -25,7 +25,7 @@ class SSDPProtocol(DatagramProtocol):
         self.max_devices = max_devices
         self.devices = []
 
-    def _send_m_search(self, service=GATEWAY_SCHEMA):
+    def _send_m_search(self, service=UPNP_ORG_IGD):
         packet = SSDPDatagram(SSDPDatagram._M_SEARCH, host=SSDP_HOST, st=service, man=SSDP_DISCOVER, mx=1)
         log.debug("sending packet to %s:\n%s", SSDP_HOST, packet.encode())
         try:

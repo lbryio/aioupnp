@@ -38,9 +38,13 @@ def main():
     if command not in ['debug_device', 'list_mappings']:
         return sys.exit(0)
 
+    def show(err):
+        print("error: {}".format(err))
+
     u = UPnP(reactor)
     d = u.discover()
     d.addCallback(run_command, u, command)
+    d.addErrback(show)
     d.addBoth(lambda _: reactor.callLater(0, reactor.stop))
     reactor.run()
 

@@ -4,7 +4,6 @@ from collections import defaultdict
 import netifaces
 from twisted.internet import defer
 
-DEVICE_ELEMENT_REGEX = re.compile("^\{urn:schemas-upnp-org:device-\d-\d\}device$")
 BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
 BASE_PORT_REGEX = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
 
@@ -42,6 +41,15 @@ def flatten_keys(d, strip):
         else:
             t[k] = flatten_keys(v, strip)
     return t
+
+
+def get_dict_val_case_insensitive(d, k):
+    match = list(filter(lambda x: x.lower() == k.lower(), d.keys()))
+    if not match:
+        return
+    if len(match) > 1:
+        raise KeyError("overlapping keys")
+    return d[match[0]]
 
 
 def get_lan_info():

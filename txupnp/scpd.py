@@ -139,14 +139,14 @@ class SCPDCommandRunner(object):
 
     @defer.inlineCallbacks
     def _discover_commands(self, service):
-        scpd_url = self._gateway.base_address + service.scpd_path.encode()
+        scpd_url = self._gateway.base_address + service.SCPDURL.encode()
         response = yield treq.get(scpd_url)
         content = yield response.content()
         try:
             scpd_response = SCPDResponse(scpd_url,
                                          response.headers, content)
             for action_dict in scpd_response.get_action_list():
-                self._register_command(action_dict, service.service_type)
+                self._register_command(action_dict, service.serviceType)
         except Exception as err:
             log.exception("failed to parse scpd response (%s) from %s\nheaders:\n%s\ncontent\n%s",
                           err, scpd_url, response.headers, content)
@@ -182,8 +182,8 @@ class SCPDCommandRunner(object):
     def _patch_command(self, action_info, service_type):
         name, inputs, outputs = self._soap_function_info(action_info)
         command = _SCPDCommand(self._gateway.base_address, self._gateway.port,
-                               self._gateway.base_address + self._gateway.get_service(service_type).control_path.encode(),
-                               self._gateway.get_service(service_type).service_id.encode(), name, inputs, outputs,
+                               self._gateway.base_address + self._gateway.get_service(service_type).controlURL.encode(),
+                               self._gateway.get_service(service_type).serviceId.encode(), name, inputs, outputs,
                                self._reactor, self._connection_pool, self._agent, self._http_client)
         current = getattr(self, command.method)
         if hasattr(current, "_return_types"):
@@ -336,9 +336,9 @@ class UPnPFallback(object):
             raise NotImplementedError()
         devices = yield threads.deferToThread(self._upnp.discover)
         if devices:
-            device_url = yield threads.deferToThread(self._upnp.selectigd)
+            self.device_url = yield threads.deferToThread(self._upnp.selectigd)
         else:
-            device_url = None
+            self.device_url = None
 
         defer.returnValue(devices > 0)
 

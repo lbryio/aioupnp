@@ -1,5 +1,6 @@
 import logging
 import json
+import treq
 from twisted.internet import defer
 from txupnp.fault import UPnPError
 from txupnp.soap import SOAPServiceManager
@@ -15,6 +16,7 @@ class UPnP(object):
         self._miniupnpc_fallback = miniupnpc_fallback
         self.soap_manager = SOAPServiceManager(reactor)
         self.miniupnpc_runner = None
+        self._miniupnpc_igd_url = None
 
     @property
     def lan_address(self):
@@ -57,6 +59,7 @@ class UPnP(object):
             log.debug("trying miniupnpc fallback")
             fallback = UPnPFallback()
             success = yield fallback.discover()
+            self._miniupnpc_igd_url = fallback.device_url
             if success:
                 log.info("successfully started miniupnpc fallback")
                 self.miniupnpc_runner = fallback
@@ -164,4 +167,9 @@ class UPnP(object):
             if isinstance(x, bytes):
                 return x.decode()
             return x
-        return json.dumps(self.soap_manager.debug(), indent=2, default=default_byte)
+        return json.dumps({
+            'txupnp': self.soap_manager.debug(),
+            'miniupnpc_igd_url': self._miniupnpc_igd_url
+            },
+            indent=2, default=default_byte
+        )
