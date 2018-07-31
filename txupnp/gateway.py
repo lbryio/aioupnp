@@ -98,7 +98,8 @@ class Device(CaseInsensitive):
                 new_services = [new_services]
             services.extend([Service(**service) for service in new_services])
         if self.deviceList:
-            devices.extend([Device(devices, services, **kw) for kw in self.deviceList.values()])
+            devices.extend([Device(devices, services, **(kw if isinstance(kw, dict) else kw[0]))
+                            for kw in self.deviceList.values()])
 
 
 class Gateway(object):
