@@ -14,9 +14,7 @@ def run_command(found, u, command):
         reactor.callLater(0, reactor.stop)
         return
     if command == "debug_device":
-        external_ip = yield u.get_external_ip()
         print(u.get_debug_info())
-        print("external ip: ", external_ip)
     if command == "list_mappings":
         redirects = yield u.get_redirects()
         print("found {} redirects".format(len(redirects)))
