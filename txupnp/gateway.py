@@ -141,6 +141,7 @@ class Gateway(object):
             "specVersion": self.spec_version,
             'usn': self.usn,
             'urn': self.urn,
+            'devices': [device.as_dict() for device in self._devices]
         }
         if include_xml:
             r['xml_response'] = self.xml_response
