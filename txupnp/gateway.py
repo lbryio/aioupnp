@@ -98,8 +98,16 @@ class Device(CaseInsensitive):
                 new_services = [new_services]
             services.extend([Service(**service) for service in new_services])
         if self.deviceList:
-            devices.extend([Device(devices, services, **(kw if isinstance(kw, dict) else kw[0]))
-                            for kw in self.deviceList.values()])
+            for kw in self.deviceList.values():
+                if isinstance(kw, dict):
+                    d = Device(devices, services, **kw)
+                    devices.append(d)
+                else:
+                    if len(kw) == 1 and isinstance(kw[0], dict):
+                        d = Device(devices, services, **kw[0])
+                        devices.append(d)
+                    else:
+                        log.warning("failed to parse device:\n%s", kw)
 
 
 class Gateway(object):

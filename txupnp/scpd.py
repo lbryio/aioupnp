@@ -319,6 +319,26 @@ class SCPDCommandRunner(object):
         """Returns (None)"""
         raise NotImplementedError()
 
+    @staticmethod
+    @return_types(none)
+    def SetEnabledForInternet(NewEnabledForInternet):
+        raise NotImplementedError()
+
+    @staticmethod
+    @return_types(bool)
+    def GetEnabledForInternet():
+        raise NotImplementedError()
+
+    @staticmethod
+    def GetMaximumActiveConnections(NewActiveConnectionIndex):
+        raise NotImplementedError()
+
+    @staticmethod
+    @return_types(str, str)
+    def GetActiveConnections():
+        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
+        raise NotImplementedError()
+
 
 class UPnPFallback(object):
     def __init__(self):
