@@ -12,13 +12,16 @@ pip install -e .
 
 ## Usage
 
-`txupnp-cli --help`
+```
+usage: txupnp-cli [-h] [--debug_logging] command
 
-`txupnp-cli --command=debug` to get gateway debugging information
+positional arguments:
+  command          debug_gateway | list_mappings
 
-`txupnp-cli --command=list_mappings` to show redirects
-
-`txupnp-cli --debug` to turn on very verbose logging
+optional arguments:
+  -h, --help       show this help message and exit
+  --debug_logging
+```
 
 
 ## License
@@ -27,4 +30,4 @@ This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
 
 ## Contact
 
-The primary contact for this project is @jackrobison(jackrobison@lbry.io)
+The primary contact for this project is @jackrobison
