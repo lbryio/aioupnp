@@ -201,7 +201,7 @@ class SCPDCommandRunner(object):
             s = self._unsupported_actions.get(service_type, [])
             s.append((action_info, err))
             self._unsupported_actions[service_type] = s
-            log.error("failed to setup command for %s\n%s", service_type, action_info)
+            log.error("available command for %s does not have a wrapper implemented: %s", service_type, action_info)
 
     def debug_commands(self):
         return {
