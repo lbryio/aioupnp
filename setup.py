@@ -22,10 +22,8 @@ setup(
     packages=find_packages(),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
-        'Twisted',
+        'twisted[tls]',
         'treq',
         'netifaces',
-        'pycryptodome',
-        'service-identity'
     ],
 )
