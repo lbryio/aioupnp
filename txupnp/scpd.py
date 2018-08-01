@@ -82,11 +82,22 @@ class _SCPDCommand(object):
             ('Content-Type', 'text/xml'),
             ('Content-Length', len(soap_body))
         ))
-        response = yield self._http_client.request(
-            POST, url=self.control_url, data=soap_body, headers=headers
-        )
+        log.debug("sending POST to %s\nheaders: %s\nbody:%s\n", self.control_url, headers, soap_body)
+        try:
+            response = yield self._http_client.request(
+                POST, url=self.control_url, data=soap_body, headers=headers
+            )
+        except Exception as err:
+            log.error("error (%s) sending POST to %s\nheaders: %s\nbody:%s\n", err, self.control_url, headers,
+                      soap_body)
+            raise UPnPError().with_traceback(err.__traceback__)
+
         xml_response = yield response.content()
-        response = self.extract_response(self.extract_body(xml_response))
+        try:
+            response = self.extract_response(self.extract_body(xml_response))
+        except Exception as err:
+            log.error("error extracting response (%s) to %s:\n%s", err, self.method, xml_response)
+            raise err
         if not response:
             log.debug("empty response to %s\n%s", self.method, xml_response)
         defer.returnValue(response)
@@ -104,7 +115,11 @@ class _SCPDCommand(object):
         if set(kwargs.keys()) != set(self.param_names):
             raise Exception("argument mismatch")
         response = yield self.send_upnp_soap(**kwargs)
-        result = self._process_result(response)
+        try:
+            result = self._process_result(response)
+        except Exception as err:
+            log.error("error formatting response (%s):\n%s", err, response)
+            raise err
         defer.returnValue(result)
 
 
@@ -164,7 +179,6 @@ class SCPDCommandRunner(object):
     @staticmethod
     def _soap_function_info(action_dict):
         if not action_dict.get('argumentList'):
-            log.debug("don't know how to handle argument list: %s", action_dict)
             return (
                 action_dict['name'],
                 [],
