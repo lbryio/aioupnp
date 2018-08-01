@@ -32,7 +32,7 @@ class CaseInsensitive(object):
             except AttributeError as err:
                 not_evaluated[k] = v
         if not_evaluated:
-            log.error("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
+            log.warning("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
 
     def _get_attr_name(self, case_insensitive):
         for k, v in self.__dict__.items():
@@ -87,6 +87,7 @@ class Device(CaseInsensitive):
     modelURL = None
     serialNumber = None
     udn = None
+    upc = None
     presentationURL = None
     iconList = None
 
@@ -165,7 +166,7 @@ class Gateway(object):
         response = yield treq.get(self.location)
         self.xml_response = yield response.content()
         if not self.xml_response:
-            log.error("service sent an empty reply\n%s", self.debug_device())
+            log.warning("service sent an empty reply\n%s", self.debug_device())
         xml_dict = etree_to_dict(ElementTree.fromstring(self.xml_response))
         schema_key = DEVICE
         root = ROOT

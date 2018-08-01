@@ -55,10 +55,10 @@ class _SCPDCommand(object):
         self.param_names = param_names
         self.returns = returns
 
-    def extract_body(self, xml_response, service_key=IP_SCHEMA):
+    def extract_body(self, xml_response):
         content_dict = etree_to_dict(ElementTree.fromstring(xml_response))
         envelope = content_dict[ENVELOPE]
-        return flatten_keys(envelope[BODY], "{%s}" % service_key)
+        return flatten_keys(envelope[BODY], "{%s}" % self.service_id)
 
     def extract_response(self, body):
         body = handle_fault(body)  # raises UPnPError if there is a fault

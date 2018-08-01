@@ -15,7 +15,10 @@ def run_command(found, u, command):
         return
     if command == "debug_device":
         print(u.get_debug_info())
-    if command == "list_mappings":
+    elif command == "get_external_ip":
+        ip = yield u.get_external_ip()
+        print(ip)
+    elif command == "list_mappings":
         redirects = yield u.get_redirects()
         print("found {} redirects".format(len(redirects)))
         for redirect in redirects:
@@ -33,7 +36,7 @@ def main():
         observer.start()
         log.setLevel(logging.DEBUG)
     command = args.command
-    if command not in ['debug_device', 'list_mappings']:
+    if command not in ['debug_device', 'list_mappings', 'get_external_ip']:
         return sys.exit(0)
 
     def show(err):
