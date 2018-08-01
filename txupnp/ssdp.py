@@ -90,13 +90,14 @@ class SSDPProtocol(DatagramProtocol):
             return
         if packet._packet_type == packet._OK:
             log.debug("%s:%i replied to our m-search with new xml url: %s", address[0], address[1], packet.location)
-        else:
-            log.debug("%s:%i notified us of a service type: %s", address[0], address[1], packet.st)
-        if packet.st not in map(lambda p: p['st'], self.devices):
-            self.devices.append(packet.as_dict())
-            log.debug("%i device%s so far", len(self.devices), "" if len(self.devices) < 2 else "s")
-            if address[0] in self.discover_callbacks:
-                self._sem.run(self.discover_callbacks[address[0]][0], packet)
+            if packet.st not in map(lambda p: p['st'], self.devices):
+                self.devices.append(packet.as_dict())
+                log.debug("%i device%s so far", len(self.devices), "" if len(self.devices) < 2 else "s")
+                if address[0] in self.discover_callbacks:
+                    self._sem.run(self.discover_callbacks[address[0]][0], packet)
+        elif packet._packet_type == packet._NOTIFY:
+            log.debug("%s:%i sent us a notification (type: %s), url: %s", address[0], address[1], packet.nts,
+                      packet.location)
 
 
 class SSDPFactory(object):

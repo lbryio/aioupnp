@@ -73,7 +73,7 @@ class UPnP(object):
 
     def add_port_mapping(self, external_port, protocol, internal_port, lan_address, description, lease_duration):
         return self.commands.AddPortMapping(
-            NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol,
+            NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
             NewEnabled=1, NewPortMappingDescription=description,
             NewLeaseDuration=lease_duration

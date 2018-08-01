@@ -1,4 +1,3 @@
-import sys
 import argparse
 import logging
 from twisted.internet import reactor, defer
@@ -20,11 +19,13 @@ def get_external_ip(u, *_):
 
 @defer.inlineCallbacks
 def list_mappings(u, *_):
-    print(u.get_debug_info(include_gateway_xml=True))
     redirects = yield u.get_redirects()
-    print("found {} redirects".format(len(redirects)))
-    for redirect in redirects:
-        print("\t", redirect)
+    ext_ip = yield u.get_external_ip()
+    for (ext_host, ext_port, proto, int_port, int_host, enabled, desc, lease) in redirects:
+        print("{}:{}/{} --> {}:{} ({}) (expires: {}) - {} ".format(
+            ext_host or ext_ip, ext_port, proto, int_host, int_port, "enabled" if enabled else "disabled",
+            "never" if not lease else lease, desc)
+        )
 
 
 cli_commands = {

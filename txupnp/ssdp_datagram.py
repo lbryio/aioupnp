@@ -50,6 +50,14 @@ class SSDPDatagram(object):
             'man',
             'mx',
         ],
+        _NOTIFY: [
+            'host',
+            'location',
+            'nt',
+            'nts',
+            'server',
+            'usn',
+        ],
         _OK: [
             'cache_control',
             # 'date',
