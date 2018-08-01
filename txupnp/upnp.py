@@ -162,13 +162,13 @@ class UPnP(object):
         )
         defer.returnValue(port)
 
-    def get_debug_info(self):
+    def get_debug_info(self, include_gateway_xml=False):
         def default_byte(x):
             if isinstance(x, bytes):
                 return x.decode()
             return x
         return json.dumps({
-            'txupnp': self.soap_manager.debug(),
+            'txupnp': self.soap_manager.debug(include_gateway_xml=include_gateway_xml),
             'miniupnpc_igd_url': self._miniupnpc_igd_url
             },
             indent=2, default=default_byte

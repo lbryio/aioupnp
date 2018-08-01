@@ -52,11 +52,11 @@ class SOAPServiceManager(object):
     def get_available_runners(self):
         return self._command_runners.keys()
 
-    def debug(self):
+    def debug(self, include_gateway_xml=False):
         results = []
         for runner in self._command_runners.values():
             gateway = runner._gateway
-            info = gateway.debug_device()
+            info = gateway.debug_device(include_xml=include_gateway_xml)
             commands = runner.debug_commands()
             service_result = []
             for service in info['services']:
