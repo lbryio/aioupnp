@@ -36,7 +36,7 @@ def xml_arg(name, arg):
 
 def get_soap_body(service_name, method, param_names, **kwargs):
     args = "".join(xml_arg(n, kwargs.get(n)) for n in param_names)
-    return '\n%s\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:%s xmlns:u="%s">%s</u:%s></s:Body></s:Envelope>' % (XML_VERSION, method, service_name, args, method)
+    return '\n%s\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:%s xmlns:u="%s">%s</u:%s></s:Body></s:Envelope></xml>' % (XML_VERSION, method, service_name, args, method)
 
 
 class _SCPDCommand(object):
