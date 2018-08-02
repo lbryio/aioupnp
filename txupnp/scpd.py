@@ -144,9 +144,9 @@ class SCPDCommandRunner(object):
         self._unsupported_actions = {}
         self._registered_commands = {}
         self._reactor = reactor
-        self._agent = Agent(reactor, connectTimeout=1)
-        self._http_client = HTTPClient(self._agent, data_to_body_producer=StringProducer)
         self._connection_pool = DirtyPool(reactor)
+        self._agent = Agent(reactor, connectTimeout=1, pool=self._connection_pool)
+        self._http_client = HTTPClient(self._agent, data_to_body_producer=StringProducer)
 
     @defer.inlineCallbacks
     def _discover_commands(self, service):
