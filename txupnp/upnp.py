@@ -11,12 +11,12 @@ log = logging.getLogger(__name__)
 
 
 class UPnP(object):
-    def __init__(self, reactor, miniupnpc_fallback=True):
+    def __init__(self, reactor, try_miniupnpc_fallback=True):
         self._reactor = reactor
-        self._miniupnpc_fallback = miniupnpc_fallback
+        self.try_miniupnpc_fallback = try_miniupnpc_fallback
         self.soap_manager = SOAPServiceManager(reactor)
         self.miniupnpc_runner = None
-        self._miniupnpc_igd_url = None
+        self.miniupnpc_igd_url = None
 
     @property
     def lan_address(self):
@@ -27,7 +27,7 @@ class UPnP(object):
         try:
             return self.soap_manager.get_runner()
         except UPnPError as err:
-            if self._miniupnpc_fallback and self.miniupnpc_runner:
+            if self.try_miniupnpc_fallback and self.miniupnpc_runner:
                 return self.miniupnpc_runner
             log.warning("upnp is not available: %s", err)
 
@@ -55,17 +55,24 @@ class UPnP(object):
         finally:
             if not keep_listening:
                 self.soap_manager.sspd_factory.disconnect()
-        if not self.commands:
+        if not found and self.try_miniupnpc_fallback:
+            found = yield self.start_miniupnpc_fallback()
+        defer.returnValue(found)
+
+    @defer.inlineCallbacks
+    def start_miniupnpc_fallback(self):
+        found = False
+        if not self.commands and not self.miniupnpc_runner:
             log.debug("trying miniupnpc fallback")
             fallback = UPnPFallback()
             success = yield fallback.discover()
-            self._miniupnpc_igd_url = fallback.device_url
+            self.miniupnpc_igd_url = fallback.device_url
             if success:
                 log.info("successfully started miniupnpc fallback")
                 self.miniupnpc_runner = fallback
                 found = True
         if not found:
-            log.warning("failed to find upnp gateway")
+            log.warning("failed to find upnp gateway using miniupnpc fallback")
         defer.returnValue(found)
 
     def get_external_ip(self):
@@ -169,7 +176,7 @@ class UPnP(object):
             return x
         return json.dumps({
             'txupnp': self.soap_manager.debug(include_gateway_xml=include_gateway_xml),
-            'miniupnpc_igd_url': self._miniupnpc_igd_url
+            'miniupnpc_igd_url': self.miniupnpc_igd_url
             },
             indent=2, default=default_byte
         )
