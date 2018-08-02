@@ -113,14 +113,14 @@ class UPnP(object):
                 defer.returnValue(None)
             raise err
 
-    def delete_port_mapping(self, external_port, protocol):
+    def delete_port_mapping(self, external_port, protocol, new_remote_host=""):
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
         :return: None
         """
         return self.commands.DeletePortMapping(
-            NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol
+            NewRemoteHost=new_remote_host, NewExternalPort=external_port, NewProtocol=protocol
         )
 
     def get_rsip_nat_status(self):

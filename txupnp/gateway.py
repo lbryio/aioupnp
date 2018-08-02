@@ -32,7 +32,7 @@ class CaseInsensitive(object):
             except AttributeError as err:
                 not_evaluated[k] = v
         if not_evaluated:
-            log.warning("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
+            log.debug("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
 
     def _get_attr_name(self, case_insensitive):
         for k, v in self.__dict__.items():

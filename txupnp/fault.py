@@ -9,5 +9,6 @@ class UPnPError(Exception):
 def handle_fault(response):
     if FAULT in response:
         fault = flatten_keys(response[FAULT], "{%s}" % CONTROL)
-        raise UPnPError(fault['detail']['UPnPError']['errorDescription'])
+        error_description = fault['detail']['UPnPError']['errorDescription']
+        raise UPnPError(error_description)
     return response

@@ -92,7 +92,7 @@ class _SCPDCommand(object):
         try:
             response = self.extract_response(self.extract_body(xml_response))
         except Exception as err:
-            log.error("error extracting response (%s) to %s:\n%s", err, self.method, xml_response)
+            log.debug("error extracting response (%s) to %s:\n%s", err, self.method, xml_response)
             raise err
         if not response:
             log.debug("empty response to %s\n%s", self.method, xml_response)

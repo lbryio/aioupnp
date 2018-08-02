@@ -2,6 +2,7 @@ import argparse
 import logging
 from twisted.internet import reactor, defer
 from txupnp.upnp import UPnP
+from txupnp.fault import UPnPError
 
 log = logging.getLogger("txupnp")
 
@@ -28,10 +29,35 @@ def list_mappings(u, *_):
         )
 
 
+@defer.inlineCallbacks
+def add_mapping(u, *_):
+    port = 4567
+    protocol = "UDP"
+    description = "txupnp test mapping"
+    yield u.get_next_mapping(port, protocol, description)
+    result = yield u.get_specific_port_mapping(port, protocol)
+    if result:
+        print("added mapping")
+
+
+@defer.inlineCallbacks
+def delete_mapping(u, *_):
+    port = 4567
+    protocol = "UDP"
+    yield u.delete_port_mapping(port, protocol)
+    mapping = yield u.get_specific_port_mapping(port, protocol)
+    if mapping:
+        print("failed to remove mapping")
+    else:
+        print("removed mapping")
+
+
 cli_commands = {
     "debug_device": debug_device,
     "get_external_ip": get_external_ip,
-    "list_mappings": list_mappings
+    "list_mappings": list_mappings,
+    "add_mapping": add_mapping,
+    "delete_mapping": delete_mapping
 }
 
 
@@ -49,7 +75,7 @@ def run_command(found, u, command, debug_xml):
 
 def main():
     parser = argparse.ArgumentParser(description="upnp command line utility")
-    parser.add_argument(dest="command", type=str, help="debug_gateway | list_mappings | get_external_ip")
+    parser.add_argument(dest="command", type=str, help="debug_gateway | list_mappings | get_external_ip | add_mapping | delete_mapping")
     parser.add_argument("--debug_logging", dest="debug_logging", default=False, action="store_true")
     parser.add_argument("--include_igd_xml", dest="include_igd_xml", default=False, action="store_true")
     args = parser.parse_args()
