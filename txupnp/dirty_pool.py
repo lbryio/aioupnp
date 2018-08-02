@@ -1,9 +1,13 @@
+import logging
 from twisted.web.client import HTTPConnectionPool, _HTTP11ClientFactory
 from twisted.web._newclient import HTTPClientParser, BadResponseVersion, HTTP11ClientProtocol, RequestNotSent
 from twisted.web._newclient import TransportProxyProducer, RequestGenerationFailed
 from twisted.python.failure import Failure
 from twisted.internet.defer import Deferred, fail, maybeDeferred
 from twisted.internet.defer import CancelledError
+
+
+log = logging.getLogger()
 
 
 class DirtyHTTPParser(HTTPClientParser):
@@ -18,6 +22,7 @@ class DirtyHTTPParser(HTTPClientParser):
             major, minor = strnumber.split(b'.')
             major, minor = int(major), int(minor)
         except ValueError as e:
+            log.exception("got a bad http version: %s", strversion)
             if b'HTTP1.1' in strversion:
                 return ("HTTP", 1, 1)
             raise BadResponseVersion(str(e), strversion)
