@@ -14,7 +14,7 @@ pip install --upgrade txupnp
 usage: txupnp-cli [-h] [--debug_logging] [--include_igd_xml] command
 
 positional arguments:
-  command            debug_gateway | list_mappings | get_external_ip |
+  command            debug_device | list_mappings | get_external_ip |
                      add_mapping | delete_mapping
 
 optional arguments:
