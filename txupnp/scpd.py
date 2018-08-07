@@ -109,7 +109,7 @@ class _SCPDCommand(object):
     @defer.inlineCallbacks
     def __call__(self, **kwargs):
         if set(kwargs.keys()) != set(self.param_names):
-            raise Exception("argument mismatch")
+            raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_names))
         response = yield self.send_upnp_soap(**kwargs)
         try:
             result = self._process_result(response)
@@ -221,7 +221,7 @@ class SCPDCommandRunner(object):
     @staticmethod
     @return_types(none)
     def AddPortMapping(NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
-                       NewEnabled, NewPortMappingDescription, NewLeaseDuration):
+                       NewEnabled, NewPortMappingDescription, NewLeaseDuration=''):
         """Returns None"""
         raise NotImplementedError()
 
@@ -373,12 +373,12 @@ class UPnPFallback(object):
 
     @return_types(none)
     def AddPortMapping(self, NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
-                       NewEnabled, NewPortMappingDescription, NewLeaseDuration):
+                       NewEnabled, NewPortMappingDescription, NewLeaseDuration=''):
         """Returns None"""
         if not self.available:
             raise NotImplementedError()
-        return threads.deferToThread(self._upnp.addportmapping, NewExternalPort, NewProtocol, NewInternalPort,
-                                     NewInternalClient, NewPortMappingDescription, NewLeaseDuration)
+        return threads.deferToThread(self._upnp.addportmapping, NewExternalPort, NewProtocol, NewInternalClient,
+                                     NewInternalPort, NewPortMappingDescription, NewLeaseDuration)
 
     def GetNATRSIPStatus(self):
         """Returns (NewRSIPAvailable, NewNATEnabled)"""

@@ -1,6 +1,5 @@
 import logging
 import json
-import treq
 from twisted.internet import defer
 from txupnp.fault import UPnPError
 from txupnp.soap import SOAPServiceManager
@@ -62,7 +61,7 @@ class UPnP(object):
     @defer.inlineCallbacks
     def start_miniupnpc_fallback(self):
         found = False
-        if not self.commands and not self.miniupnpc_runner:
+        if not self.miniupnpc_runner:
             log.debug("trying miniupnpc fallback")
             fallback = UPnPFallback()
             success = yield fallback.discover()
@@ -78,12 +77,11 @@ class UPnP(object):
     def get_external_ip(self):
         return self.commands.GetExternalIPAddress()
 
-    def add_port_mapping(self, external_port, protocol, internal_port, lan_address, description, lease_duration):
+    def add_port_mapping(self, external_port, protocol, internal_port, lan_address, description):
         return self.commands.AddPortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=1, NewPortMappingDescription=description,
-            NewLeaseDuration=lease_duration
+            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=""
         )
 
     def get_port_mapping_by_index(self, index):
@@ -118,7 +116,8 @@ class UPnP(object):
         except UPnPError as err:
             if 'NoSuchEntryInArray' in str(err):
                 defer.returnValue(None)
-            raise err
+            else:
+                raise err
 
     def delete_port_mapping(self, external_port, protocol, new_remote_host=""):
         """
@@ -149,23 +148,23 @@ class UPnP(object):
         return self.commands.GetConnectionTypeInfo()
 
     @defer.inlineCallbacks
-    def get_next_mapping(self, port, protocol, description):
+    def get_next_mapping(self, port, protocol, description, internal_port=None):
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
-        mappings = yield DeferredDict({p: self.get_specific_port_mapping(port, p)
-                                       for p in ["UDP", "TCP"]})
-        if not any((m is not None for m in mappings.values())):  # there are no redirects for this port
-            yield self.add_port_mapping(  # set one up
-                port, protocol, port, self.lan_address, description, 0
-            )
-            defer.returnValue(port)
-        if mappings[protocol]:
-            mapped_port = mappings[protocol][0]
-            mapped_address = mappings[protocol][1]
-            if mapped_port == port and mapped_address == self.lan_address:  # reuse redirect to us
-                defer.returnValue(port)
-        port = yield self.get_next_mapping(  # try the next port
-            port + 1, protocol, description
+        internal_port = internal_port or port
+        redirect_tups = yield self.get_redirects()
+        redirects = {
+            "%i:%s" % (ext_port, proto): (int_host, int_port, desc)
+            for (ext_host, ext_port, proto, int_port, int_host, enabled, desc, lease) in redirect_tups
+        }
+        while ("%i:%s" % (port, protocol)) in redirects:
+            int_host, int_port, _ = redirects["%i:%s" % (port, protocol)]
+            if int_host == self.lan_address and int_port == internal_port:
+                break
+            port += 1
+
+        yield self.add_port_mapping(  # set one up
+                port, protocol, internal_port, self.lan_address, description
         )
         defer.returnValue(port)
 
