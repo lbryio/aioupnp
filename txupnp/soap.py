@@ -35,7 +35,7 @@ class SOAPServiceManager(object):
             elif 'st' not in server_info:
                 log.error("don't know how to handle gateway: %s", server_info)
                 continue
-        defer.returnValue(len(self._command_runners))
+        defer.returnValue(len(self._command_runners) > 0)
 
     def set_runner(self, urn):
         if urn not in self._command_runners:

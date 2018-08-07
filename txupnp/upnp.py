@@ -51,8 +51,7 @@ class UPnP(object):
             log.warning("nothing left to try")
         if try_txupnp:
             try:
-                yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
-                found = True
+                found = yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
             except defer.TimeoutError:
                 found = False
             finally:
