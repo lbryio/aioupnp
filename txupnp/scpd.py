@@ -385,6 +385,7 @@ class UPnPFallback(object):
         raise NotImplementedError()
 
     @return_types(none_or_str, int, str, int, str, bool, str, int)
+    @defer.inlineCallbacks
     def GetGenericPortMappingEntry(self, NewPortMappingIndex):
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
@@ -392,7 +393,11 @@ class UPnPFallback(object):
         """
         if not self.available:
             raise NotImplementedError()
-        return threads.deferToThread(self._upnp.getgenericportmapping, NewPortMappingIndex)
+        result = yield threads.deferToThread(self._upnp.getgenericportmapping, NewPortMappingIndex)
+        if not result:
+            raise UPnPError()
+        ext_port, protocol, (int_host, int_port), desc, enabled, remote_host, lease = result
+        defer.returnValue((remote_host, ext_port, protocol, int_port, int_host, enabled, desc, lease))
 
     @return_types(int, str, bool, str, int)
     def GetSpecificPortMappingEntry(self, NewRemoteHost, NewExternalPort, NewProtocol):
