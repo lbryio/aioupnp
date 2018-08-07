@@ -45,15 +45,19 @@ class UPnP(object):
         return self.soap_manager.sspd_factory.m_search(address, timeout=timeout, max_devices=max_devices)
 
     @defer.inlineCallbacks
-    def discover(self, timeout=1, max_devices=1, keep_listening=False):
-        try:
-            yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
-            found = True
-        except defer.TimeoutError:
-            found = False
-        finally:
-            if not keep_listening:
-                self.soap_manager.sspd_factory.disconnect()
+    def discover(self, timeout=1, max_devices=1, keep_listening=False, try_txupnp=True):
+        found = False
+        if not try_txupnp and not self.try_miniupnpc_fallback:
+            log.warning("nothing left to try")
+        if try_txupnp:
+            try:
+                yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
+                found = True
+            except defer.TimeoutError:
+                found = False
+            finally:
+                if not keep_listening:
+                    self.soap_manager.sspd_factory.disconnect()
         if not found and self.try_miniupnpc_fallback:
             found = yield self.start_miniupnpc_fallback()
         defer.returnValue(found)
