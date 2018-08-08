@@ -4,7 +4,6 @@ from twisted.internet import defer
 from txupnp.fault import UPnPError
 from txupnp.soap import SOAPServiceManager
 from txupnp.scpd import UPnPFallback
-from txupnp.util import DeferredDict
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +23,17 @@ class UPnP(object):
     @property
     def commands(self):
         try:
-            return self.soap_manager.get_runner()
+            runner = self.soap_manager.get_runner()
+            required_commands = [
+                "GetExternalIPAddress",
+                "AddPortMapping",
+                "GetSpecificPortMappingEntry",
+                "GetGenericPortMappingEntry",
+                "DeletePortMapping"
+            ]
+            if all((command in runner._registered_commands for command in required_commands)):
+                return runner
+            raise UPnPError("required commands not found")
         except UPnPError as err:
             if self.try_miniupnpc_fallback and self.miniupnpc_runner:
                 return self.miniupnpc_runner
@@ -57,6 +66,19 @@ class UPnP(object):
             finally:
                 if not keep_listening:
                     self.soap_manager.sspd_factory.disconnect()
+        if found:
+            try:
+                runner = self.soap_manager.get_runner()
+                required_commands = [
+                    "GetExternalIPAddress",
+                    "AddPortMapping",
+                    "GetSpecificPortMappingEntry",
+                    "GetGenericPortMappingEntry",
+                    "DeletePortMapping"
+                ]
+                found = all((command in runner._registered_commands for command in required_commands))
+            except UPnPError:
+                found = False
         if not found and self.try_miniupnpc_fallback:
             found = yield self.start_miniupnpc_fallback()
         defer.returnValue(found)
