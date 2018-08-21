@@ -58,10 +58,12 @@ class _SCPDCommand(object):
 
     def extract_response(self, body):
         body = handle_fault(body)  # raises UPnPError if there is a fault
-        if '%sResponse' % self.method in body:
-            response_key = '%sResponse' % self.method
-        else:
-            log.error(body.keys())
+        response_key = None
+        for key in body:
+            if self.method in key:
+                response_key = key
+                break
+        if not response_key:
             raise UPnPError("unknown response fields")
         response = body[response_key]
         extracted_response = tuple([response[n] for n in self.returns])
@@ -91,6 +93,8 @@ class _SCPDCommand(object):
         xml_response = yield response.content()
         try:
             response = self.extract_response(self.extract_body(xml_response))
+        except UPnPError:
+            raise
         except Exception as err:
             log.debug("error extracting response (%s) to %s:\n%s", err, self.method, xml_response)
             raise err

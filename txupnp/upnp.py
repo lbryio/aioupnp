@@ -109,20 +109,23 @@ class UPnP(object):
             NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=""
         )
 
+    @defer.inlineCallbacks
     def get_port_mapping_by_index(self, index):
-        return self.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
+        try:
+            redirect = yield self.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
+            defer.returnValue(redirect)
+        except UPnPError:
+            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def get_redirects(self):
         redirects = []
         cnt = 0
-        while True:
-            try:
-                redirect = yield self.get_port_mapping_by_index(cnt)
-                redirects.append(redirect)
-                cnt += 1
-            except UPnPError:
-                break
+        redirect = yield self.get_port_mapping_by_index(cnt)
+        while redirect:
+            redirects.append(redirect)
+            cnt += 1
+            redirect = yield self.get_port_mapping_by_index(cnt)
         defer.returnValue(redirects)
 
     @defer.inlineCallbacks
@@ -138,11 +141,8 @@ class UPnP(object):
                 NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol
             )
             defer.returnValue(result)
-        except UPnPError as err:
-            if 'NoSuchEntryInArray' in str(err):
-                defer.returnValue(None)
-            else:
-                raise err
+        except UPnPError:
+            defer.returnValue(None)
 
     def delete_port_mapping(self, external_port, protocol, new_remote_host=""):
         """
