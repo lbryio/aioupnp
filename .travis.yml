@@ -1,0 +1,15 @@
+sudo: required
+dist: xenial
+language: python
+python: "3.7"
+
+before_install:
+  - pip install pylint coverage
+  - pip install -e .
+  - pylint txupnp
+
+script:
+  - HOME=/tmp coverage run --source=txupnp -m twisted.trial tests
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
