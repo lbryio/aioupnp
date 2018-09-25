@@ -6,7 +6,7 @@ python: "3.7"
 before_install:
   - pip install pylint coverage
   - pip install -e .
-  - pylint txupnp
+#  - pylint txupnp
 
 script:
   - HOME=/tmp coverage run --source=txupnp -m twisted.trial tests
