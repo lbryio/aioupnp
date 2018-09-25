@@ -1,0 +1,101 @@
+from twisted.trial import unittest
+from txupnp.ssdp_datagram import SSDPDatagram
+from txupnp.fault import UPnPError
+
+
+class TestParseMSearchRequest(unittest.TestCase):
+    datagram = b'M-SEARCH * HTTP/1.1\r\n' \
+               b'HOST: 239.255.255.250:1900\r\n' \
+               b'ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n' \
+               b'MAN: "ssdp:discover"\r\n' \
+               b'MX: 1\r\n' \
+               b'\r\n'
+
+    def test_parse_m_search_response(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertTrue(packet._packet_type, packet._M_SEARCH)
+        self.assertEqual(packet.host, '239.255.255.250:1900')
+        self.assertEqual(packet.st, 'urn:schemas-upnp-org:device:InternetGatewayDevice:1')
+        self.assertEqual(packet.man, 'ssdp:discover')
+        self.assertEqual(packet.mx, 1)
+
+    def test_serialize_m_search(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertEqual(packet.encode().encode(), self.datagram)
+
+
+class TestParseMSearchResponse(unittest.TestCase):
+    datagram = "\r\n".join([
+        'HTTP/1.1 200 OK',
+        'CACHE_CONTROL: max-age=1800',
+        'LOCATION: http://10.0.0.1:49152/InternetGatewayDevice.xml',
+        'SERVER: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'ST: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()
+
+    def test_parse_m_search_response(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertTrue(packet._packet_type, packet._OK)
+        self.assertEqual(packet.cache_control, 'max-age=1800')
+        self.assertEqual(packet.location, 'http://10.0.0.1:49152/InternetGatewayDevice.xml')
+        self.assertEqual(packet.server, 'Linux, UPnP/1.0, DIR-890L Ver 1.20')
+        self.assertEqual(packet.st, 'urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1')
+        self.assertEqual(packet.usn, 'uuid:00000000-0000-0000-0000-000000000000::urn:'
+                                     'schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+)
+
+
+class TestParseMSearchResponseDashCacheControl(TestParseMSearchResponse):
+    datagram = "\r\n".join([
+        'HTTP/1.1 200 OK',
+        'CACHE-CONTROL: max-age=1800',
+        'LOCATION: http://10.0.0.1:49152/InternetGatewayDevice.xml',
+        'SERVER: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'ST: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()
+
+
+class TestParseMSearchResponseCaseInsensitive(TestParseMSearchResponse):
+    datagram = "\r\n".join([
+        'HTTP/1.1 200 OK',
+        'cache-CONTROL: max-age=1800',
+        'LOCATION: http://10.0.0.1:49152/InternetGatewayDevice.xml',
+        'Server: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'st: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()
+
+
+class TestFailToParseMSearchResponseNoST(unittest.TestCase):
+    datagram = "\r\n".join([
+        'HTTP/1.1 200 OK',
+        'CACHE_CONTROL: max-age=1800',
+        'LOCATION: http://10.0.0.1:49152/InternetGatewayDevice.xml',
+        'SERVER: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()
+
+    def test_fail_to_parse_m_search_response(self):
+        self.assertRaises(UPnPError, SSDPDatagram.decode, self.datagram)
+
+
+class TestFailToParseMSearchResponseNoOK(TestFailToParseMSearchResponseNoST):
+    datagram = "\r\n".join([
+        'cache-CONTROL: max-age=1800',
+        'LOCATION: http://10.0.0.1:49152/InternetGatewayDevice.xml',
+        'Server: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'st: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()
+
+
+class TestFailToParseMSearchResponseNoLocation(TestFailToParseMSearchResponseNoST):
+    datagram = "\r\n".join([
+        'HTTP/1.1 200 OK',
+        'cache-CONTROL: max-age=1800',
+        'Server: Linux, UPnP/1.0, DIR-890L Ver 1.20',
+        'st: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
+        'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
+    ]).encode()

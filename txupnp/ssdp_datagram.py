@@ -15,7 +15,7 @@ _ssdp_datagram_patterns = {
     'nts': (re.compile("^(?i)(nts):(.*)$"), str),
     'usn': (re.compile("^(?i)(usn):(.*)$"), str),
     'location': (re.compile("^(?i)(location):(.*)$"), str),
-    'cache_control': (re.compile("^(?i)(cache-control):(.*)$"), str),
+    'cache_control': (re.compile("^(?i)(cache[-|_]control):(.*)$"), str),
     'server': (re.compile("^(?i)(server):(.*)$"), str),
 }
 
@@ -124,8 +124,12 @@ class SSDPDatagram(object):
         return self._lines_to_content_dict(self.encode().split(line_separator))
 
     @classmethod
-    def decode(cls, datagram):
+    def decode(cls, datagram: bytes):
         packet = cls._from_string(datagram.decode())
+        if packet is None:
+            raise UPnPError(
+                "failed to decode datagram: {}".format(binascii.hexlify(datagram))
+            )
         for attr_name in packet._required_fields[packet._packet_type]:
             attr = getattr(packet, attr_name)
             if attr is None:
