@@ -19,7 +19,7 @@ xml_root_sanity_pattern = re.compile(
 )
 
 
-class CaseInsensitive(object):
+class CaseInsensitive:
     def __init__(self, **kwargs):
         not_evaluated = {}
         for k, v in kwargs.items():
@@ -34,7 +34,7 @@ class CaseInsensitive(object):
         if not_evaluated:
             log.debug("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
 
-    def _get_attr_name(self, case_insensitive):
+    def _get_attr_name(self, case_insensitive: str) -> str:
         for k, v in self.__dict__.items():
             if k.lower() == case_insensitive.lower():
                 return k
@@ -60,7 +60,7 @@ class CaseInsensitive(object):
                 break
         self.__dict__[to_update or item] = value
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         return {
             k: v for k, v in self.__dict__.items() if not k.startswith("_") and not callable(v)
         }
@@ -111,7 +111,7 @@ class Device(CaseInsensitive):
                     log.warning("failed to parse device:\n%s", kw)
 
 
-class Gateway(object):
+class Gateway:
     def __init__(self, **kwargs):
         flattened = {
             k.lower(): v for k, v in kwargs.items()
@@ -143,7 +143,7 @@ class Gateway(object):
         self._devices = []
         self._services = []
 
-    def debug_device(self, include_xml=False, include_services=True):
+    def debug_device(self, include_xml: bool = False, include_services: bool = True) -> dict:
         r = {
             'server': self.server,
             'urlBase': self.url_base,
@@ -194,18 +194,18 @@ class Gateway(object):
         log.debug("finished setting up gateway:\n%s", self.debug_device())
 
     @property
-    def services(self):
+    def services(self) -> dict:
         if not self._device:
             return {}
         return {service.serviceType: service for service in self._services}
 
     @property
-    def devices(self):
+    def devices(self) -> dict:
         if not self._device:
             return {}
         return {device.udn: device for device in self._devices}
 
-    def get_service(self, service_type):
+    def get_service(self, service_type) -> Service:
         for service in self._services:
             if service.serviceType.lower() == service_type.lower():
                 return service

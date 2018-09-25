@@ -31,7 +31,7 @@ class SSDPProtocol(DatagramProtocol):
         try:
             self.transport.write(packet.encode().encode(), (self.ssdp_address, self.ssdp_port))
         except Exception as err:
-            log.exception("failed to write %s to %s:%i", binascii.hexlify(packet.encode()), self.ssdp_address, self.ssdp_port)
+            log.exception("failed to write %s to %s:%i", packet.encode(), self.ssdp_address, self.ssdp_port)
             raise err
 
     @staticmethod

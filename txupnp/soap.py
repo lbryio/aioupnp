@@ -1,6 +1,6 @@
 import logging
+import netifaces
 from twisted.internet import defer
-from txupnp.util import get_lan_info
 from txupnp.ssdp import SSDPFactory
 from txupnp.scpd import SCPDCommandRunner
 from txupnp.gateway import Gateway
@@ -11,12 +11,14 @@ log = logging.getLogger(__name__)
 
 
 class SOAPServiceManager(object):
-    def __init__(self, reactor):
+    def __init__(self, reactor, treq_get=None):
         self._reactor = reactor
-        self.iface_name, self.router_ip, self.lan_address = get_lan_info()
+        self.router_ip, self.iface_name = netifaces.gateways()['default'][netifaces.AF_INET]
+        self.lan_address = netifaces.ifaddresses(self.iface_name)[netifaces.AF_INET][0]['addr']
         self.sspd_factory = SSDPFactory(self._reactor, self.lan_address, self.router_ip)
         self._command_runners = {}
         self._selected_runner = UPNP_ORG_IGD
+        self._treq_get = treq_get
 
     @defer.inlineCallbacks
     def discover_services(self, address=None, timeout=30, max_devices=1):
@@ -29,7 +31,7 @@ class SOAPServiceManager(object):
                 locations.append(server_info['location'])
                 gateway = Gateway(**server_info)
                 yield gateway.discover_services()
-                command_runner = SCPDCommandRunner(gateway, self._reactor)
+                command_runner = SCPDCommandRunner(gateway, self._reactor, self._treq_get)
                 yield command_runner.discover_commands()
                 self._command_runners[gateway.urn.decode()] = command_runner
             elif 'st' not in server_info:

@@ -9,10 +9,10 @@ log = logging.getLogger(__name__)
 
 
 class UPnP(object):
-    def __init__(self, reactor, try_miniupnpc_fallback=True):
+    def __init__(self, reactor, try_miniupnpc_fallback=True, treq_get=None):
         self._reactor = reactor
         self.try_miniupnpc_fallback = try_miniupnpc_fallback
-        self.soap_manager = SOAPServiceManager(reactor)
+        self.soap_manager = SOAPServiceManager(reactor, treq_get=treq_get)
         self.miniupnpc_runner = None
         self.miniupnpc_igd_url = None
 

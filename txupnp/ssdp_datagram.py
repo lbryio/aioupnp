@@ -1,10 +1,10 @@
 import re
 import logging
+import binascii
 from txupnp.fault import UPnPError
 from txupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
-
 
 _ssdp_datagram_patterns = {
     'host': (re.compile("^(?i)(host):(.*)$"), str),
@@ -135,7 +135,7 @@ class SSDPDatagram(object):
         return packet
 
     @classmethod
-    def _lines_to_content_dict(cls, lines):
+    def _lines_to_content_dict(cls, lines: list) -> dict:
         result = {}
         for line in lines:
             if not line:
@@ -158,7 +158,7 @@ class SSDPDatagram(object):
         return result
 
     @classmethod
-    def _from_string(cls, datagram):
+    def _from_string(cls, datagram: str):
         lines = [l for l in datagram.split(line_separator) if l]
         if lines[0] == cls._start_lines[cls._M_SEARCH]:
             return cls._from_request(lines[1:])

@@ -5,7 +5,7 @@ from twisted.web.client import Agent
 import treq
 from treq.client import HTTPClient
 from xml.etree import ElementTree
-from txupnp.util import etree_to_dict, flatten_keys, return_types, _return_types, none_or_str, none
+from txupnp.util import etree_to_dict, flatten_keys, return_types, verify_return_types, none_or_str, none
 from txupnp.fault import handle_fault, UPnPError
 from txupnp.constants import SERVICE, SSDP_IP_ADDRESS, DEVICE, ROOT, service_types, ENVELOPE, XML_VERSION
 from txupnp.constants import BODY, POST
@@ -14,7 +14,7 @@ from txupnp.dirty_pool import DirtyPool
 log = logging.getLogger(__name__)
 
 
-class StringProducer(object):
+class StringProducer:
     def __init__(self, body):
         self.body = body
         self.length = len(body)
@@ -64,7 +64,7 @@ class _SCPDCommand(object):
                 response_key = key
                 break
         if not response_key:
-            raise UPnPError("unknown response fields")
+            raise UPnPError("unknown response fields for %s")
         response = body[response_key]
         extracted_response = tuple([response[n] for n in self.returns])
         if len(extracted_response) == 1:
@@ -143,7 +143,7 @@ class SCPDResponse(object):
 
 
 class SCPDCommandRunner(object):
-    def __init__(self, gateway, reactor):
+    def __init__(self, gateway, reactor, treq_get=None):
         self._gateway = gateway
         self._unsupported_actions = {}
         self._registered_commands = {}
@@ -151,15 +151,15 @@ class SCPDCommandRunner(object):
         self._connection_pool = DirtyPool(reactor)
         self._agent = Agent(reactor, connectTimeout=1, pool=self._connection_pool)
         self._http_client = HTTPClient(self._agent, data_to_body_producer=StringProducer)
+        self._treq_get = treq_get or treq.get
 
     @defer.inlineCallbacks
     def _discover_commands(self, service):
         scpd_url = self._gateway.base_address + service.SCPDURL.encode()
-        response = yield treq.get(scpd_url)
+        response = yield self._treq_get(scpd_url)
         content = yield response.content()
         try:
-            scpd_response = SCPDResponse(scpd_url,
-                                         response.headers, content)
+            scpd_response = SCPDResponse(scpd_url, response.headers, content)
             for action_dict in scpd_response.get_action_list():
                 self._register_command(action_dict, service.serviceType)
         except Exception as err:
@@ -200,7 +200,7 @@ class SCPDCommandRunner(object):
                                self._gateway.get_service(service_type).serviceType.encode(), name, inputs, outputs)
         current = getattr(self, command.method)
         if hasattr(current, "_return_types"):
-            command._process_result = _return_types(*current._return_types)(command._process_result)
+            command._process_result = verify_return_types(*current._return_types)(command._process_result)
         setattr(command, "__doc__", current.__doc__)
         setattr(self, command.method, command)
         self._registered_commands[command.method] = service_type

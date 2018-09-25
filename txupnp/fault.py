@@ -6,7 +6,7 @@ class UPnPError(Exception):
     pass
 
 
-def handle_fault(response):
+def handle_fault(response: dict) -> dict:
     if FAULT in response:
         fault = flatten_keys(response[FAULT], "{%s}" % CONTROL)
         error_description = fault['detail']['UPnPError']['errorDescription']

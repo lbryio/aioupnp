@@ -1,14 +1,14 @@
 import re
 import functools
 from collections import defaultdict
-import netifaces
 from twisted.internet import defer
+from xml.etree import ElementTree
 
 BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
 BASE_PORT_REGEX = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
 
 
-def etree_to_dict(t):
+def etree_to_dict(t: ElementTree) -> dict:
     d = {t.tag: {} if t.attrib else None}
     children = list(t)
     if children:
@@ -52,14 +52,12 @@ def get_dict_val_case_insensitive(d, k):
     return d[match[0]]
 
 
-def get_lan_info():
-    gateway_address, iface_name = netifaces.gateways()['default'][netifaces.AF_INET]
-    lan_addr = netifaces.ifaddresses(iface_name)[netifaces.AF_INET][0]['addr']
-    return iface_name, gateway_address, lan_addr
+def verify_return_types(*types):
+    """
+    Attempt to recast results to expected result types
+    """
 
-
-def _return_types(*types):
-    def _return_types_wrapper(fn):
+    def _verify_return_types(fn):
         @functools.wraps(fn)
         def _inner(response):
             if isinstance(response, (list, tuple)):
@@ -69,10 +67,14 @@ def _return_types(*types):
                 return fn(r)
             return fn(types[0](response))
         return _inner
-    return _return_types_wrapper
+    return _verify_return_types
 
 
 def return_types(*types):
+    """
+    Decorator to set the expected return types of a SOAP function call
+    """
+
     def return_types_wrapper(fn):
         fn._return_types = types
         return fn
