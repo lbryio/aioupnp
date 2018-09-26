@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/lbryio/txupnp/branch/master/graph/badge.svg)](https://codecov.io/gh/lbryio/txupnp)
+
 # UPnP for Twisted
 
 `txupnp` is a python2/3 library to interact with UPnP gateways using Twisted
