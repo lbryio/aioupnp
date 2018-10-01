@@ -1,45 +1,29 @@
+import netifaces
 import logging
-import json
 from twisted.internet import defer
 from txupnp.fault import UPnPError
-from txupnp.soap import SOAPServiceManager
-from txupnp.scpd import UPnPFallback
+from txupnp.ssdp import SSDPFactory
+from txupnp.gateway import Gateway
 
 log = logging.getLogger(__name__)
 
 
-class UPnP(object):
-    def __init__(self, reactor, try_miniupnpc_fallback=True, treq_get=None):
+class UPnP:
+    def __init__(self, reactor, try_miniupnpc_fallback=False, debug_ssdp=False, router_ip=None,
+                 lan_ip=None, iface_name=None):
         self._reactor = reactor
+        if router_ip and lan_ip and iface_name:
+            self.router_ip, self.lan_address, self.iface_name = router_ip, lan_ip, iface_name
+        else:
+            self.router_ip, self.iface_name = netifaces.gateways()['default'][netifaces.AF_INET]
+            self.lan_address = netifaces.ifaddresses(self.iface_name)[netifaces.AF_INET][0]['addr']
+        self.sspd_factory = SSDPFactory(self._reactor, self.lan_address, self.router_ip, debug_packets=debug_ssdp)
         self.try_miniupnpc_fallback = try_miniupnpc_fallback
-        self.soap_manager = SOAPServiceManager(reactor, treq_get=treq_get)
         self.miniupnpc_runner = None
         self.miniupnpc_igd_url = None
+        self.gateway = None
 
-    @property
-    def lan_address(self):
-        return self.soap_manager.lan_address
-
-    @property
-    def commands(self):
-        try:
-            runner = self.soap_manager.get_runner()
-            required_commands = [
-                "GetExternalIPAddress",
-                "AddPortMapping",
-                "GetSpecificPortMappingEntry",
-                "GetGenericPortMappingEntry",
-                "DeletePortMapping"
-            ]
-            if all((command in runner._registered_commands for command in required_commands)):
-                return runner
-            raise UPnPError("required commands not found")
-        except UPnPError as err:
-            if self.try_miniupnpc_fallback and self.miniupnpc_runner:
-                return self.miniupnpc_runner
-            log.warning("upnp is not available: %s", err)
-
-    def m_search(self, address, timeout=30, max_devices=2):
+    def m_search(self, address, timeout=1, max_devices=1):
         """
         Perform a HTTP over UDP M-SEARCH query
 
@@ -51,68 +35,52 @@ class UPnP(object):
             'usn': <usn>
         }, ...]
         """
-        return self.soap_manager.sspd_factory.m_search(address, timeout=timeout, max_devices=max_devices)
+        return self.sspd_factory.m_search(address, timeout=timeout, max_devices=max_devices)
 
     @defer.inlineCallbacks
-    def discover(self, timeout=1, max_devices=1, keep_listening=False, try_txupnp=True):
-        found = False
-        if not try_txupnp and not self.try_miniupnpc_fallback:
-            log.warning("nothing left to try")
-        if try_txupnp:
-            try:
-                found = yield self.soap_manager.discover_services(timeout=timeout, max_devices=max_devices)
-            except defer.TimeoutError:
-                found = False
-            finally:
-                if not keep_listening:
-                    self.soap_manager.sspd_factory.disconnect()
+    def _discover(self, timeout=1, max_devices=1):
+        server_infos = yield self.sspd_factory.m_search(
+            self.router_ip, timeout=timeout, max_devices=max_devices
+        )
+        server_info = server_infos[0]
+        if 'st' in server_info:
+            gateway = Gateway(reactor=self._reactor, **server_info)
+            yield gateway.discover_commands()
+            self.gateway = gateway
+            defer.returnValue(True)
+        elif 'st' not in server_info:
+            log.error("don't know how to handle gateway: %s", server_info)
+        defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def discover(self, timeout=1, max_devices=1):
+        try:
+            found = yield self._discover(timeout=timeout, max_devices=max_devices)
+        except defer.TimeoutError:
+            found = False
+        finally:
+            self.sspd_factory.disconnect()
         if found:
-            try:
-                runner = self.soap_manager.get_runner()
-                required_commands = [
-                    "GetExternalIPAddress",
-                    "AddPortMapping",
-                    "GetSpecificPortMappingEntry",
-                    "GetGenericPortMappingEntry",
-                    "DeletePortMapping"
-                ]
-                found = all((command in runner._registered_commands for command in required_commands))
-            except UPnPError:
-                found = False
-        if not found and self.try_miniupnpc_fallback:
-            found = yield self.start_miniupnpc_fallback()
+            log.debug("found upnp device")
+        else:
+            log.debug("failed to find upnp device")
         defer.returnValue(found)
 
-    @defer.inlineCallbacks
-    def start_miniupnpc_fallback(self):
-        found = False
-        if not self.miniupnpc_runner:
-            log.debug("trying miniupnpc fallback")
-            fallback = UPnPFallback()
-            success = yield fallback.discover()
-            self.miniupnpc_igd_url = fallback.device_url
-            if success:
-                log.info("successfully started miniupnpc fallback")
-                self.miniupnpc_runner = fallback
-                found = True
-        if not found:
-            log.warning("failed to find upnp gateway using miniupnpc fallback")
-        defer.returnValue(found)
+    def get_external_ip(self) -> str:
+        return self.gateway.commands.GetExternalIPAddress()
 
-    def get_external_ip(self):
-        return self.commands.GetExternalIPAddress()
-
-    def add_port_mapping(self, external_port, protocol, internal_port, lan_address, description):
-        return self.commands.AddPortMapping(
+    def add_port_mapping(self, external_port: int, protocol: str, internal_port, lan_address: str,
+                         description: str) -> None:
+        return self.gateway.commands.AddPortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
             NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=""
         )
 
     @defer.inlineCallbacks
-    def get_port_mapping_by_index(self, index):
+    def get_port_mapping_by_index(self, index: int) -> (str, int, str, int, str, bool, str, int):
         try:
-            redirect = yield self.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
+            redirect = yield self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
             defer.returnValue(redirect)
         except UPnPError:
             defer.returnValue(None)
@@ -129,7 +97,7 @@ class UPnP(object):
         defer.returnValue(redirects)
 
     @defer.inlineCallbacks
-    def get_specific_port_mapping(self, external_port, protocol):
+    def get_specific_port_mapping(self, external_port: int, protocol: str) -> (int, str, bool, str, int):
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -137,40 +105,22 @@ class UPnP(object):
         """
 
         try:
-            result = yield self.commands.GetSpecificPortMappingEntry(
+            result = yield self.gateway.commands.GetSpecificPortMappingEntry(
                 NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol
             )
             defer.returnValue(result)
         except UPnPError:
             defer.returnValue(None)
 
-    def delete_port_mapping(self, external_port, protocol, new_remote_host=""):
+    def delete_port_mapping(self, external_port: int, protocol: str) -> None:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
         :return: None
         """
-        return self.commands.DeletePortMapping(
-            NewRemoteHost=new_remote_host, NewExternalPort=external_port, NewProtocol=protocol
+        return self.gateway.commands.DeletePortMapping(
+            NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol
         )
-
-    def get_rsip_nat_status(self):
-        """
-        :return: (bool) NewRSIPAvailable, (bool) NewNATEnabled
-        """
-        return self.commands.GetNATRSIPStatus()
-
-    def get_status_info(self):
-        """
-        :return: (str) NewConnectionStatus, (str) NewLastConnectionError, (int) NewUptime
-        """
-        return self.commands.GetStatusInfo()
-
-    def get_connection_type_info(self):
-        """
-        :return: (str) NewConnectionType (str), NewPossibleConnectionTypes (str)
-        """
-        return self.commands.GetConnectionTypeInfo()
 
     @defer.inlineCallbacks
     def get_next_mapping(self, port, protocol, description, internal_port=None):
@@ -192,15 +142,3 @@ class UPnP(object):
                 port, protocol, internal_port, self.lan_address, description
         )
         defer.returnValue(port)
-
-    def get_debug_info(self, include_gateway_xml=False):
-        def default_byte(x):
-            if isinstance(x, bytes):
-                return x.decode()
-            return x
-        return json.dumps({
-            'txupnp': self.soap_manager.debug(include_gateway_xml=include_gateway_xml),
-            'miniupnpc_igd_url': self.miniupnpc_igd_url
-            },
-            indent=2, default=default_byte
-        )

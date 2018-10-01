@@ -1,7 +1,6 @@
 import re
 import functools
 from collections import defaultdict
-from twisted.internet import defer
 from xml.etree import ElementTree
 
 BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
@@ -59,13 +58,11 @@ def verify_return_types(*types):
 
     def _verify_return_types(fn):
         @functools.wraps(fn)
-        def _inner(response):
-            if isinstance(response, (list, tuple)):
-                r = tuple(t(r) for t, r in zip(types, response))
-                if len(r) == 1:
-                    return fn(r[0])
-                return fn(r)
-            return fn(types[0](response))
+        def _inner(*result):
+            r = fn(*tuple(t(r) for t, r in zip(types, result)))
+            if isinstance(r, tuple) and len(r) == 1:
+                return r[0]
+            return r
         return _inner
     return _verify_return_types
 
@@ -85,18 +82,3 @@ def return_types(*types):
 none_or_str = lambda x: None if not x or x == 'None' else str(x)
 
 none = lambda _: None
-
-
-@defer.inlineCallbacks
-def DeferredDict(d, consumeErrors=False):
-    keys = []
-    dl = []
-    response = {}
-    for k, v in d.items():
-        keys.append(k)
-        dl.append(v)
-    results = yield defer.DeferredList(dl, consumeErrors=consumeErrors)
-    for k, (success, result) in zip(keys, results):
-        if success:
-            response[k] = result
-    defer.returnValue(response)

@@ -1,22 +1,11 @@
 import logging
 from twisted.internet import defer
-import treq
-import re
-from xml.etree import ElementTree
-from txupnp.util import etree_to_dict, flatten_keys, get_dict_val_case_insensitive
-from txupnp.util import BASE_PORT_REGEX, BASE_ADDRESS_REGEX
-from txupnp.constants import DEVICE, ROOT
+from txupnp.scpd import SCPDCommand, SCPDRequester
+from txupnp.util import get_dict_val_case_insensitive, verify_return_types, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from txupnp.constants import SPEC_VERSION
+from txupnp.commands import SCPDCommands
 
 log = logging.getLogger(__name__)
-
-service_type_pattern = re.compile(
-    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\})"
-)
-
-xml_root_sanity_pattern = re.compile(
-    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))"
-)
 
 
 class CaseInsensitive:
@@ -112,7 +101,7 @@ class Device(CaseInsensitive):
 
 
 class Gateway:
-    def __init__(self, **kwargs):
+    def __init__(self, reactor, **kwargs):
         flattened = {
             k.lower(): v for k, v in kwargs.items()
         }
@@ -133,9 +122,10 @@ class Gateway:
         self.date = date.encode()
         self.urn = st.encode()
 
+        self._xml_response = ""
+        self._service_descriptors = {}
         self.base_address = BASE_ADDRESS_REGEX.findall(self.location)[0]
         self.port = int(BASE_PORT_REGEX.findall(self.location)[0])
-        self.xml_response = None
         self.spec_version = None
         self.url_base = None
 
@@ -143,55 +133,65 @@ class Gateway:
         self._devices = []
         self._services = []
 
-    def debug_device(self, include_xml: bool = False, include_services: bool = True) -> dict:
-        r = {
-            'server': self.server,
-            'urlBase': self.url_base,
-            'location': self.location,
-            "specVersion": self.spec_version,
-            'usn': self.usn,
-            'urn': self.urn,
-            'devices': [device.as_dict() for device in self._devices]
-        }
-        if include_xml:
-            r['xml_response'] = self.xml_response
-        if include_services:
-            r['services'] = [service.as_dict() for service in self._services]
+        self._reactor = reactor
+        self._unsupported_actions = {}
+        self._registered_commands = {}
+        self.commands = SCPDCommands()
+        self.requester = SCPDRequester(self._reactor)
 
+    def as_dict(self) -> dict:
+        r = {
+            'server': self.server.decode(),
+            'urlBase': self.url_base,
+            'location': self.location.decode(),
+            "specVersion": self.spec_version,
+            'usn': self.usn.decode(),
+            'urn': self.urn.decode(),
+        }
         return r
 
     @defer.inlineCallbacks
-    def discover_services(self):
-        log.debug("querying %s", self.location)
-        response = yield treq.get(self.location)
-        self.xml_response = yield response.content()
-        if not self.xml_response:
-            log.warning("service sent an empty reply\n%s", self.debug_device())
-        xml_dict = etree_to_dict(ElementTree.fromstring(self.xml_response))
-        schema_key = DEVICE
-        root = ROOT
-        if len(xml_dict) > 1:
-            log.warning(xml_dict.keys())
-        for k in xml_dict.keys():
-            m = xml_root_sanity_pattern.findall(k)
-            if len(m) == 3 and m[1][0] and m[2][5]:
-                schema_key = m[1][0]
-                root = m[2][5]
-                break
-
-        flattened_xml = flatten_keys(xml_dict, "{%s}" % schema_key)[root]
-        self.spec_version = get_dict_val_case_insensitive(flattened_xml, SPEC_VERSION)
-        self.url_base = get_dict_val_case_insensitive(flattened_xml, "urlbase")
-
-        if flattened_xml:
+    def discover_commands(self):
+        response = yield self.requester.scpd_get(self.location.decode().split(self.base_address.decode())[1], self.base_address.decode(), self.port)
+        self.spec_version = get_dict_val_case_insensitive(response, SPEC_VERSION)
+        self.url_base = get_dict_val_case_insensitive(response, "urlbase")
+        if not self.url_base:
+            self.url_base = self.base_address.decode()
+        if response:
             self._device = Device(
-                self._devices, self._services, **get_dict_val_case_insensitive(flattened_xml, "device")
+                self._devices, self._services, **get_dict_val_case_insensitive(response, "device")
             )
-            log.debug("finished setting up root gateway. %i devices and %i services", len(self.devices),
-                          len(self.services))
         else:
             self._device = Device(self._devices, self._services)
-        log.debug("finished setting up gateway:\n%s", self.debug_device())
+        for service_type in self.services.keys():
+            service = self.services[service_type]
+            yield self.register_commands(service)
+
+    @defer.inlineCallbacks
+    def register_commands(self, service: Service):
+        try:
+            action_list = yield self.requester.scpd_get_supported_actions(service, self.base_address.decode(), self.port)
+        except Exception as err:
+            log.exception("failed to register service %s: %s", service.serviceType, str(err))
+            return
+        for name, inputs, outputs in action_list:
+            try:
+                command = SCPDCommand(self.requester, self.base_address, self.port,
+                                      service.controlURL.encode(),
+                                      service.serviceType.encode(), name, inputs, outputs)
+                current = getattr(self.commands, command.method)
+                if hasattr(current, "_return_types"):
+                    command._process_result = verify_return_types(*current._return_types)(command._process_result)
+                setattr(command, "__doc__", current.__doc__)
+                setattr(self.commands, command.method, command)
+                self._registered_commands[command.method] = service.serviceType
+                log.debug("registered %s::%s", service.serviceType, command.method)
+            except AttributeError:
+                s = self._unsupported_actions.get(service.serviceType, [])
+                s.append(name)
+                self._unsupported_actions[service.serviceType] = s
+                log.debug("available command for %s does not have a wrapper implemented: %s %s %s",
+                          service.serviceType, name, inputs, outputs)
 
     @property
     def services(self) -> dict:
@@ -205,7 +205,13 @@ class Gateway:
             return {}
         return {device.udn: device for device in self._devices}
 
-    def get_service(self, service_type) -> Service:
+    def get_service(self, service_type: str) -> Service:
         for service in self._services:
             if service.serviceType.lower() == service_type.lower():
                 return service
+
+    def debug_commands(self):
+        return {
+            'available': self._registered_commands,
+            'failed': self._unsupported_actions
+        }

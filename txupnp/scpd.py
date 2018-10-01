@@ -1,48 +1,224 @@
+import re
 import logging
-from collections import OrderedDict
-from twisted.internet import defer, threads
-from twisted.web.client import Agent
-import treq
-from treq.client import HTTPClient
 from xml.etree import ElementTree
-from txupnp.util import etree_to_dict, flatten_keys, return_types, verify_return_types, none_or_str, none
+from twisted.internet.protocol import Protocol, ClientFactory
+from twisted.internet import defer, error
+from txupnp.constants import XML_VERSION, DEVICE, ROOT, SERVICE, ENVELOPE, BODY
+from txupnp.util import etree_to_dict, flatten_keys
 from txupnp.fault import handle_fault, UPnPError
-from txupnp.constants import SERVICE, SSDP_IP_ADDRESS, DEVICE, ROOT, service_types, ENVELOPE, XML_VERSION
-from txupnp.constants import BODY, POST
-from txupnp.dirty_pool import DirtyPool
 
 log = logging.getLogger(__name__)
 
+CONTENT_PATTERN = re.compile(
+    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode()
+)
+CONTENT_NO_XML_VERSION_PATTERN = re.compile(
+    "(\<s\:Envelope xmlns\:s=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)".encode()
+)
 
-class StringProducer:
-    def __init__(self, body):
-        self.body = body
-        self.length = len(body)
-
-    def startProducing(self, consumer):
-        consumer.write(self.body)
-        return defer.succeed(None)
-
-    def pauseProducing(self):
-        pass
-
-    def stopProducing(self):
-        pass
+XML_ROOT_SANITY_PATTERN = re.compile(
+    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))"
+)
 
 
-def xml_arg(name, arg):
-    return "<%s>%s</%s>" % (name, arg, name)
+def parse_service_description(content: bytes):
+    element_dict = etree_to_dict(ElementTree.fromstring(content.decode()))
+    service_info = flatten_keys(element_dict, "{%s}" % SERVICE)
+    if "scpd" not in service_info:
+        return []
+    action_list = service_info["scpd"]["actionList"]
+    if not len(action_list):  # it could be an empty string
+        return []
+    result = []
+    if isinstance(action_list["action"], dict):
+        arg_dicts = action_list["action"]['argumentList']['argument']
+        if not isinstance(arg_dicts, list):  # when there is one arg, ew
+            arg_dicts = [arg_dicts]
+        return [[
+            action_list["action"]['name'],
+            [i['name'] for i in arg_dicts if i['direction'] == 'in'],
+            [i['name'] for i in arg_dicts if i['direction'] == 'out']
+        ]]
+    for action in action_list["action"]:
+        if not action.get('argumentList'):
+            result.append((action['name'], [], []))
+        else:
+            arg_dicts = action['argumentList']['argument']
+            if not isinstance(arg_dicts, list):  # when there is one arg, ew
+                arg_dicts = [arg_dicts]
+            result.append((
+                action['name'],
+                [i['name'] for i in arg_dicts if i['direction'] == 'in'],
+                [i['name'] for i in arg_dicts if i['direction'] == 'out']
+            ))
+    return result
 
 
-def get_soap_body(service_name, method, param_names, **kwargs):
-    args = "".join(xml_arg(n, kwargs.get(n)) for n in param_names)
-    return '\n%s\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:%s xmlns:u="%s">%s</u:%s></s:Body></s:Envelope>' % (XML_VERSION, method, service_name, args, method)
+class SCPDHTTPClientProtocol(Protocol):
+    def connectionMade(self):
+        self.response_buff = b""
+        self.factory.reactor.callLater(0, self.transport.write, self.factory.packet)
+
+    def dataReceived(self, data):
+        self.response_buff += data
+
+    def connectionLost(self, reason):
+        if reason.trap(error.ConnectionDone):
+            if XML_VERSION.encode() in self.response_buff:
+                parsed = CONTENT_PATTERN.findall(self.response_buff)
+                result = b'' if not parsed else parsed[0][0]
+                self.factory.finished_deferred.callback(result)
+            else:
+                parsed = CONTENT_NO_XML_VERSION_PATTERN.findall(self.response_buff)
+                result = b'' if not parsed else XML_VERSION.encode() + b'\r\n' + parsed[0][0]
+                self.factory.finished_deferred.callback(result)
 
 
-class _SCPDCommand(object):
-    def __init__(self, http_client, gateway_address, service_port, control_url, service_id, method, param_names,
+class SCPDHTTPClientFactory(ClientFactory):
+    protocol = SCPDHTTPClientProtocol
+
+    def __init__(self, reactor, packet):
+        self.reactor = reactor
+        self.finished_deferred = defer.Deferred()
+        self.packet = packet
+
+    def buildProtocol(self, addr):
+        p = self.protocol()
+        p.factory = self
+        return p
+
+    @classmethod
+    def post(cls, reactor, command, **kwargs):
+        args = "".join("<%s>%s</%s>" % (n, kwargs.get(n), n) for n in command.param_names)
+        soap_body = ('\r\n%s\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+                     's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+                     '<u:%s xmlns:u="%s">%s</u:%s></s:Body></s:Envelope>' % (
+                     XML_VERSION, command.method, command.service_id.decode(),
+                     args, command.method))
+        data = (
+                (
+                    'POST %s HTTP/1.1\r\n'
+                    'Host: %s\r\n'
+                    'User-Agent: Debian/buster/sid, UPnP/1.0, MiniUPnPc/1.9\r\n'
+                    'Content-Length: %i\r\n'
+                    'Content-Type: text/xml\r\n'
+                    'SOAPAction: \"%s#%s\"\r\n'
+                    'Connection: Close\r\n'
+                    'Cache-Control: no-cache\r\n'
+                    'Pragma: no-cache\r\n'
+                    '%s'
+                    '\r\n'
+                ) % (
+                    command.control_url.decode(),  # could be just / even if it shouldn't be
+                    command.gateway_address.decode().split("http://")[1],
+                    len(soap_body),
+                    command.service_id.decode(),  # maybe no quotes
+                    command.method,
+                    soap_body
+                )
+        ).encode()
+        return cls(reactor, data)
+
+    @classmethod
+    def get(cls, reactor, control_url: str, address: str):
+        data = (
+                (
+                    'GET %s HTTP/1.1\r\n'
+                    'Accept-Encoding: gzip\r\n'
+                    'Host: %s\r\n'
+                    '\r\n'
+                ) % (control_url, address)
+        ).encode()
+        return cls(reactor, data)
+
+
+class SCPDRequester:
+    client_factory = SCPDHTTPClientFactory
+
+    def __init__(self, reactor):
+        self._reactor = reactor
+        self._get_requests = {}
+        self._post_requests = {}
+
+    def _save_get(self, request: bytes, response: bytes, destination: str) -> None:
+        self._get_requests[destination.lstrip("/")] = {
+            'request': request,
+            'response': response
+        }
+
+    def _save_post(self, request: bytes, response: bytes, destination: str) -> None:
+        p = self._post_requests.get(destination.lstrip("/"), [])
+        p.append({
+            'request': request,
+            'response': response,
+        })
+        self._post_requests[destination.lstrip("/")] = p
+
+    @defer.inlineCallbacks
+    def _scpd_get_soap_xml(self, control_url: str, address: str, service_port: int) -> bytes:
+        factory = self.client_factory.get(self._reactor, control_url, address)
+        url = address.split("http://")[1].split(":")[0]
+        self._reactor.connectTCP(url, service_port, factory)
+        xml_response_bytes = yield factory.finished_deferred
+        self._save_get(factory.packet, xml_response_bytes, control_url)
+        return xml_response_bytes
+
+    @defer.inlineCallbacks
+    def scpd_post_soap(self, command, **kwargs) -> tuple:
+        factory = self.client_factory.post(self._reactor, command, **kwargs)
+        url = command.gateway_address.split(b"http://")[1].split(b":")[0]
+        self._reactor.connectTCP(url.decode(), command.service_port, factory)
+        xml_response_bytes = yield factory.finished_deferred
+        self._save_post(
+            factory.packet, xml_response_bytes, command.gateway_address.decode() + command.control_url.decode()
+        )
+        content_dict = etree_to_dict(ElementTree.fromstring(xml_response_bytes.decode()))
+        envelope = content_dict[ENVELOPE]
+        response_body = flatten_keys(envelope[BODY], "{%s}" % command.service_id)
+        body = handle_fault(response_body)  # raises UPnPError if there is a fault
+        response_key = None
+        for key in body:
+            if command.method in key:
+                response_key = key
+                break
+        if not response_key:
+            raise UPnPError("unknown response fields for %s")
+        response = body[response_key]
+        extracted_response = tuple([response[n] for n in command.returns])
+        return extracted_response
+
+    @defer.inlineCallbacks
+    def scpd_get_supported_actions(self, service, address: str, port: int) -> list:
+        xml_bytes = yield self._scpd_get_soap_xml(service.SCPDURL, address, port)
+        return parse_service_description(xml_bytes)
+
+    @defer.inlineCallbacks
+    def scpd_get(self, control_url: str, service_address: str, service_port: int) -> dict:
+        xml_bytes = yield self._scpd_get_soap_xml(control_url, service_address, service_port)
+        xml_dict = etree_to_dict(ElementTree.fromstring(xml_bytes.decode()))
+        schema_key = DEVICE
+        root = ROOT
+        for k in xml_dict.keys():
+            m = XML_ROOT_SANITY_PATTERN.findall(k)
+            if len(m) == 3 and m[1][0] and m[2][5]:
+                schema_key = m[1][0]
+                root = m[2][5]
+                break
+        flattened_xml = flatten_keys(xml_dict, "{%s}" % schema_key)[root]
+        return flattened_xml
+
+    def dump_packets(self) -> dict:
+        return {
+            'GET': self._get_requests,
+            'POST': self._post_requests
+        }
+
+
+class SCPDCommand:
+    def __init__(self, scpd_requester: SCPDRequester, gateway_address, service_port, control_url, service_id, method,
+                 param_names,
                  returns):
-        self._http_client = http_client
+        self.scpd_requester = scpd_requester
         self.gateway_address = gateway_address
         self.service_port = service_port
         self.control_url = control_url
@@ -51,59 +227,8 @@ class _SCPDCommand(object):
         self.param_names = param_names
         self.returns = returns
 
-    def extract_body(self, xml_response):
-        content_dict = etree_to_dict(ElementTree.fromstring(xml_response))
-        envelope = content_dict[ENVELOPE]
-        return flatten_keys(envelope[BODY], "{%s}" % self.service_id)
-
-    def extract_response(self, body):
-        body = handle_fault(body)  # raises UPnPError if there is a fault
-        response_key = None
-        for key in body:
-            if self.method in key:
-                response_key = key
-                break
-        if not response_key:
-            raise UPnPError("unknown response fields for %s")
-        response = body[response_key]
-        extracted_response = tuple([response[n] for n in self.returns])
-        if len(extracted_response) == 1:
-            return extracted_response[0]
-        return extracted_response
-
-    @defer.inlineCallbacks
-    def send_upnp_soap(self, **kwargs):
-        soap_body = get_soap_body(self.service_id, self.method, self.param_names, **kwargs).encode()
-        headers = OrderedDict((
-            ('SOAPAction', '%s#%s' % (self.service_id, self.method)),
-            ('Host', ('%s:%i' % (SSDP_IP_ADDRESS, self.service_port))),
-            ('Content-Type', 'text/xml'),
-            ('Content-Length', len(soap_body))
-        ))
-        log.debug("send POST to %s\nheaders: %s\nbody:%s\n", self.control_url, headers, soap_body)
-        try:
-            response = yield self._http_client.request(
-                POST, url=self.control_url, data=soap_body, headers=headers
-            )
-        except Exception as err:
-            log.error("error (%s) sending POST to %s\nheaders: %s\nbody:%s\n", err, self.control_url, headers,
-                      soap_body)
-            raise UPnPError(err)
-
-        xml_response = yield response.content()
-        try:
-            response = self.extract_response(self.extract_body(xml_response))
-        except UPnPError:
-            raise
-        except Exception as err:
-            log.debug("error extracting response (%s) to %s:\n%s", err, self.method, xml_response)
-            raise err
-        if not response:
-            log.debug("empty response to %s\n%s", self.method, xml_response)
-        defer.returnValue(response)
-
     @staticmethod
-    def _process_result(results):
+    def _process_result(*results):
         """
         this method gets decorated automatically with a function that maps result types to the types
         defined in the @return_types decorator
@@ -114,367 +239,10 @@ class _SCPDCommand(object):
     def __call__(self, **kwargs):
         if set(kwargs.keys()) != set(self.param_names):
             raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_names))
-        response = yield self.send_upnp_soap(**kwargs)
+        response = yield self.scpd_requester.scpd_post_soap(self, **kwargs)
         try:
-            result = self._process_result(response)
+            result = self._process_result(*response)
         except Exception as err:
             log.error("error formatting response (%s):\n%s", err, response)
             raise err
         defer.returnValue(result)
-
-
-class SCPDResponse(object):
-    def __init__(self, url, headers, content):
-        self.url = url
-        self.headers = headers
-        self.content = content
-
-    def get_element_tree(self):
-        return ElementTree.fromstring(self.content)
-
-    def get_element_dict(self, service_key):
-        return flatten_keys(etree_to_dict(self.get_element_tree()), "{%s}" % service_key)
-
-    def get_action_list(self):
-        return self.get_element_dict(SERVICE)["scpd"]["actionList"]["action"]
-
-    def get_device_info(self):
-        return self.get_element_dict(DEVICE)[ROOT]
-
-
-class SCPDCommandRunner(object):
-    def __init__(self, gateway, reactor, treq_get=None):
-        self._gateway = gateway
-        self._unsupported_actions = {}
-        self._registered_commands = {}
-        self._reactor = reactor
-        self._connection_pool = DirtyPool(reactor)
-        self._agent = Agent(reactor, connectTimeout=1, pool=self._connection_pool)
-        self._http_client = HTTPClient(self._agent, data_to_body_producer=StringProducer)
-        self._treq_get = treq_get or treq.get
-
-    @defer.inlineCallbacks
-    def _discover_commands(self, service):
-        scpd_url = self._gateway.base_address + service.SCPDURL.encode()
-        response = yield self._treq_get(scpd_url)
-        content = yield response.content()
-        try:
-            scpd_response = SCPDResponse(scpd_url, response.headers, content)
-            for action_dict in scpd_response.get_action_list():
-                self._register_command(action_dict, service.serviceType)
-        except Exception as err:
-            log.exception("failed to parse scpd response (%s) from %s\nheaders:\n%s\ncontent\n%s",
-                          err, scpd_url, response.headers, content)
-        defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def discover_commands(self):
-        for service_type in service_types:
-            service = self._gateway.get_service(service_type)
-            if not service:
-                continue
-            yield self._discover_commands(service)
-        log.debug(self.debug_commands())
-
-    @staticmethod
-    def _soap_function_info(action_dict):
-        if not action_dict.get('argumentList'):
-            return (
-                action_dict['name'],
-                [],
-                []
-            )
-        arg_dicts = action_dict['argumentList']['argument']
-        if not isinstance(arg_dicts, list):  # when there is one arg, ew
-            arg_dicts = [arg_dicts]
-        return (
-            action_dict['name'],
-            [i['name'] for i in arg_dicts if i['direction'] == 'in'],
-            [i['name'] for i in arg_dicts if i['direction'] == 'out']
-        )
-
-    def _patch_command(self, action_info, service_type):
-        name, inputs, outputs = self._soap_function_info(action_info)
-        command = _SCPDCommand(self._http_client, self._gateway.base_address, self._gateway.port,
-                               self._gateway.base_address + self._gateway.get_service(service_type).controlURL.encode(),
-                               self._gateway.get_service(service_type).serviceType.encode(), name, inputs, outputs)
-        current = getattr(self, command.method)
-        if hasattr(current, "_return_types"):
-            command._process_result = verify_return_types(*current._return_types)(command._process_result)
-        setattr(command, "__doc__", current.__doc__)
-        setattr(self, command.method, command)
-        self._registered_commands[command.method] = service_type
-        log.debug("registered %s %s", service_type, action_info['name'])
-        return True
-
-    def _register_command(self, action_info, service_type):
-        try:
-            return self._patch_command(action_info, service_type)
-        except Exception as err:
-            s = self._unsupported_actions.get(service_type, [])
-            s.append((action_info, err))
-            self._unsupported_actions[service_type] = s
-            log.error("available command for %s does not have a wrapper implemented: %s", service_type, action_info)
-
-    def debug_commands(self):
-        return {
-            'available': self._registered_commands,
-            'failed': self._unsupported_actions
-        }
-
-    @staticmethod
-    @return_types(none)
-    def AddPortMapping(NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
-                       NewEnabled, NewPortMappingDescription, NewLeaseDuration=''):
-        """Returns None"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(bool, bool)
-    def GetNATRSIPStatus():
-        """Returns (NewRSIPAvailable, NewNATEnabled)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none_or_str, int, str, int, str, bool, str, int)
-    def GetGenericPortMappingEntry(NewPortMappingIndex):
-        """
-        Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
-                 NewPortMappingDescription, NewLeaseDuration)
-        """
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(int, str, bool, str, int)
-    def GetSpecificPortMappingEntry(NewRemoteHost, NewExternalPort, NewProtocol):
-        """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none)
-    def SetConnectionType(NewConnectionType):
-        """Returns None"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(str)
-    def GetExternalIPAddress():
-        """Returns (NewExternalIPAddress)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(str, str)
-    def GetConnectionTypeInfo():
-        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(str, str, int)
-    def GetStatusInfo():
-        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none)
-    def ForceTermination():
-        """Returns None"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none)
-    def DeletePortMapping(NewRemoteHost, NewExternalPort, NewProtocol):
-        """Returns None"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none)
-    def RequestConnection():
-        """Returns None"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetCommonLinkProperties():
-        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetTotalBytesSent():
-        """Returns (NewTotalBytesSent)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetTotalBytesReceived():
-        """Returns (NewTotalBytesReceived)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetTotalPacketsSent():
-        """Returns (NewTotalPacketsSent)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetTotalPacketsReceived():
-        """Returns (NewTotalPacketsReceived)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def X_GetICSStatistics():
-        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetDefaultConnectionService():
-        """Returns (NewDefaultConnectionService)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    def SetDefaultConnectionService(NewDefaultConnectionService):
-        """Returns (None)"""
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(none)
-    def SetEnabledForInternet(NewEnabledForInternet):
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(bool)
-    def GetEnabledForInternet():
-        raise NotImplementedError()
-
-    @staticmethod
-    def GetMaximumActiveConnections(NewActiveConnectionIndex):
-        raise NotImplementedError()
-
-    @staticmethod
-    @return_types(str, str)
-    def GetActiveConnections():
-        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
-        raise NotImplementedError()
-
-
-class UPnPFallback(object):
-    def __init__(self):
-        try:
-            import miniupnpc
-            self._upnp = miniupnpc.UPnP()
-            self.available = True
-        except ImportError:
-            self._upnp = None
-            self.available = False
-
-    @defer.inlineCallbacks
-    def discover(self):
-        if not self.available:
-            raise NotImplementedError()
-        devices = yield threads.deferToThread(self._upnp.discover)
-        if devices:
-            self.device_url = yield threads.deferToThread(self._upnp.selectigd)
-        else:
-            self.device_url = None
-
-        defer.returnValue(devices > 0)
-
-    @return_types(none)
-    def AddPortMapping(self, NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient,
-                       NewEnabled, NewPortMappingDescription, NewLeaseDuration=''):
-        """Returns None"""
-        if not self.available:
-            raise NotImplementedError()
-        return threads.deferToThread(self._upnp.addportmapping, NewExternalPort, NewProtocol, NewInternalClient,
-                                     NewInternalPort, NewPortMappingDescription, NewLeaseDuration)
-
-    def GetNATRSIPStatus(self):
-        """Returns (NewRSIPAvailable, NewNATEnabled)"""
-        raise NotImplementedError()
-
-    @return_types(none_or_str, int, str, int, str, bool, str, int)
-    @defer.inlineCallbacks
-    def GetGenericPortMappingEntry(self, NewPortMappingIndex):
-        """
-        Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
-                 NewPortMappingDescription, NewLeaseDuration)
-        """
-        if not self.available:
-            raise NotImplementedError()
-        result = yield threads.deferToThread(self._upnp.getgenericportmapping, NewPortMappingIndex)
-        if not result:
-            raise UPnPError()
-        ext_port, protocol, (int_host, int_port), desc, enabled, remote_host, lease = result
-        defer.returnValue((remote_host, ext_port, protocol, int_port, int_host, enabled, desc, lease))
-
-    @return_types(int, str, bool, str, int)
-    def GetSpecificPortMappingEntry(self, NewRemoteHost, NewExternalPort, NewProtocol):
-        """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
-        if not self.available:
-            raise NotImplementedError()
-        return threads.deferToThread(self._upnp.getspecificportmapping, NewExternalPort, NewProtocol)
-
-    def SetConnectionType(self, NewConnectionType):
-        """Returns None"""
-        raise NotImplementedError()
-
-    @return_types(str)
-    def GetExternalIPAddress(self):
-        """Returns (NewExternalIPAddress)"""
-        if not self.available:
-            raise NotImplementedError()
-        return threads.deferToThread(self._upnp.externalipaddress)
-
-    def GetConnectionTypeInfo(self):
-        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
-        raise NotImplementedError()
-
-    @return_types(str, str, int)
-    def GetStatusInfo(self):
-        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
-        if not self.available:
-            raise NotImplementedError()
-        return threads.deferToThread(self._upnp.statusinfo)
-
-    def ForceTermination(self):
-        """Returns None"""
-        raise NotImplementedError()
-
-    @return_types(none)
-    def DeletePortMapping(self, NewRemoteHost, NewExternalPort, NewProtocol):
-        """Returns None"""
-        if not self.available:
-            raise NotImplementedError()
-        return threads.deferToThread(self._upnp.deleteportmapping, NewExternalPort, NewProtocol)
-
-    def RequestConnection(self):
-        """Returns None"""
-        raise NotImplementedError()
-
-    def GetCommonLinkProperties(self):
-        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
-        raise NotImplementedError()
-
-    def GetTotalBytesSent(self):
-        """Returns (NewTotalBytesSent)"""
-        raise NotImplementedError()
-
-    def GetTotalBytesReceived(self):
-        """Returns (NewTotalBytesReceived)"""
-        raise NotImplementedError()
-
-    def GetTotalPacketsSent(self):
-        """Returns (NewTotalPacketsSent)"""
-        raise NotImplementedError()
-
-    def GetTotalPacketsReceived(self):
-        """Returns (NewTotalPacketsReceived)"""
-        raise NotImplementedError()
-
-    def X_GetICSStatistics(self):
-        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
-        raise NotImplementedError()
-
-    def GetDefaultConnectionService(self):
-        """Returns (NewDefaultConnectionService)"""
-        raise NotImplementedError()
-
-    def SetDefaultConnectionService(self, NewDefaultConnectionService):
-        """Returns (None)"""
-        raise NotImplementedError()

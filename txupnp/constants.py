@@ -20,15 +20,7 @@ IP_SCHEMA = 'urn:schemas-upnp-org:service:WANIPConnection:1'
 
 service_types = [
     UPNP_ORG_IGD,
-    WIFI_ALLIANCE_ORG_IGD,
-    WAN_SCHEMA,
-    LAYER_SCHEMA,
-    IP_SCHEMA,
-
-
-    CONTROL,
-    SERVICE,
-    DEVICE,
+    # WIFI_ALLIANCE_ORG_IGD,
 ]
 
 SSDP_IP_ADDRESS = '239.255.255.250'

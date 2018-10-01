@@ -1,6 +1,6 @@
 # UPnP for Twisted
 
-`txupnp` is a python2/3 library to interact with UPnP gateways using Twisted
+`txupnp` is a python 3 library to interact with UPnP gateways using `twisted`
 
 ## Installation
 
