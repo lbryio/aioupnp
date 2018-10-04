@@ -42,15 +42,17 @@ class UPnP:
         server_infos = yield self.sspd_factory.m_search(
             self.router_ip, timeout=timeout, max_devices=max_devices
         )
+        if not server_infos:
+            return False
         server_info = server_infos[0]
         if 'st' in server_info:
             gateway = Gateway(reactor=self._reactor, **server_info)
             yield gateway.discover_commands()
             self.gateway = gateway
-            defer.returnValue(True)
+            return True
         elif 'st' not in server_info:
             log.error("don't know how to handle gateway: %s", server_info)
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def discover(self, timeout=1, max_devices=1):
@@ -64,7 +66,7 @@ class UPnP:
             log.debug("found upnp device")
         else:
             log.debug("failed to find upnp device")
-        defer.returnValue(found)
+        return found
 
     def get_external_ip(self) -> str:
         return self.gateway.commands.GetExternalIPAddress()
