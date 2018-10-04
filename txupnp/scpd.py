@@ -57,6 +57,7 @@ def parse_service_description(content: bytes):
 class SCPDHTTPClientProtocol(Protocol):
     def connectionMade(self):
         self.response_buff = b""
+        log.debug("Sending HTTP:\n%s", self.factory.packet.decode())
         self.factory.reactor.callLater(0, self.transport.write, self.factory.packet)
 
     def dataReceived(self, data):
@@ -64,6 +65,7 @@ class SCPDHTTPClientProtocol(Protocol):
 
     def connectionLost(self, reason):
         if reason.trap(error.ConnectionDone):
+            log.debug("Received HTTP:\n%s", self.response_buff.decode())
             if XML_VERSION.encode() in self.response_buff:
                 parsed = CONTENT_PATTERN.findall(self.response_buff)
                 result = b'' if not parsed else parsed[0][0]
@@ -127,7 +129,7 @@ class SCPDHTTPClientFactory(ClientFactory):
                     'Accept-Encoding: gzip\r\n'
                     'Host: %s\r\n'
                     '\r\n'
-                ) % (control_url, address)
+                ) % (control_url, address.split("http://")[1])
         ).encode()
         return cls(reactor, data)
 
