@@ -25,7 +25,6 @@ setup(
     entry_points={'console_scripts': console_scripts},
     install_requires=[
         'twisted[tls]',
-        'treq',
         'netifaces',
     ],
 )
