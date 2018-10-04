@@ -12,7 +12,8 @@ log = logging.getLogger(__name__)
 
 class SSDPProtocol(DatagramProtocol):
     def __init__(self, reactor, iface, router, ssdp_address=SSDP_IP_ADDRESS,
-                 ssdp_port=SSDP_PORT, ttl=1, max_devices=None):
+                 ssdp_port=SSDP_PORT, ttl=1, max_devices=None, debug_packets=False,
+                 debug_sent=None, debug_received=None):
         self._reactor = reactor
         self._sem = defer.DeferredSemaphore(1)
         self.discover_callbacks = {}
@@ -24,34 +25,36 @@ class SSDPProtocol(DatagramProtocol):
         self._start = None
         self.max_devices = max_devices
         self.devices = []
+        self.debug_packets = debug_packets
+        self.debug_sent = debug_sent if debug_sent is not None else []
+        self.debug_received = debug_received if debug_sent is not None else []
 
     def _send_m_search(self, service=UPNP_ORG_IGD):
         packet = SSDPDatagram(SSDPDatagram._M_SEARCH, host=SSDP_HOST, st=service, man=SSDP_DISCOVER, mx=1)
         log.debug("sending packet to %s:\n%s", SSDP_HOST, packet.encode())
         try:
-            self.transport.write(packet.encode().encode(), (self.ssdp_address, self.ssdp_port))
+            msg_bytes = packet.encode().encode()
+            if self.debug_packets:
+                self.debug_sent.append(msg_bytes)
+            self.transport.write(msg_bytes, (self.ssdp_address, self.ssdp_port))
         except Exception as err:
             log.exception("failed to write %s to %s:%i", packet.encode(), self.ssdp_address, self.ssdp_port)
             raise err
 
     @staticmethod
-    def _gather(finished_deferred, max_results):
-        results = []
-
+    def _gather(finished_deferred, max_results, results: list):
         def discover_cb(packet):
-            if not finished_deferred.called:
+            if not finished_deferred.called and packet.st in service_types:
                 results.append(packet.as_dict())
                 if len(results) >= max_results:
                     finished_deferred.callback(results)
 
         return discover_cb
 
-    def m_search(self, address=None, timeout=1, max_devices=1):
-        address = address or self.iface
-
+    def m_search(self, address, timeout, max_devices):
         # return deferred for a pending call if we have one
         if address in self.discover_callbacks:
-            d = self.protocol.discover_callbacks[address][1]
+            d = self.discover_callbacks[address][1]
             if not d.called:  # the existing deferred has already fired, make a new one
                 return d
 
@@ -63,7 +66,7 @@ class SSDPProtocol(DatagramProtocol):
         d = defer.Deferred()
         d.addTimeout(timeout, self._reactor)
         d.addErrback(_trap_timeout_and_return_results)
-        found_cb = self._gather(d, max_devices)
+        found_cb = self._gather(d, max_devices, self.devices)
         self.discover_callbacks[address] = found_cb, d
         for st in service_types:
             self._send_m_search(service=st)
@@ -73,11 +76,12 @@ class SSDPProtocol(DatagramProtocol):
         self._start = self._reactor.seconds()
         self.transport.setTTL(self.ttl)
         self.transport.joinGroup(self.ssdp_address, interface=self.iface)
-        self.m_search()
 
     def datagramReceived(self, datagram, address):
         if address[0] == self.iface:
             return
+        if self.debug_packets:
+            self.debug_received.append((address, datagram))
         try:
             packet = SSDPDatagram.decode(datagram)
             log.debug("decoded %s from %s:%i:\n%s", packet.get_friendly_name(), address[0], address[1], packet.encode())
@@ -90,23 +94,30 @@ class SSDPProtocol(DatagramProtocol):
             return
         if packet._packet_type == packet._OK:
             log.debug("%s:%i replied to our m-search with new xml url: %s", address[0], address[1], packet.location)
-            if packet.st not in map(lambda p: p['st'], self.devices):
-                self.devices.append(packet.as_dict())
-                log.debug("%i device%s so far", len(self.devices), "" if len(self.devices) < 2 else "s")
-                if address[0] in self.discover_callbacks:
+            # if address[0] in self.discover_callbacks and packet.location not in map(lambda p: p['location'], self.devices):
+            if packet.location not in map(lambda p: p['location'], self.devices):
+                if address[0] not in self.discover_callbacks:
+                    self.devices.append(packet.as_dict())
+                else:
                     self._sem.run(self.discover_callbacks[address[0]][0], packet)
+            else:
+                log.info("ignored packet from %s:%s (%s) %s", address[0], address[1], packet._packet_type, packet.location)
         elif packet._packet_type == packet._NOTIFY:
             log.debug("%s:%i sent us a notification (type: %s), url: %s", address[0], address[1], packet.nts,
                       packet.location)
 
 
-class SSDPFactory(object):
-    def __init__(self, reactor, lan_address, router_address):
+class SSDPFactory:
+    def __init__(self, reactor, lan_address, router_address, debug_packets=False):
         self.lan_address = lan_address
         self.router_address = router_address
         self._reactor = reactor
         self.protocol = None
         self.port = None
+        self.debug_packets = debug_packets
+        self.debug_sent = []
+        self.debug_received = []
+        self.server_infos = []
 
     def disconnect(self):
         if not self.port:
@@ -118,13 +129,15 @@ class SSDPFactory(object):
 
     def connect(self):
         if not self.protocol:
-            self.protocol = SSDPProtocol(self._reactor, self.lan_address, self.router_address)
+            self.protocol = SSDPProtocol(self._reactor, self.lan_address, self.router_address,
+                                         debug_packets=self.debug_packets, debug_sent=self.debug_sent,
+                                         debug_received=self.debug_received)
         if not self.port:
             self._reactor.addSystemEventTrigger("before", "shutdown", self.disconnect)
             self.port = self._reactor.listenMulticast(self.protocol.ssdp_port, self.protocol, listenMultiple=True)
 
     @defer.inlineCallbacks
-    def m_search(self, address, timeout=1, max_devices=1):
+    def m_search(self, address, timeout, max_devices):
         """
         Perform a M-SEARCH (HTTP over UDP) and gather the results
 
@@ -140,7 +153,16 @@ class SSDPFactory(object):
             'usn': (str) usn
         }, ...]
         """
-
         self.connect()
         server_infos = yield self.protocol.m_search(address, timeout, max_devices)
+        for server_info in server_infos:
+            self.server_infos.append(server_info)
         defer.returnValue(server_infos)
+
+    def get_ssdp_packet_replay(self) -> dict:
+        return {
+            'lan_address': self.lan_address,
+            'router_address': self.router_address,
+            'sent': self.debug_sent,
+            'received': self.debug_received,
+        }

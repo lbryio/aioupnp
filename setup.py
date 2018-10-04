@@ -21,7 +21,7 @@ setup(
     long_description=long_description,
     url="https://github.com/lbryio/txupnp",
     license=__license__,
-    packages=find_packages(),
+    packages=find_packages(exclude=['tests']),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
         'twisted[tls]',
