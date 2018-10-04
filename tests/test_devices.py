@@ -2,11 +2,7 @@ from twisted.internet import reactor, defer
 from twisted.trial import unittest
 from txupnp.constants import SSDP_PORT, SSDP_IP_ADDRESS
 from txupnp.upnp import UPnP
-from txupnp.scpd import SCPDCommand
-from txupnp.gateway import Service
-from txupnp.fault import UPnPError
 from txupnp.mocks import MockReactor, MockSSDPServiceGatewayProtocol, get_device_test_case
-from txupnp.util import verify_return_types
 
 
 class TestDevice(unittest.TestCase):
@@ -103,3 +99,15 @@ class TestSCPD(TestDevice):
         command5 = getattr(self.upnp, method)
         result = yield command5(*tuple(args))
         self.assertEqual(result, expected)
+
+
+class TestDDWRT(unittest.TestCase):
+    manufacturer, model = "DD-WRT", "router"
+
+
+class TestDDWRTSSDP(TestSSDP):
+    manufacturer, model = "DD-WRT", "router"
+
+
+class TestDDWRTSCPD(TestSCPD):
+    manufacturer, model = "DD-WRT", "router"
