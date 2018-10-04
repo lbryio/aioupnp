@@ -101,13 +101,17 @@ class TestSCPD(TestDevice):
         self.assertEqual(result, expected)
 
 
-class TestDDWRT(unittest.TestCase):
-    manufacturer, model = "DD-WRT", "router"
-
-
 class TestDDWRTSSDP(TestSSDP):
     manufacturer, model = "DD-WRT", "router"
 
 
 class TestDDWRTSCPD(TestSCPD):
     manufacturer, model = "DD-WRT", "router"
+
+
+class TestMiniUPnPMiniUPnPd(TestSSDP):
+    manufacturer, model = "MiniUPnP", "MiniUPnPd"
+
+
+class TestMiniUPnPMiniUPnPdSCPD(TestSCPD):
+    manufacturer, model = "MiniUPnP", "MiniUPnPd"
