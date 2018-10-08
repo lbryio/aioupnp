@@ -1,8 +1,9 @@
 import os
+import socket
 import logging
 import json
 import asyncio
-import functools
+from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.constants import UPNP_ORG_IGD
@@ -12,19 +13,9 @@ from aioupnp.protocols.ssdp import m_search
 log = logging.getLogger(__name__)
 
 
-def cli(format_result=None):
-    def _cli(fn):
-        @functools.wraps(fn)
-        async def _inner(*args, **kwargs):
-            result = await fn(*args, **kwargs)
-            if not format_result or not result or not isinstance(result, (list, dict, tuple)):
-                return result
-            self = args[0]
-            return {k: v for k, v in zip(getattr(self.gateway.commands, format_result).return_order, result)}
-        f = _inner
-        f._cli = True
-        return f
-    return _cli
+def cli(fn):
+    fn._cli = True
+    return fn
 
 
 def _encode(x):
@@ -36,14 +27,14 @@ def _encode(x):
 
 
 class UPnP:
-    def __init__(self, lan_address: str, gateway_address: str, gateway: Gateway):
+    def __init__(self, lan_address: str, gateway_address: str, gateway: Gateway) -> None:
         self.lan_address = lan_address
         self.gateway_address = gateway_address
         self.gateway = gateway
 
     @classmethod
     def get_lan_and_gateway(cls, lan_address: str = '', gateway_address: str = '',
-                            interface_name: str = 'default') -> (str, str):
+                            interface_name: str = 'default') -> Tuple[str, str]:
         if not lan_address or not gateway_address:
             gateway_addr, lan_addr = get_gateway_and_lan_addresses(interface_name)
             lan_address = lan_address or lan_addr
@@ -52,18 +43,19 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = UPNP_ORG_IGD, interface_name: str = 'default'):
+                       service: str = UPNP_ORG_IGD, interface_name: str = 'default',
+                       ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
             raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
-        gateway = await Gateway.discover_gateway(lan_address, gateway_address, timeout, service)
+        gateway = await Gateway.discover_gateway(lan_address, gateway_address, timeout, service, ssdp_socket, soap_socket)
         return cls(lan_address, gateway_address, gateway)
 
     @classmethod
-    @cli()
+    @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = UPNP_ORG_IGD, interface_name: str = 'default') -> dict:
+                       service: str = UPNP_ORG_IGD, interface_name: str = 'default') -> Dict:
         lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         datagram = await m_search(lan_address, gateway_address, timeout, service)
         return {
@@ -72,32 +64,39 @@ class UPnP:
             'discover_reply': datagram.as_dict()
         }
 
-    @cli()
+    @cli
     async def get_external_ip(self) -> str:
         return await self.gateway.commands.GetExternalIPAddress()
 
-    @cli("AddPortMapping")
+    @cli
     async def add_port_mapping(self, external_port: int, protocol: str, internal_port, lan_address: str,
                          description: str) -> None:
-        return await self.gateway.commands.AddPortMapping(
+        await self.gateway.commands.AddPortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
             NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=""
         )
+        return
 
-    @cli("GetGenericPortMappingEntry")
-    async def get_port_mapping_by_index(self, index: int) -> dict:
-        return await self._get_port_mapping_by_index(index)
+    @cli
+    async def get_port_mapping_by_index(self, index: int) -> Dict:
+        result = await self._get_port_mapping_by_index(index)
+        if result:
+            return {
+                k: v for k, v in zip(self.gateway.commands.GetGenericPortMappingEntry.return_order, result)
+            }
+        return {}
 
-    async def _get_port_mapping_by_index(self, index: int) -> (str, int, str, int, str, bool, str, int):
+    async def _get_port_mapping_by_index(self, index: int) -> Union[Tuple[str, int, str, int, str, bool, str, int],
+                                                                  None]:
         try:
             redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
             return redirect
         except UPnPError:
-            return
+            return None
 
-    @cli()
-    async def get_redirects(self) -> list:
+    @cli
+    async def get_redirects(self) -> List[Dict]:
         redirects = []
         cnt = 0
         redirect = await self.get_port_mapping_by_index(cnt)
@@ -107,8 +106,8 @@ class UPnP:
             redirect = await self.get_port_mapping_by_index(cnt)
         return redirects
 
-    @cli("GetSpecificPortMappingEntry")
-    async def get_specific_port_mapping(self, external_port: int, protocol: str):
+    @cli
+    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Dict:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -116,13 +115,14 @@ class UPnP:
         """
 
         try:
-            return await self.gateway.commands.GetSpecificPortMappingEntry(
+            result = await self.gateway.commands.GetSpecificPortMappingEntry(
                 NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol
             )
+            return {k: v for k, v in zip(self.gateway.commands.GetSpecificPortMappingEntry.return_order, result)}
         except UPnPError:
-            return
+            return {}
 
-    @cli()
+    @cli
     async def delete_port_mapping(self, external_port: int, protocol: str) -> None:
         """
         :param external_port: (int) external port to listen on
@@ -133,7 +133,7 @@ class UPnP:
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol
         )
 
-    @cli("AddPortMapping")
+    @cli
     async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
@@ -163,14 +163,14 @@ class UPnP:
         )
         return port
 
-    @cli()
-    async def get_soap_commands(self) -> dict:
+    @cli
+    async def get_soap_commands(self) -> Dict:
         return {
             'supported': list(self.gateway._registered_commands.keys()),
             'unsupported': self.gateway._unsupported_actions
         }
 
-    @cli()
+    @cli
     async def generate_test_data(self):
         external_ip = await self.get_external_ip()
         redirects = await self.get_redirects()
@@ -216,13 +216,13 @@ class UPnP:
     @classmethod
     def run_cli(cls, method, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
                           service: str = UPNP_ORG_IGD, interface_name: str = 'default',
-                kwargs: dict = None):
+                kwargs: dict = None) -> None:
         kwargs = kwargs or {}
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        fut = asyncio.Future()
+        fut: asyncio.Future = asyncio.Future()
 
         async def wrapper():
             if method == 'm_search':

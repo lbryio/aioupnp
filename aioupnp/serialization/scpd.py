@@ -1,4 +1,5 @@
 import re
+from typing import Dict
 from xml.etree import ElementTree
 from aioupnp.constants import XML_VERSION, DEVICE, ROOT
 from aioupnp.util import etree_to_dict, flatten_keys
@@ -33,7 +34,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
     ).encode()
 
 
-def deserialize_scpd_get_response(content: bytes) -> dict:
+def deserialize_scpd_get_response(content: bytes) -> Dict:
     if XML_VERSION.encode() in content:
         parsed = CONTENT_PATTERN.findall(content)
         content = b'' if not parsed else parsed[0][0]
@@ -47,3 +48,4 @@ def deserialize_scpd_get_response(content: bytes) -> dict:
                 root = m[2][5]
                 break
         return flatten_keys(xml_dict, "{%s}" % schema_key)[root]
+    return {}

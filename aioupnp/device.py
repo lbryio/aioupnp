@@ -1,10 +1,11 @@
 import logging
+from typing import List
 
 log = logging.getLogger(__name__)
 
 
 class CaseInsensitive:
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         not_evaluated = {}
         for k, v in kwargs.items():
             if k.startswith("_"):
@@ -22,6 +23,7 @@ class CaseInsensitive:
         for k, v in self.__dict__.items():
             if k.lower() == case_insensitive.lower():
                 return k
+        raise AttributeError(case_insensitive)
 
     def __getattr__(self, item):
         if item in self.__dict__:
@@ -75,7 +77,7 @@ class Device(CaseInsensitive):
     presentationURL = None
     iconList = None
 
-    def __init__(self, devices, services, **kwargs):
+    def __init__(self, devices: List, services: List, **kwargs) -> None:
         super(Device, self).__init__(**kwargs)
         if self.serviceList and "service" in self.serviceList:
             new_services = self.serviceList["service"]

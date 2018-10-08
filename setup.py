@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages  # type: ignore
 from aioupnp import __version__, __name__, __email__, __author__, __license__
 
 console_scripts = [

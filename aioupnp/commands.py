@@ -1,5 +1,6 @@
-def none_or_str(x):
-    return None if not x or x == 'None' else str(x)
+from typing import Tuple, Union
+
+none_or_str = Union[None, str]
 
 
 class SCPDCommands:
@@ -14,12 +15,13 @@ class SCPDCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def GetNATRSIPStatus() -> (bool, bool):
+    async def GetNATRSIPStatus() -> Tuple[bool, bool]:
         """Returns (NewRSIPAvailable, NewNATEnabled)"""
         raise NotImplementedError()
 
     @staticmethod
-    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> (none_or_str, int, str, int, str, bool, str, int):
+    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> Tuple[none_or_str, int, str, int, str,
+                                                                            bool, str, int]:
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
                  NewPortMappingDescription, NewLeaseDuration)
@@ -27,7 +29,8 @@ class SCPDCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def GetSpecificPortMappingEntry(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str) -> (int, str, bool, str, int):
+    async def GetSpecificPortMappingEntry(NewRemoteHost: str, NewExternalPort: int,
+                                          NewProtocol: str) -> Tuple[int, str, bool, str, int]:
         """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
         raise NotImplementedError()
 
@@ -42,12 +45,12 @@ class SCPDCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def GetConnectionTypeInfo() -> (str, str):
+    async def GetConnectionTypeInfo() -> Tuple[str, str]:
         """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
         raise NotImplementedError()
 
     @staticmethod
-    async def GetStatusInfo() -> (str, str, int):
+    async def GetStatusInfo() -> Tuple[str, str, int]:
         """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
         raise NotImplementedError()
 
@@ -92,7 +95,7 @@ class SCPDCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def X_GetICSStatistics() -> (int, int, int, int, str, str):
+    async def X_GetICSStatistics() -> Tuple[int, int, int, int, str, str]:
         """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
         raise NotImplementedError()
 
@@ -119,6 +122,6 @@ class SCPDCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def GetActiveConnections() -> (str, str):
+    async def GetActiveConnections() -> Tuple[str, str]:
         """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
         raise NotImplementedError()

@@ -1,6 +1,7 @@
 import re
 import socket
 from collections import defaultdict
+from typing import Tuple, Dict
 from xml.etree import ElementTree
 import netifaces
 
@@ -9,15 +10,17 @@ BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode
 BASE_PORT_REGEX = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
 
 
-def etree_to_dict(t: ElementTree) -> dict:
-    d = {t.tag: {} if t.attrib else None}
+def etree_to_dict(t: ElementTree.Element) -> Dict:
+    d: dict = {}
+    if t.attrib:
+        d[t.tag] = {}
     children = list(t)
     if children:
-        dd = defaultdict(list)
+        dd: dict = defaultdict(list)
         for dc in map(etree_to_dict, children):
             for k, v in dc.items():
                 dd[k].append(v)
-        d = {t.tag: {k: v[0] if len(v) == 1 else v for k, v in dd.items()}}
+        d[t.tag] = {k: v[0] if len(v) == 1 else v for k, v in dd.items()}
     if t.attrib:
         d[t.tag].update(('@' + k, v) for k, v in t.attrib.items())
     if t.text:
@@ -81,8 +84,8 @@ def get_interfaces():
     return r
 
 
-def get_gateway_and_lan_addresses(interface_name: str) -> (str, str):
+def get_gateway_and_lan_addresses(interface_name: str) -> Tuple[str, str]:
     for iface_name, (gateway, lan) in get_interfaces().items():
         if interface_name == iface_name:
             return gateway, lan
-    return None, None
+    return '', ''

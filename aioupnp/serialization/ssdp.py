@@ -1,6 +1,7 @@
 import re
 import logging
 import binascii
+from typing import Dict, List
 from aioupnp.fault import UPnPError
 from aioupnp.constants import line_separator
 
@@ -69,13 +70,8 @@ class SSDPDatagram(object):
         ]
     }
 
-    _marshallers = {
-        'mx': str,
-        'man': lambda x: ("\"%s\"" % x)
-    }
-
     def __init__(self, packet_type, host=None, st=None, man=None, mx=None, nt=None, nts=None, usn=None, location=None,
-                 cache_control=None, server=None, date=None, ext=None, **kwargs):
+                 cache_control=None, server=None, date=None, ext=None, **kwargs) -> None:
         if packet_type not in [self._M_SEARCH, self._NOTIFY, self._OK]:
             raise UPnPError("unknown packet type: {}".format(packet_type))
         self._packet_type = packet_type
@@ -95,8 +91,9 @@ class SSDPDatagram(object):
             if not k.startswith("_") and hasattr(self, k.lower()) and getattr(self, k.lower()) is None:
                 setattr(self, k.lower(), v)
 
-    def __repr__(self):
-        return ("SSDPDatagram(packet_type=%s, " % self._packet_type) + ", ".join("%s=%s" % (n, v) for n, v in self.as_dict().items()) + ")"
+    def __repr__(self) -> str:
+        return ("SSDPDatagram(packet_type=%s, " % self._packet_type) + \
+               ", ".join("%s=%s" % (n, v) for n, v in self.as_dict().items()) + ")"
 
     def __getitem__(self, item):
         for i in self._required_fields[self._packet_type]:
@@ -104,17 +101,19 @@ class SSDPDatagram(object):
                 return getattr(self, i)
         raise KeyError(item)
 
-    def get_friendly_name(self):
+    def get_friendly_name(self) -> str:
         return self._friendly_names[self._packet_type]
 
-    def encode(self, trailing_newlines=2):
+    def encode(self, trailing_newlines: int = 2) -> str:
         lines = [self._start_lines[self._packet_type]]
         for attr_name in self._required_fields[self._packet_type]:
             attr = getattr(self, attr_name)
             if attr is None:
                 raise UPnPError("required field for {} is missing: {}".format(self._packet_type, attr_name))
-            if attr_name in self._marshallers:
-                value = self._marshallers[attr_name](attr)
+            if attr_name == 'mx':
+                value = str(attr)
+            elif attr_name == 'man':
+                value = "\"%s\"" % attr
             else:
                 value = attr
             lines.append("{}: {}".format(attr_name.upper(), value))
@@ -123,7 +122,7 @@ class SSDPDatagram(object):
             serialized += line_separator
         return serialized
 
-    def as_dict(self):
+    def as_dict(self) -> Dict:
         return self._lines_to_content_dict(self.encode().split(line_separator))
 
     @classmethod
@@ -142,8 +141,8 @@ class SSDPDatagram(object):
         return packet
 
     @classmethod
-    def _lines_to_content_dict(cls, lines: list) -> dict:
-        result = {}
+    def _lines_to_content_dict(cls, lines: list) -> Dict:
+        result: dict = {}
         for line in lines:
             if not line:
                 continue
@@ -175,13 +174,13 @@ class SSDPDatagram(object):
             return cls._from_response(lines[1:])
 
     @classmethod
-    def _from_response(cls, lines):
+    def _from_response(cls, lines: List):
         return cls(cls._OK, **cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_notify(cls, lines):
+    def _from_notify(cls, lines: List):
         return cls(cls._NOTIFY, **cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_request(cls, lines):
+    def _from_request(cls, lines: List):
         return cls(cls._M_SEARCH, **cls._lines_to_content_dict(lines))

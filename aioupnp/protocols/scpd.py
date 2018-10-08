@@ -1,4 +1,5 @@
 import logging
+import socket
 from xml.etree import ElementTree
 import asyncio
 from asyncio.protocols import Protocol
@@ -16,7 +17,7 @@ class SCPDHTTPClientProtocol(Protocol):
     GET = 'GET'
 
     def __init__(self, method: str, message: bytes, finished: asyncio.Future, soap_method: str=None,
-                 soap_service_id: str=None, close_after_send: bool = False):
+                 soap_service_id: str=None, close_after_send: bool = False) -> None:
         self.method = method
         assert soap_service_id is not None and soap_method is not None if method == 'POST' else True, \
             'soap args not provided'
@@ -60,7 +61,7 @@ class SCPDHTTPClientProtocol(Protocol):
 
 async def scpd_get(control_url: str, address: str, port: int) -> dict:
     loop = asyncio.get_running_loop()
-    finished = asyncio.Future()
+    finished: asyncio.Future = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
         lambda : SCPDHTTPClientProtocol('GET', packet, finished),  address, port
@@ -72,15 +73,15 @@ async def scpd_get(control_url: str, address: str, port: int) -> dict:
 
 
 async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: list, service_id: bytes,
-                    close_after_send: bool, **kwargs):
+                    close_after_send: bool, soap_socket: socket.socket = None,  **kwargs):
     loop = asyncio.get_running_loop()
-    finished = asyncio.Future()
+    finished: asyncio.Future = asyncio.Future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     transport, protocol = await loop.create_connection(
         lambda : SCPDHTTPClientProtocol(
             'POST', packet, finished, soap_method=method, soap_service_id=service_id.decode(),
             close_after_send=close_after_send
-        ), address, port
+        ), address, port, sock=soap_socket
     )
     try:
         return await asyncio.wait_for(finished, 1.0)

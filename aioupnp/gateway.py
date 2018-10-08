@@ -1,4 +1,7 @@
 import logging
+import socket
+import typing
+from typing import Dict, List, Union, Type, Tuple
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from aioupnp.constants import SPEC_VERSION, UPNP_ORG_IGD, SERVICE
 from aioupnp.commands import SCPDCommands
@@ -7,11 +10,16 @@ from aioupnp.protocols.ssdp import m_search
 from aioupnp.protocols.scpd import scpd_get
 from aioupnp.protocols.soap import SCPDCommand
 from aioupnp.util import flatten_keys
+from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
+return_type_lambas = {
+    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ['none', 'nil'] else None
+}
 
-def get_action_list(element_dict: dict) -> list:  # [(<method>, [<input1>, ...], [<output1, ...]), ...]
+
+def get_action_list(element_dict: dict) -> List:  # [(<method>, [<input1>, ...], [<output1, ...]), ...]
     service_info = flatten_keys(element_dict, "{%s}" % SERVICE)
     if "actionList" in service_info:
         action_list = service_info["actionList"]
@@ -20,7 +28,7 @@ def get_action_list(element_dict: dict) -> list:  # [(<method>, [<input1>, ...],
     if not len(action_list):  # it could be an empty string
         return []
 
-    result = []
+    result: list = []
     if isinstance(action_list["action"], dict):
         arg_dicts = action_list["action"]['argumentList']['argument']
         if not isinstance(arg_dicts, list):  # when there is one arg
@@ -97,21 +105,22 @@ class Gateway:
         return r
 
     @property
-    def services(self) -> dict:
+    def services(self) -> Dict:
         if not self._device:
             return {}
         return {service.serviceType: service for service in self._services}
 
     @property
-    def devices(self) -> dict:
+    def devices(self) -> Dict:
         if not self._device:
             return {}
         return {device.udn: device for device in self._devices}
 
-    def get_service(self, service_type: str) -> Service:
+    def get_service(self, service_type: str) -> Union[Type[Service], None]:
         for service in self._services:
             if service.serviceType.lower() == service_type.lower():
                 return service
+        return None
 
     def debug_commands(self):
         return {
@@ -121,13 +130,14 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 1,
-                               service: str = UPNP_ORG_IGD):
-        datagram = await m_search(lan_address, gateway_address, timeout, service)
+                               service: str = UPNP_ORG_IGD, ssdp_socket: socket.socket = None,
+                               soap_socket: socket.socket = None):
+        datagram = await m_search(lan_address, gateway_address, timeout, service, ssdp_socket)
         gateway = cls(**datagram.as_dict())
-        await gateway.discover_commands()
+        await gateway.discover_commands(soap_socket)
         return gateway
 
-    async def discover_commands(self):
+    async def discover_commands(self, soap_socket: socket.socket = None):
         response = await scpd_get("/" + self.path.decode(), self.base_ip.decode(), self.port)
 
         self.spec_version = get_dict_val_case_insensitive(response, SPEC_VERSION)
@@ -141,9 +151,11 @@ class Gateway:
         else:
             self._device = Device(self._devices, self._services)
         for service_type in self.services.keys():
-            await self.register_commands(self.services[service_type])
+            await self.register_commands(self.services[service_type], soap_socket)
 
-    async def register_commands(self, service: Service):
+    async def register_commands(self, service: Service, soap_socket: socket.socket = None):
+        if not service.SCPDURL:
+            raise UPnPError("no scpd url")
         service_dict = await scpd_get(("" if service.SCPDURL.startswith("/") else "/") + service.SCPDURL,
                                       self.base_ip.decode(), self.port)
         if not service_dict:
@@ -157,8 +169,10 @@ class Gateway:
                 annotations = current.__annotations__
                 return_types = annotations.get('return', None)
                 if return_types:
-                    if not isinstance(return_types, tuple):
+                    if isinstance(return_types, type):
                         return_types = (return_types, )
+                    else:
+                        return_types = tuple([return_type_lambas.get(a, a) for a in return_types.__args__])
                     return_types = {r: t for r, t in zip(outputs, return_types)}
                 param_types = {}
                 for param_name, param_type in annotations.items():
@@ -167,7 +181,7 @@ class Gateway:
                     param_types[param_name] = param_type
                 command = SCPDCommand(
                     self.base_ip.decode(), self.port, service.controlURL, service.serviceType.encode(),
-                    name, param_types, return_types, inputs, outputs)
+                    name, param_types, return_types, inputs, outputs, soap_socket)
                 setattr(command, "__doc__", current.__doc__)
                 setattr(self.commands, command.method, command)
 

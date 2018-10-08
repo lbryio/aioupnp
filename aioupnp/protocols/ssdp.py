@@ -1,9 +1,9 @@
 import re
+import socket
 import binascii
 import asyncio
 import logging
-from typing import DefaultDict
-from asyncio.coroutines import coroutine
+from typing import Dict, List, Tuple
 from asyncio.futures import Future
 from asyncio.transports import DatagramTransport
 from aioupnp.fault import UPnPError
@@ -17,17 +17,12 @@ log = logging.getLogger(__name__)
 
 
 class SSDPProtocol(MulticastProtocol):
-    def __init__(self, lan_address):
-        super().__init__()
+    def __init__(self, multicast_address: str, lan_address: str) -> None:
+        super().__init__(multicast_address, lan_address)
         self.lan_address = lan_address
-        self.discover_callbacks: DefaultDict[coroutine] = {}
-        self.transport: DatagramTransport
-        self.notifications = []
-        self.replies = []
-
-    def connection_made(self, transport: DatagramTransport):
-        super().connection_made(transport)
-        self.set_ttl(1)
+        self.discover_callbacks: Dict = {}
+        self.notifications: List = []
+        self.replies: List = []
 
     async def m_search(self, address, timeout: int = 1, service=UPNP_ORG_IGD) -> SSDPDatagram:
         if (address, service) in self.discover_callbacks:
@@ -37,7 +32,7 @@ class SSDPProtocol(MulticastProtocol):
             mx=1
         )
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
-        f = Future()
+        f: Future = Future()
         self.discover_callbacks[(address, service)] = f
         return await asyncio.wait_for(f, timeout)
 
@@ -57,8 +52,9 @@ class SSDPProtocol(MulticastProtocol):
             if (addr[0], packet.st) in self.discover_callbacks:
                 if packet.st not in map(lambda p: p['st'], self.replies):
                     self.replies.append(packet)
-                f: Future = self.discover_callbacks.pop((addr[0], packet.st))
-                f.set_result(packet)
+                ok_fut: Future = self.discover_callbacks.pop((addr[0], packet.st))
+                ok_fut.set_result(packet)
+                return
 
         elif packet._packet_type == packet._NOTIFY:
             if packet.nt == SSDP_ROOT_DEVICE:
@@ -70,21 +66,27 @@ class SSDPProtocol(MulticastProtocol):
                         break
                 if key:
                     log.debug("got a notification with the requested m-search info")
-                    f: Future = self.discover_callbacks.pop(key)
-                    f.set_result(SSDPDatagram(
+                    notify_fut: Future = self.discover_callbacks.pop(key)
+                    notify_fut.set_result(SSDPDatagram(
                         SSDPDatagram._OK, cache_control='', location=packet.location, server=packet.server,
                         st=UPNP_ORG_IGD, usn=packet.usn
                     ))
                 self.notifications.append(packet.as_dict())
+                return
 
 
-async def listen_ssdp(lan_address: str, gateway_address: str) -> (DatagramTransport, SSDPProtocol, str, str):
+async def listen_ssdp(lan_address: str, gateway_address: str,
+                      ssdp_socket: socket.socket = None) -> Tuple[DatagramTransport, SSDPProtocol,
+                                                                  str, str]:
     loop = asyncio.get_running_loop()
     try:
-        sock = SSDPProtocol.create_socket(lan_address, SSDP_IP_ADDRESS)
-        transport, protocol = await loop.create_datagram_endpoint(
-            lambda: SSDPProtocol(lan_address), sock=sock
+        sock = ssdp_socket or SSDPProtocol.create_multicast_socket(lan_address)
+        listen_result: Tuple = await loop.create_datagram_endpoint(
+            lambda: SSDPProtocol(SSDP_IP_ADDRESS, lan_address), sock=sock
         )
+        transport: DatagramTransport = listen_result[0]
+        protocol: SSDPProtocol = listen_result[1]
+        protocol.set_ttl(1)
     except Exception:
         log.exception("failed to create multicast socket %s:%i", lan_address, SSDP_PORT)
         raise
@@ -92,12 +94,12 @@ async def listen_ssdp(lan_address: str, gateway_address: str) -> (DatagramTransp
 
 
 async def m_search(lan_address: str, gateway_address: str, timeout: int = 1,
-                   service: str = UPNP_ORG_IGD) -> SSDPDatagram:
+                   service: str = UPNP_ORG_IGD, ssdp_socket: socket.socket = None) -> SSDPDatagram:
     transport, protocol, gateway_address, lan_address = await listen_ssdp(
-        lan_address, gateway_address
+        lan_address, gateway_address, ssdp_socket
     )
     try:
-        return await protocol.m_search(gateway_address, timeout=timeout, service=service)
+        return await protocol.m_search(address=gateway_address, timeout=timeout, service=service)
     except asyncio.TimeoutError:
         raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
     finally:

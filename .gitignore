@@ -4,3 +4,4 @@ _trial_temp/
 build/
 dist/
 .coverage
+.mypy_cache/

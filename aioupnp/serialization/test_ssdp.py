@@ -1,6 +1,7 @@
 import unittest
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.fault import UPnPError
+from aioupnp.constants import UPNP_ORG_IGD
 
 
 class TestParseMSearchRequest(unittest.TestCase):
@@ -11,7 +12,7 @@ class TestParseMSearchRequest(unittest.TestCase):
                b'MX: 1\r\n' \
                b'\r\n'
 
-    def test_parse_m_search_response(self):
+    def test_parse_m_search(self):
         packet = SSDPDatagram.decode(self.datagram)
         self.assertTrue(packet._packet_type, packet._M_SEARCH)
         self.assertEqual(packet.host, '239.255.255.250:1900')
@@ -44,6 +45,30 @@ class TestParseMSearchResponse(unittest.TestCase):
         self.assertEqual(packet.usn, 'uuid:00000000-0000-0000-0000-000000000000::urn:'
                                      'schemas-upnp-org:service:WANCommonInterfaceConfig:1'
 )
+
+
+class TestParseMSearchResponseRedSonic(TestParseMSearchResponse):
+    datagram = \
+        b"HTTP/1.1 200 OK\r\n" \
+        b"CACHE-CONTROL: max-age=1800\r\n" \
+        b"DATE: Thu, 04 Oct 2018 22:59:40 GMT\r\n" \
+        b"EXT:\r\n" \
+        b"LOCATION: http://10.1.10.1:49152/IGDdevicedesc_brlan0.xml\r\n" \
+        b"OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n" \
+        b"01-NLS: 00000000-0000-0000-0000-000000000000\r\n" \
+        b"SERVER: Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22\r\n" \
+        b"X-User-Agent: redsonic\r\n" \
+        b"ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n" \
+        b"USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n" \
+        b"\r\n"
+
+    def test_parse_m_search_response(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertTrue(packet._packet_type, packet._OK)
+        self.assertEqual(packet.cache_control, 'max-age=1800')
+        self.assertEqual(packet.location, 'http://10.1.10.1:49152/IGDdevicedesc_brlan0.xml')
+        self.assertEqual(packet.server, 'Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22')
+        self.assertEqual(packet.st, UPNP_ORG_IGD)
 
 
 class TestParseMSearchResponseDashCacheControl(TestParseMSearchResponse):
