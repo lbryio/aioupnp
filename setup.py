@@ -21,7 +21,7 @@ setup(
     long_description=long_description,
     url="https://github.com/lbryio/aioupnp",
     license=__license__,
-    packages=find_packages(exclude=['tests']),
+    packages=find_packages(),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
         'netifaces',

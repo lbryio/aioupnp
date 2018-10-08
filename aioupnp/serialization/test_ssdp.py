@@ -67,6 +67,14 @@ class TestParseMSearchResponseCaseInsensitive(TestParseMSearchResponse):
         'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
     ]).encode()
 
+    def test_get_case_insensitive(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertEqual('max-age=1800', packet['Cache_Control'])
+
+    def test_key_error(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertRaises(KeyError, lambda : packet['Cache Control'])
+
 
 class TestFailToParseMSearchResponseNoST(unittest.TestCase):
     datagram = "\r\n".join([

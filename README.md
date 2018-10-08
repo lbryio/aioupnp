@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/lbryio/txupnp/branch/master/graph/badge.svg)](https://codecov.io/gh/lbryio/txupnp)
+[![codecov](https://codecov.io/gh/lbryio/aioupnp/branch/master/graph/badge.svg)](https://codecov.io/gh/lbryio/aioupnp)
 
 # UPnP for asyncio
 
@@ -32,4 +32,3 @@ This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
 ## Contact
 
 The primary contact for this project is [@jackrobison](mailto:jack@lbry.io)
-
