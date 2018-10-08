@@ -1,7 +1,9 @@
 import re
-import functools
+import socket
 from collections import defaultdict
 from xml.etree import ElementTree
+import netifaces
+
 
 BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
 BASE_PORT_REGEX = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
@@ -50,35 +52,37 @@ def get_dict_val_case_insensitive(d, k):
         raise KeyError("overlapping keys")
     return d[match[0]]
 
-
-def verify_return_types(*types):
-    """
-    Attempt to recast results to expected result types
-    """
-
-    def _verify_return_types(fn):
-        @functools.wraps(fn)
-        def _inner(*result):
-            r = fn(*tuple(t(r) for t, r in zip(types, result)))
-            if isinstance(r, tuple) and len(r) == 1:
-                return r[0]
-            return r
-        return _inner
-    return _verify_return_types
+# import struct
+# import fcntl
+# def get_ip_address(ifname):
+#     SIOCGIFADDR = 0x8915
+#     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     return socket.inet_ntoa(fcntl.ioctl(
+#         s.fileno(),
+#         SIOCGIFADDR,
+#         struct.pack(b'256s', ifname[:15].encode())
+#     )[20:24])
 
 
-def return_types(*types):
-    """
-    Decorator to set the expected return types of a SOAP function call
-    """
+def get_interfaces():
+    r = {
+        interface_name: (router_address, netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]['addr'])
+        for router_address, interface_name, _ in netifaces.gateways()[socket.AF_INET]
+    }
+    for interface_name in netifaces.interfaces():
+        if interface_name in ['lo', 'localhost'] or interface_name in r:
+            continue
+        addresses = netifaces.ifaddresses(interface_name)
+        if netifaces.AF_INET in addresses:
+            address = addresses[netifaces.AF_INET][0]['addr']
+            gateway_guess = ".".join(address.split(".")[:-1] + ["1"])
+            r[interface_name] = (gateway_guess, address)
+    r['default'] = r[netifaces.gateways()['default'][netifaces.AF_INET][1]]
+    return r
 
-    def return_types_wrapper(fn):
-        fn._return_types = types
-        return fn
 
-    return return_types_wrapper
-
-
-none_or_str = lambda x: None if not x or x == 'None' else str(x)
-
-none = lambda _: None
+def get_gateway_and_lan_addresses(interface_name: str) -> (str, str):
+    for iface_name, (gateway, lan) in get_interfaces().items():
+        if interface_name == iface_name:
+            return gateway, lan
+    return None, None

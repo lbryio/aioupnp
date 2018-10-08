@@ -1,5 +1,5 @@
-from txupnp.util import flatten_keys
-from txupnp.constants import FAULT, CONTROL
+from aioupnp.util import flatten_keys
+from aioupnp.constants import FAULT, CONTROL
 
 
 class UPnPError(Exception):

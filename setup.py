@@ -1,12 +1,12 @@
 import os
 from setuptools import setup, find_packages
-from txupnp import __version__, __name__, __email__, __author__, __license__
+from aioupnp import __version__, __name__, __email__, __author__, __license__
 
 console_scripts = [
-    'txupnp-cli = txupnp.cli:main',
+    'aioupnp = aioupnp.__main__:main',
 ]
 
-package_name = "txupnp"
+package_name = "aioupnp"
 base_dir = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(base_dir, 'README.md'), 'rb') as f:
     long_description = f.read().decode('utf-8')
@@ -16,15 +16,14 @@ setup(
     version=__version__,
     author=__author__,
     author_email=__email__,
-    description="UPnP for twisted",
-    keywords="upnp twisted",
+    description="UPnP for asyncio",
+    keywords="upnp asyncio",
     long_description=long_description,
-    url="https://github.com/lbryio/txupnp",
+    url="https://github.com/lbryio/aioupnp",
     license=__license__,
     packages=find_packages(exclude=['tests']),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
-        'twisted[tls]',
         'netifaces',
     ],
 )

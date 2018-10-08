@@ -1,27 +1,25 @@
-from txupnp.util import return_types, none_or_str, none
+def none_or_str(x):
+    return None if not x or x == 'None' else str(x)
 
 
-class SCPDCommands:  # TODO use type annotations
+class SCPDCommands:
     def debug_commands(self) -> dict:
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def AddPortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
+    async def AddPortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
                        NewInternalClient: str, NewEnabled: bool, NewPortMappingDescription: str,
                        NewLeaseDuration: str = '') -> None:
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(bool, bool)
-    def GetNATRSIPStatus() -> (bool, bool):
+    async def GetNATRSIPStatus() -> (bool, bool):
         """Returns (NewRSIPAvailable, NewNATEnabled)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none_or_str, int, str, int, str, bool, str, int)
-    def GetGenericPortMappingEntry(NewPortMappingIndex) -> (none_or_str, int, str, int, str, bool, str, int):
+    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> (none_or_str, int, str, int, str, bool, str, int):
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
                  NewPortMappingDescription, NewLeaseDuration)
@@ -29,70 +27,62 @@ class SCPDCommands:  # TODO use type annotations
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(int, str, bool, str, int)
-    def GetSpecificPortMappingEntry(NewRemoteHost, NewExternalPort, NewProtocol) -> (int, str, bool, str, int):
+    async def GetSpecificPortMappingEntry(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str) -> (int, str, bool, str, int):
         """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def SetConnectionType(NewConnectionType) -> None:
+    async def SetConnectionType(NewConnectionType: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(str)
-    def GetExternalIPAddress() -> str:
+    async def GetExternalIPAddress() -> str:
         """Returns (NewExternalIPAddress)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(str, str)
-    def GetConnectionTypeInfo() -> (str, str):
+    async def GetConnectionTypeInfo() -> (str, str):
         """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(str, str, int)
-    def GetStatusInfo() -> (str, str, int):
+    async def GetStatusInfo() -> (str, str, int):
         """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def ForceTermination() -> None:
+    async def ForceTermination() -> None:
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def DeletePortMapping(NewRemoteHost, NewExternalPort, NewProtocol) -> None:
+    async def DeletePortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def RequestConnection() -> None:
+    async def RequestConnection() -> None:
         """Returns None"""
         raise NotImplementedError()
 
     @staticmethod
-    def GetCommonLinkProperties():
+    async def GetCommonLinkProperties():
         """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
         raise NotImplementedError()
 
     @staticmethod
-    def GetTotalBytesSent():
+    async def GetTotalBytesSent():
         """Returns (NewTotalBytesSent)"""
         raise NotImplementedError()
 
     @staticmethod
-    def GetTotalBytesReceived():
+    async def GetTotalBytesReceived():
         """Returns (NewTotalBytesReceived)"""
         raise NotImplementedError()
 
     @staticmethod
-    def GetTotalPacketsSent():
+    async def GetTotalPacketsSent():
         """Returns (NewTotalPacketsSent)"""
         raise NotImplementedError()
 
@@ -102,36 +92,33 @@ class SCPDCommands:  # TODO use type annotations
         raise NotImplementedError()
 
     @staticmethod
-    def X_GetICSStatistics():
+    async def X_GetICSStatistics() -> (int, int, int, int, str, str):
         """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
         raise NotImplementedError()
 
     @staticmethod
-    def GetDefaultConnectionService():
+    async def GetDefaultConnectionService():
         """Returns (NewDefaultConnectionService)"""
         raise NotImplementedError()
 
     @staticmethod
-    def SetDefaultConnectionService(NewDefaultConnectionService) -> None:
+    async def SetDefaultConnectionService(NewDefaultConnectionService: str) -> None:
         """Returns (None)"""
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(none)
-    def SetEnabledForInternet(NewEnabledForInternet) -> None:
+    async def SetEnabledForInternet(NewEnabledForInternet: bool) -> None:
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(bool)
-    def GetEnabledForInternet() -> bool:
+    async def GetEnabledForInternet() -> bool:
         raise NotImplementedError()
 
     @staticmethod
-    def GetMaximumActiveConnections(NewActiveConnectionIndex):
+    async def GetMaximumActiveConnections(NewActiveConnectionIndex: int):
         raise NotImplementedError()
 
     @staticmethod
-    @return_types(str, str)
-    def GetActiveConnections() -> (str, str):
+    async def GetActiveConnections() -> (str, str):
         """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
         raise NotImplementedError()
