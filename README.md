@@ -13,16 +13,16 @@ pip install --upgrade aioupnp
 ## Usage
 
 ```
-usage: aioupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
-               [--gateway_address=<gateway_address>]
-               [--lan_address=<lan_address>] [--timeout=<timeout>]
-               [--service=<service>]
-               command [--<arg name>=<arg>]...
-
-commands: add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | get_soap_commands | get_specific_port_mapping | m_search
-
-for help with a specific command: txupnp help <command>
+aioupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
+        [--gateway_address=<gateway_address>]
+        [--lan_address=<lan_address>] [--timeout=<timeout>]
+        [--service=<service>]
+        command [--<arg name>=<arg>]...
 ```
+
+### Commands
+    add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | get_soap_commands | get_specific_port_mapping | m_search
+
 
 
 ## License
@@ -31,4 +31,5 @@ This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
 
 ## Contact
 
-The primary contact for this project is @jackrobison
+The primary contact for this project is [@jackrobison](mailto:jack@lbry.io)
+
