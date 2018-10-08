@@ -31,6 +31,7 @@ class SSDPProtocol(MulticastProtocol):
             SSDPDatagram._M_SEARCH, host="{}:{}".format(SSDP_IP_ADDRESS, SSDP_PORT), st=service, man=SSDP_DISCOVER,
             mx=1
         )
+        log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
         f: Future = Future()
         self.discover_callbacks[(address, service)] = f
@@ -41,15 +42,15 @@ class SSDPProtocol(MulticastProtocol):
             return
         try:
             packet = SSDPDatagram.decode(data)
-            log.debug("decoded %s from %s:%i:\n%s", packet.get_friendly_name(), addr[0], addr[1], packet.encode())
+            log.debug("decoded packet from %s:%i: %s", addr[0], addr[1], packet)
         except UPnPError as err:
-            log.error("failed to decode SSDP packet from %s:%i: %s\npacket: %s", addr[0], addr[1], err,
+            log.error("failed to decode SSDP packet from %s:%i (%s): %s", addr[0], addr[1], err,
                       binascii.hexlify(data))
             return
 
         if packet._packet_type == packet._OK:
-            log.debug("%s:%i sent us an OK", addr[0], addr[1])
             if (addr[0], packet.st) in self.discover_callbacks:
+                log.debug("%s:%i replied to our m-search", addr[0], addr[1])
                 if packet.st not in map(lambda p: p['st'], self.replies):
                     self.replies.append(packet)
                 ok_fut: Future = self.discover_callbacks.pop((addr[0], packet.st))
