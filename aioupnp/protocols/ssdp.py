@@ -28,8 +28,8 @@ class SSDPProtocol(MulticastProtocol):
         if (address, service) in self.discover_callbacks:
             return self.discover_callbacks[(address, service)]
         packet = SSDPDatagram(
-            SSDPDatagram._M_SEARCH, host="{}:{}".format(SSDP_IP_ADDRESS, SSDP_PORT), st=service, man=SSDP_DISCOVER,
-            mx=1
+            SSDPDatagram._M_SEARCH, host="{}:{}".format(SSDP_IP_ADDRESS, SSDP_PORT), st=service,
+            man="\"%s\"" % SSDP_DISCOVER, mx=1
         )
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
