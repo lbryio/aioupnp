@@ -24,15 +24,24 @@ class SSDPProtocol(MulticastProtocol):
         self.notifications: List = []
         self.replies: List = []
 
-    async def m_search(self, address, timeout: int = 1, service=UPNP_ORG_IGD) -> SSDPDatagram:
-        if (address, service) in self.discover_callbacks:
-            return self.discover_callbacks[(address, service)]
+    def send_m_search_packet(self, service, address, man):
         packet = SSDPDatagram(
             SSDPDatagram._M_SEARCH, host="{}:{}".format(SSDP_IP_ADDRESS, SSDP_PORT), st=service,
-            man="\"%s\"" % SSDP_DISCOVER, mx=1
+            man=man, mx=1
         )
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
+
+    async def m_search(self, address, timeout: int = 1, service=UPNP_ORG_IGD) -> SSDPDatagram:
+        if (address, service) in self.discover_callbacks:
+            return self.discover_callbacks[(address, service)]
+
+        # D-Link, Cisco
+        self.send_m_search_packet(service, address, "%s" % SSDP_DISCOVER)
+
+        # DD-WRT
+        self.send_m_search_packet(service, address, SSDP_DISCOVER)
+
         f: Future = Future()
         self.discover_callbacks[(address, service)] = f
         return await asyncio.wait_for(f, timeout)
