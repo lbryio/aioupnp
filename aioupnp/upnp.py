@@ -219,8 +219,11 @@ class UPnP:
                 kwargs: dict = None) -> None:
         kwargs = kwargs or {}
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         fut: asyncio.Future = asyncio.Future()
 
