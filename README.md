@@ -13,11 +13,11 @@ pip install --upgrade aioupnp
 ## Usage
 
 ```
-usage: txupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
-              [--gateway_address=<gateway_address>]
-              [--lan_address=<lan_address>] [--timeout=<timeout>]
-              [--service=<service>]
-              command [--<arg name>=<arg>]...
+usage: aioupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
+               [--gateway_address=<gateway_address>]
+               [--lan_address=<lan_address>] [--timeout=<timeout>]
+               [--service=<service>]
+               command [--<arg name>=<arg>]...
 
 commands: add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | get_soap_commands | get_specific_port_mapping | m_search
 
