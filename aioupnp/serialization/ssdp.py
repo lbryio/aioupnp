@@ -1,12 +1,12 @@
 import re
 import logging
 import binascii
-from txupnp.fault import UPnPError
-from txupnp.constants import line_separator
+from aioupnp.fault import UPnPError
+from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
-_ssdp_datagram_patterns = {
+ssdp_datagram_patterns = {
     'host': (re.compile("^(?i)(host):(.*)$"), str),
     'st': (re.compile("^(?i)(st):(.*)$"), str),
     'man': (re.compile("^(?i)(man):|(\"(.*)\")$"), str),
@@ -19,7 +19,7 @@ _ssdp_datagram_patterns = {
     'server': (re.compile("^(?i)(server):(.*)$"), str),
 }
 
-_vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
+vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
 
 
 class SSDPDatagram(object):
@@ -39,9 +39,9 @@ class SSDPDatagram(object):
         _OK: "m-search response"
     }
 
-    _vendor_field_pattern = _vendor_pattern
+    _vendor_field_pattern = vendor_pattern
 
-    _patterns = _ssdp_datagram_patterns
+    _patterns = ssdp_datagram_patterns
 
     _required_fields = {
         _M_SEARCH: [
@@ -94,6 +94,9 @@ class SSDPDatagram(object):
         for k, v in kwargs.items():
             if not k.startswith("_") and hasattr(self, k.lower()) and getattr(self, k.lower()) is None:
                 setattr(self, k.lower(), v)
+
+    def __repr__(self):
+        return ("SSDPDatagram(packet_type=%s, " % self._packet_type) + ", ".join("%s=%s" % (n, v) for n, v in self.as_dict().items()) + ")"
 
     def __getitem__(self, item):
         for i in self._required_fields[self._packet_type]:
@@ -166,7 +169,7 @@ class SSDPDatagram(object):
         lines = [l for l in datagram.split(line_separator) if l]
         if lines[0] == cls._start_lines[cls._M_SEARCH]:
             return cls._from_request(lines[1:])
-        if lines[0] == cls._start_lines[cls._NOTIFY]:
+        if lines[0] in [cls._start_lines[cls._NOTIFY], cls._start_lines[cls._NOTIFY] + " "]:
             return cls._from_notify(lines[1:])
         if lines[0] == cls._start_lines[cls._OK]:
             return cls._from_response(lines[1:])

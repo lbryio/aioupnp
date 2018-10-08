@@ -18,11 +18,6 @@ WAN_SCHEMA = 'urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
 LAYER_SCHEMA = 'urn:schemas-upnp-org:service:Layer3Forwarding:1'
 IP_SCHEMA = 'urn:schemas-upnp-org:service:WANIPConnection:1'
 
-service_types = [
-    UPNP_ORG_IGD,
-    # WIFI_ALLIANCE_ORG_IGD,
-]
-
 SSDP_IP_ADDRESS = '239.255.255.250'
 SSDP_PORT = 1900
 SSDP_HOST = "%s:%i" % (SSDP_IP_ADDRESS, SSDP_PORT)

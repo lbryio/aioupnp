@@ -1,6 +1,6 @@
-from twisted.trial import unittest
-from txupnp.ssdp_datagram import SSDPDatagram
-from txupnp.fault import UPnPError
+import unittest
+from aioupnp.serialization.ssdp import SSDPDatagram
+from aioupnp.fault import UPnPError
 
 
 class TestParseMSearchRequest(unittest.TestCase):
@@ -99,3 +99,27 @@ class TestFailToParseMSearchResponseNoLocation(TestFailToParseMSearchResponseNoS
         'st: urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1',
         'USN: uuid:00000000-0000-0000-0000-000000000000::urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1'
     ]).encode()
+
+
+class TestParseNotify(unittest.TestCase):
+    datagram = \
+        b'NOTIFY * HTTP/1.1 \r\n' \
+        b'Host: 239.255.255.250:1900\r\n' \
+        b'Cache-Control: max-age=180\r\n' \
+        b'Location: http://192.168.1.1:5431/dyndev/uuid:000c-29ea-247500c00068\r\n' \
+        b'NT: upnp:rootdevice\r\n' \
+        b'NTS: ssdp:alive\r\n' \
+        b'SERVER: LINUX/2.4 UPnP/1.0 BRCM400/1.0\r\n' \
+        b'USN: uuid:000c-29ea-247500c00068::upnp:rootdevice\r\n' \
+        b'\r\n'
+
+    def test_parse_notify(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertTrue(packet._packet_type, packet._NOTIFY)
+        self.assertEqual(packet.host, '239.255.255.250:1900')
+        self.assertEqual(packet.cache_control, 'max-age=180')
+        self.assertEqual(packet.location, 'http://192.168.1.1:5431/dyndev/uuid:000c-29ea-247500c00068')
+        self.assertEqual(packet.nt, 'upnp:rootdevice')
+        self.assertEqual(packet.nts, 'ssdp:alive')
+        self.assertEqual(packet.server, 'LINUX/2.4 UPnP/1.0 BRCM400/1.0')
+        self.assertEqual(packet.usn, 'uuid:000c-29ea-247500c00068::upnp:rootdevice')

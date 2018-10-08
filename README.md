@@ -1,28 +1,27 @@
 [![codecov](https://codecov.io/gh/lbryio/txupnp/branch/master/graph/badge.svg)](https://codecov.io/gh/lbryio/txupnp)
 
-# UPnP for Twisted
+# UPnP for asyncio
 
-`txupnp` is a python 3 library to interact with UPnP gateways using `twisted`
+`aioupnp` is a python 3 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
 
 ## Installation
 
 ```
-pip install --upgrade txupnp
+pip install --upgrade aioupnp
 ```
 
 ## Usage
 
 ```
-usage: txupnp-cli [-h] [--debug_logging] [--include_igd_xml] command
+usage: txupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
+              [--gateway_address=<gateway_address>]
+              [--lan_address=<lan_address>] [--timeout=<timeout>]
+              [--service=<service>]
+              command [--<arg name>=<arg>]...
 
-positional arguments:
-  command            debug_device | list_mappings | get_external_ip |
-                     add_mapping | delete_mapping
+commands: add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | get_soap_commands | get_specific_port_mapping | m_search
 
-optional arguments:
-  -h, --help         show this help message and exit
-  --debug_logging
-  --include_igd_xml
+for help with a specific command: txupnp help <command>
 ```
 
 
