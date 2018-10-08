@@ -37,7 +37,7 @@ class SSDPProtocol(MulticastProtocol):
             return self.discover_callbacks[(address, service)]
 
         # D-Link, Cisco
-        self.send_m_search_packet(service, address, "%s" % SSDP_DISCOVER)
+        self.send_m_search_packet(service, address, "\"%s\"" % SSDP_DISCOVER)
 
         # DD-WRT
         self.send_m_search_packet(service, address, SSDP_DISCOVER)
