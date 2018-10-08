@@ -30,7 +30,6 @@ class SSDPProtocol(MulticastProtocol):
             man=man, mx=1
         )
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
-        print(packet.encode())
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
 
     async def m_search(self, address, timeout: int = 1, service=UPNP_ORG_IGD) -> SSDPDatagram:
