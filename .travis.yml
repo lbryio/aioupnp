@@ -4,12 +4,11 @@ language: python
 python: "3.7"
 
 before_install:
-  - pip install pylint coverage mypy
+  - pip install pylint coverage mypy lxml
   - pip install -e .
+  - mypy . --txt-report . --scripts-are-modules; cat index.txt; rm index.txt
 
 script:
-  #  - pylint aioupnp
-  - mypy .
   - HOME=/tmp coverage run --source=aioupnp -m unittest -v
 
 after_success:
