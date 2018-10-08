@@ -7,17 +7,21 @@ from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
+
+_template = "^(?i)(%s):[ ]*(.*)$"
+
+
 ssdp_datagram_patterns = {
     'host': (re.compile("^(?i)(host):(.*)$"), str),
-    'st': (re.compile("^(?i)(st):(.*)$"), str),
-    'man': (re.compile("^(?i)(man):|(\"(.*)\")$"), str),
-    'mx': (re.compile("^(?i)(mx):(.*)$"), int),
-    'nt': (re.compile("^(?i)(nt):(.*)$"), str),
-    'nts': (re.compile("^(?i)(nts):(.*)$"), str),
-    'usn': (re.compile("^(?i)(usn):(.*)$"), str),
-    'location': (re.compile("^(?i)(location):(.*)$"), str),
-    'cache_control': (re.compile("^(?i)(cache[-|_]control):(.*)$"), str),
-    'server': (re.compile("^(?i)(server):(.*)$"), str),
+    'st': (re.compile(_template % 'st'), str),
+    'man': (re.compile(_template % 'man'), str),
+    'mx': (re.compile(_template % 'mx'), int),
+    'nt': (re.compile(_template % 'nt'), str),
+    'nts': (re.compile(_template % 'nts'), str),
+    'usn': (re.compile(_template % 'usn'), str),
+    'location': (re.compile(_template % 'location'), str),
+    'cache_control': (re.compile(_template % 'cache[-|_]control'), str),
+    'server': (re.compile(_template % 'server'), str),
 }
 
 vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")

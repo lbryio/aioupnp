@@ -4,11 +4,28 @@ from aioupnp.fault import UPnPError
 from aioupnp.constants import UPNP_ORG_IGD
 
 
-class TestParseMSearchRequest(unittest.TestCase):
+class TestParseMSearchRequestWithQuotes(unittest.TestCase):
     datagram = b'M-SEARCH * HTTP/1.1\r\n' \
                b'HOST: 239.255.255.250:1900\r\n' \
                b'ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n' \
                b'MAN: "ssdp:discover"\r\n' \
+               b'MX: 1\r\n' \
+               b'\r\n'
+
+    def test_parse_m_search(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertTrue(packet._packet_type, packet._M_SEARCH)
+        self.assertEqual(packet.host, '239.255.255.250:1900')
+        self.assertEqual(packet.st, 'urn:schemas-upnp-org:device:InternetGatewayDevice:1')
+        self.assertEqual(packet.man, '"ssdp:discover"')
+        self.assertEqual(packet.mx, 1)
+
+
+class TestParseMSearchRequestWithoutQuotes(unittest.TestCase):
+    datagram = b'M-SEARCH * HTTP/1.1\r\n' \
+               b'HOST: 239.255.255.250:1900\r\n' \
+               b'ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n' \
+               b'MAN: ssdp:discover\r\n' \
                b'MX: 1\r\n' \
                b'\r\n'
 
