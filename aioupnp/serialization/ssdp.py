@@ -112,8 +112,6 @@ class SSDPDatagram(object):
                 raise UPnPError("required field for {} is missing: {}".format(self._packet_type, attr_name))
             if attr_name == 'mx':
                 value = str(attr)
-            elif attr_name == 'man':
-                value = "\"%s\"" % attr
             else:
                 value = attr
             lines.append("{}: {}".format(attr_name.upper(), value))
