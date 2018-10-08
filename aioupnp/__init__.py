@@ -1,4 +1,4 @@
-__version__ = "0.0.1a11"
+__version__ = "0.0.2a1"
 __name__ = "aioupnp"
 __author__ = "Jack Robison"
 __maintainer__ = "Jack Robison"
