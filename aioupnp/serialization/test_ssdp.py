@@ -1,16 +1,16 @@
 import unittest
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.fault import UPnPError
-from aioupnp.constants import UPNP_ORG_IGD
+from aioupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER
 
 
 class TestParseMSearchRequestWithQuotes(unittest.TestCase):
-    datagram = b'M-SEARCH * HTTP/1.1\r\n' \
-               b'HOST: 239.255.255.250:1900\r\n' \
-               b'ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n' \
-               b'MAN: "ssdp:discover"\r\n' \
-               b'MX: 1\r\n' \
-               b'\r\n'
+    datagram = b"M-SEARCH * HTTP/1.1\r\n" \
+               b"HOST: 239.255.255.250:1900\r\n" \
+               b"ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n" \
+               b"MAN: \"ssdp:discover\"\r\n" \
+               b"MX: 1\r\n" \
+               b"\r\n"
 
     def test_parse_m_search(self):
         packet = SSDPDatagram.decode(self.datagram)
@@ -19,6 +19,17 @@ class TestParseMSearchRequestWithQuotes(unittest.TestCase):
         self.assertEqual(packet.st, 'urn:schemas-upnp-org:device:InternetGatewayDevice:1')
         self.assertEqual(packet.man, '"ssdp:discover"')
         self.assertEqual(packet.mx, 1)
+
+    def test_serialize_m_search(self):
+        packet = SSDPDatagram.decode(self.datagram)
+        self.assertEqual(packet.encode().encode(), self.datagram)
+
+        self.assertEqual(
+            self.datagram, SSDPDatagram(
+                SSDPDatagram._M_SEARCH, host="{}:{}".format('239.255.255.250', 1900), st=UPNP_ORG_IGD,
+                man='\"%s\"' % SSDP_DISCOVER, mx=1
+            ).encode().encode()
+        )
 
 
 class TestParseMSearchRequestWithoutQuotes(unittest.TestCase):

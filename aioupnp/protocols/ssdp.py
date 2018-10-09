@@ -39,7 +39,7 @@ class SSDPProtocol(MulticastProtocol):
         # D-Link works with both
 
         # Cisco only works with quotes
-        self.send_m_search_packet(service, address, '"%s"' % SSDP_DISCOVER)
+        self.send_m_search_packet(service, address, '\"%s\"' % SSDP_DISCOVER)
 
         # DD-WRT only works without quotes
         self.send_m_search_packet(service, address, SSDP_DISCOVER)
