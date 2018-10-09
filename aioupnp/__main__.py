@@ -1,7 +1,6 @@
 import logging
 import sys
 from aioupnp.upnp import UPnP
-from aioupnp.constants import UPNP_ORG_IGD
 
 
 log = logging.getLogger("aioupnp")
@@ -47,7 +46,7 @@ def main():
         'gateway_address': '',
         'lan_address': '',
         'timeout': 1,
-        'service': UPNP_ORG_IGD,
+        'service': '',  # if not provided try all of them
         'return_as_json': True
     }
 

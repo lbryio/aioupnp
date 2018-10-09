@@ -8,7 +8,8 @@ from asyncio.futures import Future
 from asyncio.transports import DatagramTransport
 from aioupnp.fault import UPnPError
 from aioupnp.serialization.ssdp import SSDPDatagram
-from aioupnp.constants import UPNP_ORG_IGD, SSDP_IP_ADDRESS, SSDP_PORT, SSDP_DISCOVER, SSDP_ROOT_DEVICE
+from aioupnp.constants import UPNP_ORG_IGD, WIFI_ALLIANCE_ORG_IGD
+from aioupnp.constants import SSDP_IP_ADDRESS, SSDP_PORT, SSDP_DISCOVER, SSDP_ROOT_DEVICE
 from aioupnp.protocols.multicast import MulticastProtocol
 
 ADDRESS_REGEX = re.compile("^http:\/\/(\d+\.\d+\.\d+\.\d+)\:(\d*)(\/[\w|\/|\:|\-|\.]*)$")
@@ -32,21 +33,33 @@ class SSDPProtocol(MulticastProtocol):
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
 
-    async def m_search(self, address, timeout: int = 1, service=UPNP_ORG_IGD) -> SSDPDatagram:
+    async def m_search(self, address, timeout: int = 1, service='') -> SSDPDatagram:
         if (address, service) in self.discover_callbacks:
             return self.discover_callbacks[(address, service)]
 
-        # D-Link works with both
+        if not service:
+            services = [UPNP_ORG_IGD, WIFI_ALLIANCE_ORG_IGD]
+        else:
+            services = [service]
 
-        # Cisco only works with quotes
-        self.send_m_search_packet(service, address, '\"%s\"' % SSDP_DISCOVER)
+        search_futs: List[Future] = []
+        outer_fut: Future = Future()
 
-        # DD-WRT only works without quotes
-        self.send_m_search_packet(service, address, SSDP_DISCOVER)
+        for service in services:
+            # D-Link works with both
 
-        f: Future = Future()
-        self.discover_callbacks[(address, service)] = f
-        return await asyncio.wait_for(f, timeout)
+            # Cisco only works with quotes
+            self.send_m_search_packet(service, address, '\"%s\"' % SSDP_DISCOVER)
+
+            # DD-WRT only works without quotes
+            self.send_m_search_packet(service, address, SSDP_DISCOVER)
+
+            f: Future = Future()
+            f.add_done_callback(lambda _f: outer_fut.set_result(_f.result()))
+            self.discover_callbacks[(address, service)] = f
+            search_futs.append(f)
+
+        return await asyncio.wait_for(outer_fut, timeout)
 
     def datagram_received(self, data, addr) -> None:
         if addr[0] == self.lan_address:
@@ -106,7 +119,7 @@ async def listen_ssdp(lan_address: str, gateway_address: str,
 
 
 async def m_search(lan_address: str, gateway_address: str, timeout: int = 1,
-                   service: str = UPNP_ORG_IGD, ssdp_socket: socket.socket = None) -> SSDPDatagram:
+                   service: str = '', ssdp_socket: socket.socket = None) -> SSDPDatagram:
     transport, protocol, gateway_address, lan_address = await listen_ssdp(
         lan_address, gateway_address, ssdp_socket
     )

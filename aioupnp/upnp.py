@@ -6,7 +6,6 @@ import asyncio
 from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
-from aioupnp.constants import UPNP_ORG_IGD
 from aioupnp.util import get_gateway_and_lan_addresses
 from aioupnp.protocols.ssdp import m_search
 
@@ -43,7 +42,7 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = UPNP_ORG_IGD, interface_name: str = 'default',
+                       service: str = '', interface_name: str = 'default',
                        ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -55,7 +54,7 @@ class UPnP:
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = UPNP_ORG_IGD, interface_name: str = 'default') -> Dict:
+                       service: str = '', interface_name: str = 'default') -> Dict:
         lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         datagram = await m_search(lan_address, gateway_address, timeout, service)
         return {
@@ -215,7 +214,7 @@ class UPnP:
 
     @classmethod
     def run_cli(cls, method, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
-                          service: str = UPNP_ORG_IGD, interface_name: str = 'default',
+                          service: str = '', interface_name: str = 'default',
                 kwargs: dict = None) -> None:
         kwargs = kwargs or {}
 
