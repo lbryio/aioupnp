@@ -50,6 +50,7 @@ class SCPDHTTPClientProtocol(Protocol):
             try:
                 packet = deserialize_soap_post_response(self.response_buff, self.soap_method, self.soap_service_id)
                 if not packet:
+                    self.finished.set_result(packet)
                     return
             except ElementTree.ParseError:
                 pass
