@@ -5,7 +5,7 @@ from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_AD
 from aioupnp.constants import SPEC_VERSION, UPNP_ORG_IGD, SERVICE
 from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
-from aioupnp.protocols.ssdp import m_search
+from aioupnp.protocols.ssdp import fuzzy_m_search
 from aioupnp.protocols.scpd import scpd_get
 from aioupnp.protocols.soap import SCPDCommand
 from aioupnp.util import flatten_keys
@@ -129,9 +129,8 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 1,
-                               service: str = UPNP_ORG_IGD, man: str = '', mx: int = 1,
                                ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
-        datagram = await m_search(lan_address, gateway_address, timeout, service, man, mx, ssdp_socket)
+        datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
         gateway = cls(**datagram.as_dict())
         await gateway.discover_commands(soap_socket)
         return gateway

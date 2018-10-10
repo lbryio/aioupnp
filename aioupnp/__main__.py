@@ -1,6 +1,8 @@
 import logging
 import sys
+from collections import OrderedDict
 from aioupnp.upnp import UPnP
+from aioupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER, SSDP_HOST
 
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
@@ -45,13 +47,14 @@ def main():
         'gateway_address': '',
         'lan_address': '',
         'timeout': 1,
-        'service': '',  # if not provided try all of them
-        'man': '',
-        'mx': 1,
-        'return_as_json': True
+
+        'HOST': SSDP_HOST,
+        'ST': UPNP_ORG_IGD,
+        'MAN': SSDP_DISCOVER,
+        'MX': 1,
     }
 
-    options = {}
+    options = OrderedDict()
     command = None
     for arg in args:
         if arg.startswith("--"):
@@ -80,9 +83,8 @@ def main():
         log.setLevel(logging.DEBUG)
 
     UPnP.run_cli(
-        command.replace('-', '_'), options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('service'), options.pop('man'), options.pop('mx'),
-        options.pop('interface'), kwargs
+        command.replace('-', '_'), options, options.pop('lan_address'), options.pop('gateway_address'),
+        options.pop('timeout'), options.pop('interface'), kwargs
     )
 
 

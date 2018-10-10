@@ -3,11 +3,12 @@ import socket
 import logging
 import json
 import asyncio
+from collections import OrderedDict
 from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
-from aioupnp.protocols.ssdp import m_search
+from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
 
 log = logging.getLogger(__name__)
 
@@ -42,23 +43,24 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default',
+                       interface_name: str = 'default',
                        ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
             raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
         gateway = await Gateway.discover_gateway(
-            lan_address, gateway_address, timeout, service, man, mx, ssdp_socket, soap_socket
+            lan_address, gateway_address, timeout, ssdp_socket, soap_socket
         )
         return cls(lan_address, gateway_address, gateway)
 
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default') -> Dict:
+                       args: OrderedDict = None, interface_name: str = 'default') -> Dict:
+        args = args or OrderedDict()
         lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
-        datagram = await m_search(lan_address, gateway_address, timeout, service, man, mx)
+        datagram = await m_search(lan_address, gateway_address, args, timeout)
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
@@ -215,10 +217,10 @@ class UPnP:
         return "Generated test data! -> %s" % device_path
 
     @classmethod
-    def run_cli(cls, method, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
-                          service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default',
-                kwargs: dict = None) -> None:
+    def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
+                interface_name: str = 'default', kwargs: dict = None) -> None:
         kwargs = kwargs or {}
+        igd_args = igd_args
         timeout = int(timeout)
         try:
             asyncio.get_running_loop()
@@ -231,12 +233,12 @@ class UPnP:
         async def wrapper():
             if method == 'm_search':
                 fn = lambda *_a, **_kw: cls.m_search(
-                    lan_address, gateway_address, timeout, service, man, mx, interface_name
+                    lan_address, gateway_address, timeout, igd_args, interface_name
                 )
             else:
                 try:
                     u = await cls.discover(
-                        lan_address, gateway_address, timeout, service, man, mx, interface_name
+                        lan_address, gateway_address, timeout, interface_name
                     )
                 except UPnPError as err:
                     fut.set_exception(err)
