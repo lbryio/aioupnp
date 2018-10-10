@@ -1,7 +1,81 @@
 import unittest
+from collections import OrderedDict
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.fault import UPnPError
 from aioupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER
+
+
+class TestMSearchDatagramSerialization(unittest.TestCase):
+    packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'Host: 239.255.255.250:1900\r\n' \
+        b'Man: "ssdp:discover"\r\n' \
+        b'ST: ssdp:all\r\n' \
+        b'MX: 5\r\n' \
+        b'\r\n'
+
+    datagram_args = OrderedDict([
+        ('Host', "{}:{}".format('239.255.255.250', 1900)),
+        ('Man', '"ssdp:discover"'),
+        ('ST', 'ssdp:all'),
+        ('MX', 5),
+    ])
+
+    def test_deserialize_and_reserialize(self):
+        packet1 = SSDPDatagram.decode(self.packet)
+        packet2 = SSDPDatagram("M-SEARCH", self.datagram_args)
+        self.assertEqual(packet2.encode(), packet1.encode())
+
+
+class TestSerializationOrder(TestMSearchDatagramSerialization):
+    packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'Host: 239.255.255.250:1900\r\n' \
+        b'ST: ssdp:all\r\n' \
+        b'Man: "ssdp:discover"\r\n' \
+        b'MX: 5\r\n' \
+        b'\r\n'
+
+    datagram_args = OrderedDict([
+        ('Host', "{}:{}".format('239.255.255.250', 1900)),
+        ('ST', 'ssdp:all'),
+        ('Man', '"ssdp:discover"'),
+        ('MX', 5),
+    ])
+
+
+class TestSerializationPreserveCase(TestMSearchDatagramSerialization):
+    packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'HOST: 239.255.255.250:1900\r\n' \
+        b'ST: ssdp:all\r\n' \
+        b'Man: "ssdp:discover"\r\n' \
+        b'mx: 5\r\n' \
+        b'\r\n'
+
+    datagram_args = OrderedDict([
+        ('HOST', "{}:{}".format('239.255.255.250', 1900)),
+        ('ST', 'ssdp:all'),
+        ('Man', '"ssdp:discover"'),
+        ('mx', 5),
+    ])
+
+
+class TestSerializationPreserveAllLowerCase(TestMSearchDatagramSerialization):
+    packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'host: 239.255.255.250:1900\r\n' \
+        b'st: ssdp:all\r\n' \
+        b'man: "ssdp:discover"\r\n' \
+        b'mx: 5\r\n' \
+        b'\r\n'
+
+    datagram_args = OrderedDict([
+        ('host', "{}:{}".format('239.255.255.250', 1900)),
+        ('st', 'ssdp:all'),
+        ('man', '"ssdp:discover"'),
+        ('mx', 5),
+    ])
 
 
 class TestParseMSearchRequestWithQuotes(unittest.TestCase):
@@ -19,17 +93,6 @@ class TestParseMSearchRequestWithQuotes(unittest.TestCase):
         self.assertEqual(packet.st, 'urn:schemas-upnp-org:device:InternetGatewayDevice:1')
         self.assertEqual(packet.man, '"ssdp:discover"')
         self.assertEqual(packet.mx, 1)
-
-    def test_serialize_m_search(self):
-        packet = SSDPDatagram.decode(self.datagram)
-        self.assertEqual(packet.encode().encode(), self.datagram)
-
-        self.assertEqual(
-            self.datagram, SSDPDatagram(
-                SSDPDatagram._M_SEARCH, host="{}:{}".format('239.255.255.250', 1900), st=UPNP_ORG_IGD,
-                man='\"%s\"' % SSDP_DISCOVER, mx=1
-            ).encode().encode()
-        )
 
 
 class TestParseMSearchRequestWithoutQuotes(unittest.TestCase):
@@ -178,7 +241,7 @@ class TestParseNotify(unittest.TestCase):
         packet = SSDPDatagram.decode(self.datagram)
         self.assertTrue(packet._packet_type, packet._NOTIFY)
         self.assertEqual(packet.host, '239.255.255.250:1900')
-        self.assertEqual(packet.cache_control, 'max-age=180')
+        self.assertEqual(packet.cache_control, 'max-age=180')  # this is an optional field
         self.assertEqual(packet.location, 'http://192.168.1.1:5431/dyndev/uuid:000c-29ea-247500c00068')
         self.assertEqual(packet.nt, 'upnp:rootdevice')
         self.assertEqual(packet.nts, 'ssdp:alive')
