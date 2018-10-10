@@ -37,7 +37,6 @@ class MulticastProtocol(DatagramProtocol):
 
     def connection_made(self, transport) -> None:
         self.transport = transport
-        self.join_group(self.multicast_address, self.bind_address)
 
     @classmethod
     def create_multicast_socket(cls, bind_address: str):

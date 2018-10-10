@@ -112,10 +112,15 @@ async def listen_ssdp(lan_address: str, gateway_address: str,
         )
         transport: DatagramTransport = listen_result[0]
         protocol: SSDPProtocol = listen_result[1]
+    except Exception as err:
+        raise UPnPError(err)
+    try:
+        protocol.join_group(protocol.multicast_address, protocol.bind_address)
         protocol.set_ttl(1)
-    except Exception:
-        log.exception("failed to create multicast socket %s:%i", lan_address, SSDP_PORT)
-        raise
+    except Exception as err:
+        transport.close()
+        raise UPnPError(err)
+
     return transport, protocol, gateway_address, lan_address
 
 
