@@ -3,7 +3,7 @@ import socket
 from typing import Dict, List, Union, Type
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from aioupnp.constants import SPEC_VERSION, UPNP_ORG_IGD, SERVICE
-from aioupnp.commands import SCPDCommands
+from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
 from aioupnp.protocols.ssdp import m_search
 from aioupnp.protocols.scpd import scpd_get
@@ -90,7 +90,7 @@ class Gateway:
 
         self._unsupported_actions = {}
         self._registered_commands = {}
-        self.commands = SCPDCommands()
+        self.commands = SOAPCommands()
 
     def gateway_descriptor(self) -> dict:
         r = {
@@ -129,9 +129,9 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 1,
-                               service: str = UPNP_ORG_IGD, man: str = '',
+                               service: str = UPNP_ORG_IGD, man: str = '', mx: int = 1,
                                ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
-        datagram = await m_search(lan_address, gateway_address, timeout, service, man, ssdp_socket)
+        datagram = await m_search(lan_address, gateway_address, timeout, service, man, mx, ssdp_socket)
         gateway = cls(**datagram.as_dict())
         await gateway.discover_commands(soap_socket)
         return gateway

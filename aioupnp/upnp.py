@@ -42,23 +42,23 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = '', man: str = '', interface_name: str = 'default',
+                       service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default',
                        ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
             raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
         gateway = await Gateway.discover_gateway(
-            lan_address, gateway_address, timeout, service, man, ssdp_socket, soap_socket
+            lan_address, gateway_address, timeout, service, man, mx, ssdp_socket, soap_socket
         )
         return cls(lan_address, gateway_address, gateway)
 
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       service: str = '', man: str = '', interface_name: str = 'default') -> Dict:
+                       service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default') -> Dict:
         lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
-        datagram = await m_search(lan_address, gateway_address, timeout, service, man)
+        datagram = await m_search(lan_address, gateway_address, timeout, service, man, mx)
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
@@ -216,7 +216,7 @@ class UPnP:
 
     @classmethod
     def run_cli(cls, method, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
-                          service: str = '', man: str = '', interface_name: str = 'default',
+                          service: str = '', man: str = '', mx: int = 1, interface_name: str = 'default',
                 kwargs: dict = None) -> None:
         kwargs = kwargs or {}
         timeout = int(timeout)
@@ -231,12 +231,12 @@ class UPnP:
         async def wrapper():
             if method == 'm_search':
                 fn = lambda *_a, **_kw: cls.m_search(
-                    lan_address, gateway_address, timeout, service, man, interface_name
+                    lan_address, gateway_address, timeout, service, man, mx, interface_name
                 )
             else:
                 try:
                     u = await cls.discover(
-                        lan_address, gateway_address, timeout, service, man, interface_name
+                        lan_address, gateway_address, timeout, service, man, mx, interface_name
                     )
                 except UPnPError as err:
                     fut.set_exception(err)

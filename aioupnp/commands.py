@@ -3,7 +3,7 @@ from typing import Tuple, Union
 none_or_str = Union[None, str]
 
 
-class SCPDCommands:
+class SOAPCommands:
     def debug_commands(self) -> dict:
         raise NotImplementedError()
 

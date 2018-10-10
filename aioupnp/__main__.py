@@ -47,6 +47,7 @@ def main():
         'timeout': 1,
         'service': '',  # if not provided try all of them
         'man': '',
+        'mx': 1,
         'return_as_json': True
     }
 
@@ -80,8 +81,8 @@ def main():
 
     UPnP.run_cli(
         command.replace('-', '_'), options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('service'), options.pop('man'), options.pop('interface'),
-        kwargs
+        options.pop('timeout'), options.pop('service'), options.pop('man'), options.pop('mx'),
+        options.pop('interface'), kwargs
     )
 
 

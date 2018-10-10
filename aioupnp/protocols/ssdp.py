@@ -25,15 +25,15 @@ class SSDPProtocol(MulticastProtocol):
         self.notifications: List = []
         self.replies: List = []
 
-    def send_m_search_packet(self, service, address, man):
+    def send_m_search_packet(self, service, address, man, mx):
         packet = SSDPDatagram(
             SSDPDatagram._M_SEARCH, host="{}:{}".format(SSDP_IP_ADDRESS, SSDP_PORT), st=service,
-            man=man, mx=1
+            man=man, mx=mx
         )
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
 
-    async def m_search(self, address, timeout: int = 1, service='', man='') -> SSDPDatagram:
+    async def m_search(self, address: str, timeout: int = 1, service: str = '', man: str = '', mx: int = 1) -> SSDPDatagram:
         if (address, service) in self.discover_callbacks:
             return self.discover_callbacks[(address, service)]
         man = man or SSDP_DISCOVER
@@ -49,10 +49,10 @@ class SSDPProtocol(MulticastProtocol):
             # D-Link works with both
 
             # Cisco only works with quotes
-            self.send_m_search_packet(service, address, '\"%s\"' % man)
+            self.send_m_search_packet(service, address, '\"%s\"' % man, mx)
 
             # DD-WRT only works without quotes
-            self.send_m_search_packet(service, address, man)
+            self.send_m_search_packet(service, address, man, mx)
 
             f: Future = Future()
             f.add_done_callback(lambda _f: outer_fut.set_result(_f.result()))
@@ -125,12 +125,12 @@ async def listen_ssdp(lan_address: str, gateway_address: str,
 
 
 async def m_search(lan_address: str, gateway_address: str, timeout: int = 1,
-                   service: str = '', man: str = '', ssdp_socket: socket.socket = None) -> SSDPDatagram:
+                   service: str = '', man: str = '', mx: int = 1, ssdp_socket: socket.socket = None) -> SSDPDatagram:
     transport, protocol, gateway_address, lan_address = await listen_ssdp(
         lan_address, gateway_address, ssdp_socket
     )
     try:
-        return await protocol.m_search(address=gateway_address, timeout=timeout, service=service, man=man)
+        return await protocol.m_search(address=gateway_address, timeout=timeout, service=service, man=man, mx=mx)
     except asyncio.TimeoutError:
         raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
     finally:
