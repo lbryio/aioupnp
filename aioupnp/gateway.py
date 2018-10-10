@@ -155,8 +155,7 @@ class Gateway:
     async def register_commands(self, service: Service, soap_socket: socket.socket = None):
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
-        service_dict = await scpd_get(("" if service.SCPDURL.startswith("/") else "/") + service.SCPDURL,
-                                      self.base_ip.decode(), self.port)
+        service_dict = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
         if not service_dict:
             return
 
