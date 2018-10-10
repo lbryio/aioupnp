@@ -53,8 +53,8 @@ class SSDPDatagram(object):
     _required_fields = {
         _M_SEARCH: [
             'host',
-            'st',
             'man',
+            'st',
             'mx',
         ],
         _NOTIFY: [
