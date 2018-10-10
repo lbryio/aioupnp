@@ -233,9 +233,13 @@ class UPnP:
                     lan_address, gateway_address, timeout, service, man, interface_name
                 )
             else:
-                u = await cls.discover(
-                    lan_address, gateway_address, timeout, service, man, interface_name
-                )
+                try:
+                    u = await cls.discover(
+                        lan_address, gateway_address, timeout, service, man, interface_name
+                    )
+                except UPnPError as err:
+                    fut.set_exception(err)
+                    return
                 if hasattr(u, method) and hasattr(getattr(u, method), "_cli"):
                     fn = getattr(u, method)
                 else:
@@ -254,7 +258,7 @@ class UPnP:
         try:
             result = fut.result()
         except UPnPError as err:
-            print("error: %s" % str(err))
+            print("aioupnp encountered an error:\n%s" % str(err))
             return
 
         if isinstance(result, (list, tuple, dict)):
