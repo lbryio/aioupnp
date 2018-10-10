@@ -33,10 +33,10 @@ class SSDPProtocol(MulticastProtocol):
         log.debug("sending packet to %s:%i: %s", address, SSDP_PORT, packet)
         self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
 
-    async def m_search(self, address, timeout: int = 1, service='') -> SSDPDatagram:
+    async def m_search(self, address, timeout: int = 1, service='', man='') -> SSDPDatagram:
         if (address, service) in self.discover_callbacks:
             return self.discover_callbacks[(address, service)]
-
+        man = man or SSDP_DISCOVER
         if not service:
             services = [UPNP_ORG_IGD, WIFI_ALLIANCE_ORG_IGD]
         else:
@@ -49,10 +49,10 @@ class SSDPProtocol(MulticastProtocol):
             # D-Link works with both
 
             # Cisco only works with quotes
-            self.send_m_search_packet(service, address, '\"%s\"' % SSDP_DISCOVER)
+            self.send_m_search_packet(service, address, '\"%s\"' % man)
 
             # DD-WRT only works without quotes
-            self.send_m_search_packet(service, address, SSDP_DISCOVER)
+            self.send_m_search_packet(service, address, man)
 
             f: Future = Future()
             f.add_done_callback(lambda _f: outer_fut.set_result(_f.result()))
@@ -119,12 +119,12 @@ async def listen_ssdp(lan_address: str, gateway_address: str,
 
 
 async def m_search(lan_address: str, gateway_address: str, timeout: int = 1,
-                   service: str = '', ssdp_socket: socket.socket = None) -> SSDPDatagram:
+                   service: str = '', man: str = '', ssdp_socket: socket.socket = None) -> SSDPDatagram:
     transport, protocol, gateway_address, lan_address = await listen_ssdp(
         lan_address, gateway_address, ssdp_socket
     )
     try:
-        return await protocol.m_search(address=gateway_address, timeout=timeout, service=service)
+        return await protocol.m_search(address=gateway_address, timeout=timeout, service=service, man=man)
     except asyncio.TimeoutError:
         raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
     finally:

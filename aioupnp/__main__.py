@@ -2,7 +2,6 @@ import logging
 import sys
 from aioupnp.upnp import UPnP
 
-
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)-15s-%(filename)s:%(lineno)s->%(message)s'))
@@ -47,6 +46,7 @@ def main():
         'lan_address': '',
         'timeout': 1,
         'service': '',  # if not provided try all of them
+        'man': '',
         'return_as_json': True
     }
 
@@ -80,7 +80,7 @@ def main():
 
     UPnP.run_cli(
         command.replace('-', '_'), options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('service'), options.pop('interface'),
+        options.pop('timeout'), options.pop('service'), options.pop('man'), options.pop('interface'),
         kwargs
     )
 

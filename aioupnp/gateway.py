@@ -1,7 +1,6 @@
 import logging
 import socket
-import typing
-from typing import Dict, List, Union, Type, Tuple
+from typing import Dict, List, Union, Type
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from aioupnp.constants import SPEC_VERSION, UPNP_ORG_IGD, SERVICE
 from aioupnp.commands import SCPDCommands
@@ -130,15 +129,15 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 1,
-                               service: str = UPNP_ORG_IGD, ssdp_socket: socket.socket = None,
-                               soap_socket: socket.socket = None):
-        datagram = await m_search(lan_address, gateway_address, timeout, service, ssdp_socket)
+                               service: str = UPNP_ORG_IGD, man: str = '',
+                               ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
+        datagram = await m_search(lan_address, gateway_address, timeout, service, man, ssdp_socket)
         gateway = cls(**datagram.as_dict())
         await gateway.discover_commands(soap_socket)
         return gateway
 
     async def discover_commands(self, soap_socket: socket.socket = None):
-        response = await scpd_get("/" + self.path.decode(), self.base_ip.decode(), self.port)
+        response = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
 
         self.spec_version = get_dict_val_case_insensitive(response, SPEC_VERSION)
         self.url_base = get_dict_val_case_insensitive(response, "urlbase")
