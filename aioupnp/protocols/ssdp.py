@@ -82,6 +82,7 @@ class SSDPProtocol(MulticastProtocol):
                 return
 
         elif packet._packet_type == packet._NOTIFY:
+            log.debug("%s:%i sent us a notification: %s", packet)
             if packet.nt == SSDP_ROOT_DEVICE:
                 address, port, path = ADDRESS_REGEX.findall(packet.location)[0]
                 key = None

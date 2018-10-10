@@ -219,6 +219,7 @@ class UPnP:
                           service: str = '', man: str = '', interface_name: str = 'default',
                 kwargs: dict = None) -> None:
         kwargs = kwargs or {}
+        timeout = int(timeout)
         try:
             asyncio.get_running_loop()
         except RuntimeError:
@@ -246,7 +247,7 @@ class UPnP:
                     fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
                     return
             try:
-                result = await fn(**kwargs)
+                result = await fn(**{k: fn.__annotations__[k](v) for k, v in kwargs.items()})
                 fut.set_result(result)
             except UPnPError as err:
                 fut.set_exception(err)
