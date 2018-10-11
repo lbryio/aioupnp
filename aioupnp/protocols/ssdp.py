@@ -146,7 +146,9 @@ async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 
             result = await protocol.m_search(address=gateway_address, timeout=timeout, datagram_args=args)
             transport.close()
             return result
-        except TimeoutError:
+        except asyncio.TimeoutError:
             pass
+        except Exception as err:
+            log.error(err)
     transport.close()
     raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
