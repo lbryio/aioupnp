@@ -199,9 +199,12 @@ class UPnP:
         except (UPnPError, NotImplementedError):
             print("failed to add and remove a mapping")
 
-        device = list(self.gateway.devices.values())[0]
-        assert device.manufacturer and device.modelName
-        device_path = os.path.join(os.getcwd(), self.gateway.manufacturer_string)
+        if self.gateway._device:
+            device = list(self.gateway.devices.values())[0]
+            assert device.manufacturer and device.modelName
+            device_path = os.path.join(os.getcwd(), self.gateway.manufacturer_string)
+        else:
+            device_path = os.path.join(os.getcwd(), "UNKNOWN GATEWAY")
         with open(device_path, "w") as f:
             f.write(json.dumps({
                 "gateway": self.gateway.debug_gateway(),
