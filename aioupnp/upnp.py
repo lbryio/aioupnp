@@ -199,7 +199,7 @@ class UPnP:
         except (UPnPError, NotImplementedError):
             print("failed to add and remove a mapping")
 
-        if self.gateway._device:
+        if self.gateway.devices:
             device = list(self.gateway.devices.values())[0]
             assert device.manufacturer and device.modelName
             device_path = os.path.join(os.getcwd(), self.gateway.manufacturer_string)
