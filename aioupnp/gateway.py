@@ -1,13 +1,15 @@
 import logging
 import socket
+from collections import OrderedDict
 from typing import Dict, List, Union, Type
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
-from aioupnp.constants import SPEC_VERSION, UPNP_ORG_IGD, SERVICE
+from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
 from aioupnp.protocols.ssdp import fuzzy_m_search
 from aioupnp.protocols.scpd import scpd_get
-from aioupnp.protocols.soap import SCPDCommand
+from aioupnp.protocols.soap import SOAPCommand
+from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.util import flatten_keys
 from aioupnp.fault import UPnPError
 
@@ -53,43 +55,36 @@ def get_action_list(element_dict: dict) -> List:  # [(<method>, [<input1>, ...],
 
 
 class Gateway:
-    def __init__(self, **kwargs):
-        flattened = {
-            k.lower(): v for k, v in kwargs.items()
-        }
-        usn = flattened["usn"]
-        server = flattened["server"]
-        location = flattened["location"]
-        st = flattened["st"]
+    def __init__(self, ok_packet: SSDPDatagram, m_search_args: OrderedDict, lan_address: str,
+                 gateway_address: str) -> None:
+        self._ok_packet = ok_packet
+        self._m_search_args = m_search_args
+        self._lan_address = lan_address
+        self.usn = (ok_packet.usn or '').encode()
+        self.ext = (ok_packet.ext or '').encode()
+        self.server = (ok_packet.server or '').encode()
+        self.location = (ok_packet.location or '').encode()
+        self.cache_control = (ok_packet.cache_control or '').encode()
+        self.date = (ok_packet.date or '').encode()
+        self.urn = (ok_packet.st or '').encode()
 
-        cache_control = flattened.get("cache_control") or flattened.get("cache-control") or ""
-        date = flattened.get("date", "")
-        ext = flattened.get("ext", "")
-
-        self.usn = usn.encode()
-        self.ext = ext.encode()
-        self.server = server.encode()
-        self.location = location.encode()
-        self.cache_control = cache_control.encode()
-        self.date = date.encode()
-        self.urn = st.encode()
-
-        self._xml_response = ""
-        self._service_descriptors = {}
+        self._xml_response = b""
+        self._service_descriptors: Dict = {}
         self.base_address = BASE_ADDRESS_REGEX.findall(self.location)[0]
         self.port = int(BASE_PORT_REGEX.findall(self.location)[0])
         self.base_ip = self.base_address.lstrip(b"http://").split(b":")[0]
+        assert self.base_ip == gateway_address.encode()
         self.path = self.location.split(b"%s:%i/" % (self.base_ip, self.port))[1]
 
         self.spec_version = None
         self.url_base = None
 
-        self._device = None
-        self._devices = []
-        self._services = []
+        self._device: Union[None, Device] = None
+        self._devices: List = []
+        self._services: List = []
 
-        self._unsupported_actions = {}
-        self._registered_commands = {}
+        self._unsupported_actions: Dict = {}
+        self._registered_commands: Dict = {}
         self.commands = SOAPCommands()
 
     def gateway_descriptor(self) -> dict:
@@ -102,6 +97,12 @@ class Gateway:
             'urn': self.urn.decode(),
         }
         return r
+
+    @property
+    def manufacturer_string(self) -> str:
+        if not self._device:
+            raise NotImplementedError()
+        return "%s %s" % (self._device.manufacturer, self._device.modelName)
 
     @property
     def services(self) -> Dict:
@@ -121,23 +122,36 @@ class Gateway:
                 return service
         return None
 
-    def debug_commands(self):
+    @property
+    def _soap_requests(self) -> Dict:
         return {
-            'available': self._registered_commands,
-            'failed': self._unsupported_actions
+            name: getattr(self.commands, name)._requests for name in self._registered_commands.keys()
+        }
+
+    def debug_gateway(self) -> Dict:
+        return {
+            'gateway_address': self.base_ip,
+            'soap_port': self.port,
+            'm_search_args': self._m_search_args,
+            'reply': self._ok_packet.as_dict(),
+            'registered_soap_commands': self._registered_commands,
+            'unsupported_soap_commands': self._unsupported_actions,
+            'gateway_xml': self._xml_response,
+            'service_descriptors': self._service_descriptors,
+            'soap_requests': self._soap_requests
         }
 
     @classmethod
-    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 1,
+    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
                                ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
-        datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
-        gateway = cls(**datagram.as_dict())
+        m_search_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+        gateway = cls(datagram, m_search_args, lan_address, gateway_address)
         await gateway.discover_commands(soap_socket)
         return gateway
 
     async def discover_commands(self, soap_socket: socket.socket = None):
-        response = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
-
+        response, xml_bytes = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
+        self._xml_response = xml_bytes
         self.spec_version = get_dict_val_case_insensitive(response, SPEC_VERSION)
         self.url_base = get_dict_val_case_insensitive(response, "urlbase")
         if not self.url_base:
@@ -154,7 +168,9 @@ class Gateway:
     async def register_commands(self, service: Service, soap_socket: socket.socket = None):
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
-        service_dict = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
+        service_dict, xml_bytes = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
+        self._service_descriptors[service.SCPDURL] = xml_bytes
+
         if not service_dict:
             return
 
@@ -176,7 +192,7 @@ class Gateway:
                     if param_name == "return":
                         continue
                     param_types[param_name] = param_type
-                command = SCPDCommand(
+                command = SOAPCommand(
                     self.base_ip.decode(), self.port, service.controlURL, service.serviceType.encode(),
                     name, param_types, return_types, inputs, outputs, soap_socket)
                 setattr(command, "__doc__", current.__doc__)

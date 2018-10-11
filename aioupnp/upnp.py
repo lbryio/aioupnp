@@ -8,7 +8,8 @@ from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
-from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
+from aioupnp.protocols.ssdp import m_search
+from aioupnp.protocols.soap import SOAPCommand
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class UPnP:
         return lan_address, gateway_address
 
     @classmethod
-    async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
+    async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
                        interface_name: str = 'default',
                        ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
@@ -77,7 +78,7 @@ class UPnP:
         await self.gateway.commands.AddPortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=""
+            NewEnabled=True, NewPortMappingDescription=description, NewLeaseDuration=""
         )
         return
 
@@ -85,13 +86,14 @@ class UPnP:
     async def get_port_mapping_by_index(self, index: int) -> Dict:
         result = await self._get_port_mapping_by_index(index)
         if result:
-            return {
-                k: v for k, v in zip(self.gateway.commands.GetGenericPortMappingEntry.return_order, result)
-            }
+            if isinstance(self.gateway.commands.GetGenericPortMappingEntry, SOAPCommand):
+                return {
+                    k: v for k, v in zip(self.gateway.commands.GetGenericPortMappingEntry.return_order, result)
+                }
         return {}
 
-    async def _get_port_mapping_by_index(self, index: int) -> Union[Tuple[str, int, str, int, str, bool, str, int],
-                                                                  None]:
+    async def _get_port_mapping_by_index(self, index: int) -> Union[None,
+                                                                    Tuple[Union[None, str], int, str, int, str, bool, str, int]]:
         try:
             redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
             return redirect
@@ -119,9 +121,11 @@ class UPnP:
 
         try:
             result = await self.gateway.commands.GetSpecificPortMappingEntry(
-                NewRemoteHost=None, NewExternalPort=external_port, NewProtocol=protocol
+                NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol
             )
-            return {k: v for k, v in zip(self.gateway.commands.GetSpecificPortMappingEntry.return_order, result)}
+            if isinstance(self.gateway.commands.GetSpecificPortMappingEntry, SOAPCommand):
+                return {k: v for k, v in zip(self.gateway.commands.GetSpecificPortMappingEntry.return_order, result)}
+            return {}
         except UPnPError:
             return {}
 
@@ -175,49 +179,38 @@ class UPnP:
 
     @cli
     async def generate_test_data(self):
-        external_ip = await self.get_external_ip()
-        redirects = await self.get_redirects()
-        ext_port = await self.get_next_mapping(4567, "UDP", "aioupnp test mapping")
-        delete = await self.delete_port_mapping(ext_port, "UDP")
-        after_delete = await self.get_specific_port_mapping(ext_port, "UDP")
+        print("found gateway via M-SEARCH")
+        try:
+            external_ip = await self.get_external_ip()
+            print("got external ip: %s" % external_ip)
+        except UPnPError:
+            print("failed to get the external ip")
+        try:
+            redirects = await self.get_redirects()
+            print("got redirects:\n%s" % redirects)
+        except UPnPError:
+            print("failed to get redirects")
 
-        commands_test_case = (
-            ("get_external_ip", (), "1.2.3.4"),
-            ("get_redirects", (), redirects),
-            ("get_next_mapping", (4567, "UDP", "aioupnp test mapping"), ext_port),
-            ("delete_port_mapping", (ext_port, "UDP"), delete),
-            ("get_specific_port_mapping", (ext_port, "UDP"), after_delete),
-        )
+        try:
+            ext_port = await self.get_next_mapping(4567, "UDP", "aioupnp test mapping")
+            print("set up external mapping to port %i" % ext_port)
+            await self.delete_port_mapping(ext_port, "UDP")
+            print("deleted mapping")
+        except UPnPError:
+            print("failed to add and remove a mapping")
 
-        gateway = self.gateway
-        device = list(gateway.devices.values())[0]
+        device = list(self.gateway.devices.values())[0]
         assert device.manufacturer and device.modelName
-        device_path = os.path.join(os.getcwd(), "%s %s" % (device.manufacturer, device.modelName))
-        commands = gateway.debug_commands()
+        device_path = os.path.join(os.getcwd(), self.gateway.manufacturer_string)
         with open(device_path, "w") as f:
             f.write(json.dumps({
-                "router_address": self.gateway_address,
+                "gateway": self.gateway.debug_gateway(),
                 "client_address": self.lan_address,
-                "port": gateway.port,
-                "gateway_dict": gateway.gateway_descriptor(),
-                'expected_devices': [
-                    {
-                        'cache_control': 'max-age=1800',
-                        'location': gateway.location,
-                        'server': gateway.server,
-                        'st': gateway.urn,
-                        'usn': gateway.usn
-                    }
-                ],
-                'commands': commands,
-                # 'ssdp': u.sspd_factory.get_ssdp_packet_replay(),
-                # 'scpd': gateway.requester.dump_packets(),
-                'soap': commands_test_case
-            }, default=_encode, indent=2).replace(external_ip, "1.2.3.4"))
+            }, default=_encode, indent=2))
         return "Generated test data! -> %s" % device_path
 
     @classmethod
-    def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 60,
+    def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
                 interface_name: str = 'default', kwargs: dict = None) -> None:
         kwargs = kwargs or {}
         igd_args = igd_args
@@ -257,6 +250,9 @@ class UPnP:
                 log.exception("uncaught error")
                 fut.set_exception(UPnPError("uncaught error: %s" % str(err)))
 
+        if not hasattr(UPnP, method) or not hasattr(getattr(UPnP, method), "_cli"):
+            fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
+            wrapper = lambda : None
         asyncio.run(wrapper())
         try:
             result = fut.result()

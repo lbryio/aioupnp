@@ -9,7 +9,6 @@ from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
-
 _template = "^(?i)(%s):[ ]*(.*)$"
 
 
@@ -54,8 +53,8 @@ class SSDPDatagram(object):
         _M_SEARCH: [
             'host',
             'man',
-            'st',
             'mx',
+            'st',
         ],
         _NOTIFY: [
             'host',
@@ -85,9 +84,9 @@ class SSDPDatagram(object):
             k.lower().replace("-", "_") for k in kwargs.keys()
         ]
         self.host = None
-        self.st = None
         self.man = None
         self.mx = None
+        self.st = None
         self.nt = None
         self.nts = None
         self.usn = None

@@ -1,5 +1,6 @@
 import logging
 import socket
+import typing
 from xml.etree import ElementTree
 import asyncio
 from asyncio.protocols import Protocol
@@ -38,43 +39,46 @@ class SCPDHTTPClientProtocol(Protocol):
         if self.method == self.GET:
             try:
                 packet = deserialize_scpd_get_response(self.response_buff)
-                if not packet:
-                    return
-            except ElementTree.ParseError:
-                pass
-            except UPnPError as err:
-                self.finished.set_exception(err)
-            else:
-                self.finished.set_result(packet)
-        elif self.method == self.POST:
-            try:
-                packet = deserialize_soap_post_response(self.response_buff, self.soap_method, self.soap_service_id)
-                if not packet:
+                if packet:
                     self.finished.set_result(packet)
                     return
             except ElementTree.ParseError:
                 pass
             except UPnPError as err:
                 self.finished.set_exception(err)
-            else:
-                self.finished.set_result(packet)
+        elif self.method == self.POST:
+            try:
+                packet = deserialize_soap_post_response(self.response_buff, self.soap_method, self.soap_service_id)
+                if packet:
+                    self.finished.set_result(packet)
+                    return
+            except ElementTree.ParseError:
+                pass
+            except UPnPError as err:
+                self.finished.set_exception(err)
 
 
-async def scpd_get(control_url: str, address: str, port: int) -> dict:
+async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[typing.Dict, bytes]:
     loop = asyncio.get_running_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
         lambda : SCPDHTTPClientProtocol('GET', packet, finished),  address, port
     )
+    assert isinstance(protocol, SCPDHTTPClientProtocol)
+    parsed: typing.Dict = {}
     try:
-        return await asyncio.wait_for(finished, 1.0)
+        parsed = await asyncio.wait_for(finished, 1.0)
+    except UPnPError:
+        return parsed, protocol.response_buff
     finally:
         transport.close()
+    return parsed, protocol.response_buff
 
 
 async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: list, service_id: bytes,
-                    close_after_send: bool, soap_socket: socket.socket = None,  **kwargs):
+                    close_after_send: bool, soap_socket: socket.socket = None,
+                    **kwargs) -> typing.Tuple[typing.Dict, bytes]:
     loop = asyncio.get_running_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
@@ -84,7 +88,12 @@ async def scpd_post(control_url: str, address: str, port: int, method: str, para
             close_after_send=close_after_send
         ), address, port, sock=soap_socket
     )
+    assert isinstance(protocol, SCPDHTTPClientProtocol)
+    parsed: typing.Dict = {}
     try:
-        return await asyncio.wait_for(finished, 1.0)
+        parsed = await asyncio.wait_for(finished, 1.0)
+    except UPnPError:
+        return parsed, protocol.response_buff
     finally:
         transport.close()
+    return parsed, protocol.response_buff
