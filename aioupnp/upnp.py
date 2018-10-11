@@ -183,12 +183,12 @@ class UPnP:
         try:
             external_ip = await self.get_external_ip()
             print("got external ip: %s" % external_ip)
-        except UPnPError:
+        except (UPnPError, NotImplementedError):
             print("failed to get the external ip")
         try:
             redirects = await self.get_redirects()
             print("got redirects:\n%s" % redirects)
-        except UPnPError:
+        except (UPnPError, NotImplementedError):
             print("failed to get redirects")
 
         try:
@@ -196,7 +196,7 @@ class UPnP:
             print("set up external mapping to port %i" % ext_port)
             await self.delete_port_mapping(ext_port, "UDP")
             print("deleted mapping")
-        except UPnPError:
+        except (UPnPError, NotImplementedError):
             print("failed to add and remove a mapping")
 
         device = list(self.gateway.devices.values())[0]
