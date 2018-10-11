@@ -46,7 +46,7 @@ def main():
         'interface': 'default',
         'gateway_address': '',
         'lan_address': '',
-        'timeout': 1,
+        'timeout': 30,
 
         'HOST': SSDP_HOST,
         'ST': UPNP_ORG_IGD,
@@ -58,7 +58,10 @@ def main():
     command = None
     for arg in args:
         if arg.startswith("--"):
-            k, v = arg.split("=")
+            if "=" in arg:
+                k, v = arg.split("=")
+            else:
+                k, v = arg, True
             k = k.lstrip('--')
             options[k] = v
         else:
