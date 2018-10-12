@@ -47,11 +47,6 @@ def main():
         'gateway_address': '',
         'lan_address': '',
         'timeout': 30,
-
-        'HOST': SSDP_HOST,
-        'ST': UPNP_ORG_IGD,
-        'MAN': SSDP_DISCOVER,
-        'MX': 1,
     }
 
     options = OrderedDict()

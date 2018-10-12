@@ -8,8 +8,9 @@ from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
-from aioupnp.protocols.ssdp import m_search
+from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
 from aioupnp.protocols.soap import SOAPCommand
+from aioupnp.serialization.ssdp import SSDPDatagram
 
 log = logging.getLogger(__name__)
 
@@ -44,27 +45,35 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                       interface_name: str = 'default',
+                       igd_args: OrderedDict = None, interface_name: str = 'default',
                        ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
             raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
         gateway = await Gateway.discover_gateway(
-            lan_address, gateway_address, timeout, ssdp_socket, soap_socket
+            lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket
         )
         return cls(lan_address, gateway_address, gateway)
 
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       args: OrderedDict = None, interface_name: str = 'default') -> Dict:
-        args = args or OrderedDict()
-        lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
-        datagram = await m_search(lan_address, gateway_address, args, timeout)
+                       igd_args: OrderedDict = None, interface_name: str = 'default',
+                       ssdp_socket: socket.socket = None) -> Dict:
+        try:
+            lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
+        except Exception as err:
+            raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
+        if not igd_args:
+            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+        else:
+            igd_args = OrderedDict(igd_args)
+            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket)
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
+            'm_search_kwargs': SSDPDatagram("M-SEARCH", igd_args).get_cli_igd_kwargs(),
             'discover_reply': datagram.as_dict()
         }
 
@@ -234,7 +243,7 @@ class UPnP:
             else:
                 try:
                     u = await cls.discover(
-                        lan_address, gateway_address, timeout, interface_name
+                        lan_address, gateway_address, timeout, igd_args, interface_name
                     )
                 except UPnPError as err:
                     fut.set_exception(err)
@@ -249,6 +258,7 @@ class UPnP:
                 fut.set_result(result)
             except UPnPError as err:
                 fut.set_exception(err)
+
             except Exception as err:
                 log.exception("uncaught error")
                 fut.set_exception(UPnPError("uncaught error: %s" % str(err)))

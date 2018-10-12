@@ -6,7 +6,7 @@ from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_AD
 from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
-from aioupnp.protocols.ssdp import fuzzy_m_search
+from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
 from aioupnp.protocols.scpd import scpd_get
 from aioupnp.protocols.soap import SOAPCommand
 from aioupnp.serialization.ssdp import SSDPDatagram
@@ -100,9 +100,10 @@ class Gateway:
 
     @property
     def manufacturer_string(self) -> str:
-        if not self._device:
+        if not self.devices:
             raise NotImplementedError()
-        return "%s %s" % (self._device.manufacturer, self._device.modelName)
+        device = list(self.devices.values())[0]
+        return "%s %s" % (device.manufacturer, device.modelName)
 
     @property
     def services(self) -> Dict:
@@ -143,8 +144,13 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
-        m_search_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+                               igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
+                               soap_socket: socket.socket = None):
+        if not igd_args:
+            m_search_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+        else:
+            m_search_args = OrderedDict(igd_args)
+            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket)
         gateway = cls(datagram, m_search_args, lan_address, gateway_address)
         await gateway.discover_commands(soap_socket)
         return gateway

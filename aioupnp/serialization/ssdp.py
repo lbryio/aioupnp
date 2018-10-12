@@ -101,10 +101,15 @@ class SSDPDatagram(object):
                 setattr(self, normalized, v)
         self._case_mappings: dict = {k.lower(): k for k in kwargs.keys()}
 
+    def get_cli_igd_kwargs(self) -> str:
+        fields = []
+        for field in self._field_order:
+            v = getattr(self, field)
+            fields.append("--%s=%s" % (self._case_mappings.get(field, field), v))
+        return " ".join(fields)
+
     def __repr__(self) -> str:
         return self.as_json()
-        # return ("SSDPDatagram(packet_type=%s, " % self._packet_type) + \
-        #        ", ".join("%s=%s" % (n, v) for n, v in self.as_dict().items()) + ")"
 
     def __getitem__(self, item):
         for i in self._required_fields[self._packet_type]:
