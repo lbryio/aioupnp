@@ -73,14 +73,13 @@ class UPnP:
         return await self.gateway.commands.GetExternalIPAddress()
 
     @cli
-    async def add_port_mapping(self, external_port: int, protocol: str, internal_port, lan_address: str,
-                         description: str) -> None:
-        await self.gateway.commands.AddPortMapping(
+    async def add_port_mapping(self, external_port: int, protocol: str, internal_port: int, lan_address: str,
+                               description: str, lease_duration: int) -> None:
+        return await self.gateway.commands.AddPortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=True, NewPortMappingDescription=description, NewLeaseDuration=""
+            NewEnabled=True, NewPortMappingDescription=description, NewLeaseDuration=str(lease_duration)
         )
-        return
 
     @cli
     async def get_port_mapping_by_index(self, index: int) -> Dict:
@@ -92,8 +91,8 @@ class UPnP:
                 }
         return {}
 
-    async def _get_port_mapping_by_index(self, index: int) -> Union[None,
-                                                                    Tuple[Union[None, str], int, str, int, str, bool, str, int]]:
+    async def _get_port_mapping_by_index(self, index: int) -> Union[None, Tuple[Union[None, str], int, str,
+                                                                                int, str, bool, str, int]]:
         try:
             redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
             return redirect
@@ -141,7 +140,8 @@ class UPnP:
         )
 
     @cli
-    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
+    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None,
+                               lease_duration: int=86400) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         internal_port = internal_port or port
@@ -166,7 +166,7 @@ class UPnP:
             port += 1
 
         await self.add_port_mapping(  # set one up
-                port, protocol, internal_port, self.lan_address, description
+                port, protocol, internal_port, self.lan_address, description, lease_duration
         )
         return port
 
