@@ -1,7 +1,9 @@
 import logging
 import socket
+import asyncio
 import typing
 from aioupnp.protocols.scpd import scpd_post
+from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
@@ -27,10 +29,14 @@ class SOAPCommand:
             raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_types.keys()))
         close_after_send = not self.return_types or self.return_types == [None]
         soap_kwargs = {n: self.param_types[n](kwargs[n]) for n in self.param_types.keys()}
-        response, xml_bytes = await scpd_post(
-            self.control_url, self.gateway_address, self.service_port, self.method, self.param_order, self.service_id,
-            close_after_send, self.soap_socket, **soap_kwargs
-        )
+        try:
+            response, xml_bytes = await scpd_post(
+                self.control_url, self.gateway_address, self.service_port, self.method, self.param_order, self.service_id,
+                close_after_send, self.soap_socket, **soap_kwargs
+            )
+        except asyncio.TimeoutError as err:
+            raise UPnPError(err)
+
         self._requests.append((soap_kwargs, xml_bytes))
         if not response:
             return None
