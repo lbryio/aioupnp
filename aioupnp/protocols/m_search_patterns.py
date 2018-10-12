@@ -48,11 +48,11 @@ from collections import OrderedDict
 from aioupnp.constants import SSDP_DISCOVER, SSDP_HOST
 
 SEARCH_TARGETS = [
-    'ssdp:all'
-    'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'upnp:rootdevice',
+    'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-wifialliance-org:device:WFADevice:1',
     'urn:schemas-upnp-org:device:WANDevice:1',
+    'ssdp:all'
 ]
 
 
@@ -69,16 +69,15 @@ def format_packet_args(order: list, **kwargs):
 def packet_generator():
     for st in SEARCH_TARGETS:
         order = ["HOST", "MAN", "MX", "ST"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
         yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
-
-        yield format_packet_args(order, Host=SSDP_HOST, Man=SSDP_DISCOVER, MX=1, ST=st)
         yield format_packet_args(order, Host=SSDP_HOST, Man='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, Host=SSDP_HOST, Man=SSDP_DISCOVER, MX=1, ST=st)
 
         order = ["HOST", "MAN", "ST", "MX"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
         yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
 
         order = ["HOST", "ST", "MAN", "MX"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
         yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
