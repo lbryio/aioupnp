@@ -1,8 +1,8 @@
 import logging
 import sys
+import textwrap
 from collections import OrderedDict
 from aioupnp.upnp import UPnP
-from aioupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER, SSDP_HOST
 
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
@@ -10,29 +10,35 @@ handler.setFormatter(logging.Formatter('%(asctime)-15s-%(filename)s:%(lineno)s->
 log.addHandler(handler)
 log.setLevel(logging.WARNING)
 
+base_usage = "\n".join(textwrap.wrap(
+    "aioupnp [-h] [--debug_logging] [--interface=<interface>] [--gateway_address=<gateway_address>]"
+    " [--lan_address=<lan_address>] [--timeout=<timeout>] [(--<header_key>=<value>)...]",
+    100, subsequent_indent='  ', break_long_words=False)) + "\n"
+
 
 def get_help(command):
     fn = getattr(UPnP, command)
     params = command + " " + " ".join(["[--%s=<%s>]" % (k, k) for k in fn.__annotations__ if k != 'return'])
-    return \
-        "usage: aioupnp [--debug_logging=<debug_logging>] [--interface=<interface>]\n" \
-        "              [--gateway_address=<gateway_address>]\n" \
-        "              [--lan_address=<lan_address>] [--timeout=<timeout>]\n" \
-        "              [--service=<service>]\n" \
-        "              %s\n" % params
+    return base_usage + "\n".join(
+        textwrap.wrap(params, 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False)
+    )
 
 
 def main():
     commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
-    help_str = " | ".join(commands)
+    help_str = "\n".join(textwrap.wrap(
+        " | ".join(commands), 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False
+    ))
+
     usage = \
-        "usage: aioupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]\n" \
-        "              [--gateway_address=<gateway_address>]\n" \
-        "              [--lan_address=<lan_address>] [--timeout=<timeout>]\n" \
-        "              [--service=<service>]\n" \
-        "              command [--<arg name>=<arg>]...\n" \
-        "\n" \
-        "commands: %s\n\nfor help with a specific command: aioupnp help <command>" % help_str
+        "\n%s\n" \
+        "If m-search headers are provided as keyword arguments all of the headers to be used must be provided,\n" \
+        "in the order they are to be used. For example:\n" \
+        "  aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search\n\n" \
+        "Commands:\n" \
+        "%s\n\n" \
+        "For help with a specific command:" \
+        "  aioupnp help <command>\n" % (base_usage, help_str)
 
     args = sys.argv[1:]
     if args[0] in ['help', '-h', '--help']:

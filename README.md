@@ -4,20 +4,39 @@
 
 `aioupnp` is a python 3 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
 
+## Supported devices
+    DD-WRT
+    miniupnpd
+    Actiontec GT784WN
+    D-Link DIR-890L
+
 ## Installation
 
+For normal usage
 ```
-pip install --upgrade aioupnp
+pip install aioupnp
 ```
+
+For development
+```
+git clone https://github.com/lbryio/aioupnp.git
+cd aioupnp
+pip install -e .
+```
+
 
 ## Usage
 
 ```
-aioupnp [-h] [--debug_logging=<debug_logging>] [--interface=<interface>]
-        [--gateway_address=<gateway_address>]
+aioupnp [-h] [--debug_logging] [--interface=<interface>] [--gateway_address=<gateway_address>]
         [--lan_address=<lan_address>] [--timeout=<timeout>]
-        [--service=<service>]
+        [(--<case sensitive m-search header>=<value>)...]
         command [--<arg name>=<arg>]...
+
+If m-search headers are provided as keyword arguments all of the headers to be used must be provided,
+in the order they are to be used. For example:
+
+aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search
 ```
 
 ### Commands
@@ -36,15 +55,15 @@ To list the active port mappings on the gateway
    
 To debug the default gateway
 
-    aioupnp --debug_logging=1 m_search
+    aioupnp --debug_logging m_search
 
 To debug a gateway on a non default network interface
 
-    aioupnp --interface=vmnet1 --debug_logging=1 m_search
+    aioupnp --interface=vmnet1 --debug_logging m_search
 
 To debug a gateway on a non default network interface that isn't the router
 
-    aioupnp --interface=vmnet1 --gateway_address=192.168.1.106 --debug_logging=1 m_search
+    aioupnp --interface=vmnet1 --gateway_address=192.168.1.106 --debug_logging m_search
     
 ## License
 
