@@ -63,8 +63,10 @@ class UPnP:
                        ssdp_socket: socket.socket = None) -> Dict:
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
+            assert gateway_address and lan_address
         except Exception as err:
-            raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
+            raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
+                                                                                                  str(err)))
         if not igd_args:
             igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
         else:
