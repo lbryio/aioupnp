@@ -2,7 +2,7 @@
 
 # UPnP for asyncio
 
-`aioupnp` is a python 3 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
+`aioupnp` is a python 3.7 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
 
 ## Supported devices
     DD-WRT
@@ -12,12 +12,18 @@
 
 ## Installation
 
-For normal usage
+Verify the default python is python 3.7
+
+```
+python --version
+```
+
+Installation for normal usage
 ```
 pip install aioupnp
 ```
 
-For development
+Installation for development
 ```
 git clone https://github.com/lbryio/aioupnp.git
 cd aioupnp
