@@ -139,7 +139,6 @@ async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int =
     )
     packet_args = list(packet_generator())
     batch_size = 2
-    b = 0
     batch_timeout = float(timeout) / float(len(packet_args))
     while packet_args:
         args = packet_args[:batch_size]
@@ -149,14 +148,15 @@ async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int =
             await protocol.m_search(gateway_address, batch_timeout, args)
             return args
         except (asyncio.TimeoutError, asyncio.CancelledError):
-            b += 1
             continue
     raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
 
 
 async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30,
                             ssdp_socket: socket.socket = None) -> typing.Tuple[OrderedDict, SSDPDatagram]:
+    # we don't know which packet the gateway replies to, so send small batches at a time
     args_to_try = await _fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+    # check the args in the batch that got a reply one at a time to see which one worked
     for args in args_to_try:
         try:
             packet = await m_search(lan_address, gateway_address, args, 3)
