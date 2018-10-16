@@ -3,7 +3,7 @@ import logging
 import binascii
 import json
 from collections import OrderedDict
-from typing import Dict, List
+from typing import List
 from aioupnp.fault import UPnPError
 from aioupnp.constants import line_separator
 
@@ -100,6 +100,9 @@ class SSDPDatagram(object):
             if not normalized.startswith("_") and hasattr(self, normalized) and getattr(self,normalized) is None:
                 setattr(self, normalized, v)
         self._case_mappings: dict = {k.lower(): k for k in kwargs.keys()}
+        for k in self._required_fields[self._packet_type]:
+            if getattr(self, k) is None:
+                raise UPnPError("missing required field %s" % k)
 
     def get_cli_igd_kwargs(self) -> str:
         fields = []
