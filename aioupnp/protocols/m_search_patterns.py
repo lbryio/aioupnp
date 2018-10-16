@@ -52,6 +52,8 @@ SEARCH_TARGETS = [
     'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-wifialliance-org:device:WFADevice:1',
     'urn:schemas-upnp-org:device:WANDevice:1',
+    "urn:schemas-upnp-org:service:WANIPConnection:1",
+    "urn:schemas-upnp-org:service:WANPPPConnection:1",
     'ssdp:all'
 ]
 
