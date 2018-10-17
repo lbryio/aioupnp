@@ -1,7 +1,8 @@
 import logging
 import socket
+import asyncio
 from collections import OrderedDict
-from typing import Dict, List, Union, Type
+from typing import Dict, List, Union, Type, Set
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands
@@ -145,17 +146,47 @@ class Gateway:
         }
 
     @classmethod
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
+                               igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
+                               soap_socket: socket.socket = None, unicast: bool = False):
+        ignored: set = set()
+        while True:
+            if not igd_args:
+                m_search_args, datagram = await asyncio.wait_for(fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket,
+                                                               ignored, unicast), timeout)
+            else:
+                m_search_args = OrderedDict(igd_args)
+                datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket, ignored,
+                                          unicast)
+            try:
+                gateway = cls(datagram, m_search_args, lan_address, gateway_address)
+                await gateway.discover_commands(soap_socket)
+                log.debug('found gateway device %s', datagram.location)
+                return gateway
+            except asyncio.TimeoutError:
+                log.debug("get %s timed out, looking for other devices", datagram.location)
+                ignored.add(datagram.location)
+                continue
+
+    @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
                                igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
-                               soap_socket: socket.socket = None):
-        if not igd_args:
-            m_search_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
-        else:
-            m_search_args = OrderedDict(igd_args)
-            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket)
-        gateway = cls(datagram, m_search_args, lan_address, gateway_address)
-        await gateway.discover_commands(soap_socket)
-        return gateway
+                               soap_socket: socket.socket = None, unicast: bool = None):
+        if unicast is not None:
+            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, ssdp_socket,
+                                               soap_socket, unicast=unicast)
+        done, pending = await asyncio.wait([
+            cls._discover_gateway(
+                lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket, unicast=True
+            ),
+            cls._discover_gateway(
+                lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket, unicast=False
+            )], return_when=asyncio.tasks.FIRST_COMPLETED
+        )
+        for task in list(pending):
+            task.cancel()
+        result = list(done)[0].result()
+        return result
 
     async def discover_commands(self, soap_socket: socket.socket = None):
         response, xml_bytes = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
