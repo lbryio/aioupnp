@@ -9,6 +9,7 @@
     miniupnpd
     Actiontec GT784WN
     D-Link DIR-890L
+    Cisco CGA4131COM
 
 ## Installation
 
