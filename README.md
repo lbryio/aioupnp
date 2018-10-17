@@ -46,7 +46,7 @@ aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:roo
 ```
 
 ### Commands
-    add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | get_soap_commands | get_specific_port_mapping | m_search
+    add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | debug_gateway | generate_test_data | get_specific_port_mapping | m_search
 
 
 ### Examples

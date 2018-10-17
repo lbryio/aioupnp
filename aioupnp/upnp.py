@@ -182,11 +182,11 @@ class UPnP:
         return port
 
     @cli
-    async def get_soap_commands(self) -> Dict:
-        return {
-            'supported': list(self.gateway._registered_commands.keys()),
-            'unsupported': self.gateway._unsupported_actions
-        }
+    async def debug_gateway(self) -> str:
+        return json.dumps({
+            "gateway": self.gateway.debug_gateway(),
+            "client_address": self.lan_address,
+        }, default=_encode, indent=2)
 
     @cli
     async def generate_test_data(self):
@@ -201,7 +201,6 @@ class UPnP:
             print("got redirects:\n%s" % redirects)
         except (UPnPError, NotImplementedError):
             print("failed to get redirects")
-
         try:
             ext_port = await self.get_next_mapping(4567, "UDP", "aioupnp test mapping")
             print("set up external mapping to port %i" % ext_port)
@@ -217,10 +216,7 @@ class UPnP:
         else:
             device_path = os.path.join(os.getcwd(), "UNKNOWN GATEWAY")
         with open(device_path, "w") as f:
-            f.write(json.dumps({
-                "gateway": self.gateway.debug_gateway(),
-                "client_address": self.lan_address,
-            }, default=_encode, indent=2))
+            f.write(await self.debug_gateway())
         return "Generated test data! -> %s" % device_path
 
     @classmethod

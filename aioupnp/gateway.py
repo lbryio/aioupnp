@@ -132,13 +132,15 @@ class Gateway:
     def debug_gateway(self) -> Dict:
         return {
             'gateway_address': self.base_ip,
-            'soap_port': self.port,
-            'm_search_args': self._m_search_args,
+            'gateway_descriptor': self.gateway_descriptor(),
+            'gateway_xml': self._xml_response,
+            'services_xml': self._service_descriptors,
+            'services': {service.SCPDURL: service.as_dict() for service in self._services},
+            'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
             'reply': self._ok_packet.as_dict(),
+            'soap_port': self.port,
             'registered_soap_commands': self._registered_commands,
             'unsupported_soap_commands': self._unsupported_actions,
-            'gateway_xml': self._xml_response,
-            'service_descriptors': self._service_descriptors,
             'soap_requests': self._soap_requests
         }
 
