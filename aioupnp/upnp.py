@@ -89,7 +89,7 @@ class UPnP:
         return await self.gateway.commands.AddPortMapping(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=1, NewPortMappingDescription=description
+            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration='0'
         )
 
     @cli
@@ -151,8 +151,7 @@ class UPnP:
         )
 
     @cli
-    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None,
-                               lease_duration: int=86400) -> int:
+    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         internal_port = internal_port or port
@@ -168,7 +167,7 @@ class UPnP:
 
         redirects = {
             "%i:%s" % (ext_port, proto): (int_host, int_port, desc)
-            for (ext_host, ext_port, proto, int_port, int_host, enabled, desc, lease) in redirect_tups
+            for (ext_host, ext_port, proto, int_port, int_host, enabled, desc, _) in redirect_tups
         }
         while ("%i:%s" % (port, protocol)) in redirects:
             int_host, int_port, _ = redirects["%i:%s" % (port, protocol)]
@@ -177,7 +176,7 @@ class UPnP:
             port += 1
 
         await self.add_port_mapping(  # set one up
-                port, protocol, internal_port, self.lan_address, description, lease_duration
+                port, protocol, internal_port, self.lan_address, description
         )
         return port
 
