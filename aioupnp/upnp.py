@@ -133,11 +133,11 @@ class UPnP:
             result = await self.gateway.commands.GetSpecificPortMappingEntry(
                 NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol
             )
-            if isinstance(self.gateway.commands.GetSpecificPortMappingEntry, SOAPCommand):
+            if result and isinstance(self.gateway.commands.GetSpecificPortMappingEntry, SOAPCommand):
                 return {k: v for k, v in zip(self.gateway.commands.GetSpecificPortMappingEntry.return_order, result)}
-            return {}
         except UPnPError:
-            return {}
+            pass
+        return {}
 
     @cli
     async def delete_port_mapping(self, external_port: int, protocol: str) -> None:
@@ -196,18 +196,42 @@ class UPnP:
         except (UPnPError, NotImplementedError):
             print("failed to get the external ip")
         try:
-            redirects = await self.get_redirects()
-            print("got redirects:\n%s" % redirects)
+            await self.get_redirects()
+            print("got redirects")
         except (UPnPError, NotImplementedError):
             print("failed to get redirects")
         try:
+            await self.get_specific_port_mapping(4567, "UDP")
+            print("got specific mapping")
+        except (UPnPError, NotImplementedError):
+            print("failed to get specific mapping")
+        try:
             ext_port = await self.get_next_mapping(4567, "UDP", "aioupnp test mapping")
             print("set up external mapping to port %i" % ext_port)
+            try:
+                await self.get_specific_port_mapping(4567, "UDP")
+                print("got specific mapping")
+            except (UPnPError, NotImplementedError):
+                print("failed to get specific mapping")
+            try:
+                await self.get_redirects()
+                print("got redirects")
+            except (UPnPError, NotImplementedError):
+                print("failed to get redirects")
             await self.delete_port_mapping(ext_port, "UDP")
             print("deleted mapping")
         except (UPnPError, NotImplementedError):
             print("failed to add and remove a mapping")
-
+        try:
+            await self.get_redirects()
+            print("got redirects")
+        except (UPnPError, NotImplementedError):
+            print("failed to get redirects")
+        try:
+            await self.get_specific_port_mapping(4567, "UDP")
+            print("got specific mapping")
+        except (UPnPError, NotImplementedError):
+            print("failed to get specific mapping")
         if self.gateway.devices:
             device = list(self.gateway.devices.values())[0]
             assert device.manufacturer and device.modelName

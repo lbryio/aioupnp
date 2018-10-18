@@ -53,11 +53,12 @@ def deserialize_soap_post_response(response: bytes, method: str, service_id: str
     response_body = flatten_keys(envelope[BODY], "{%s}" % service_id)
     body = handle_fault(response_body)  # raises UPnPError if there is a fault
     response_key = None
-
+    if not body:
+        return {}
     for key in body:
         if method in key:
             response_key = key
             break
     if not response_key:
-        raise UPnPError("unknown response fields for %s")
+        raise UPnPError("unknown response fields for %s: %s" % (method, body))
     return body[response_key]

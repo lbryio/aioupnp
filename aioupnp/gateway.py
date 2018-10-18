@@ -125,13 +125,23 @@ class Gateway:
         return None
 
     @property
-    def _soap_requests(self) -> Dict:
-        return {
-            name: getattr(self.commands, name)._requests for name in self._registered_commands.keys()
-        }
+    def soap_requests(self) -> List:
+        soap_call_infos = []
+        for name in self._registered_commands.keys():
+            if not hasattr(getattr(self.commands, name), "_requests"):
+                continue
+            soap_call_infos.extend([
+                (name, request_args, raw_response, decoded_response, soap_error, ts)
+                for (
+                    request_args, raw_response, decoded_response, soap_error, ts
+                ) in getattr(self.commands, name)._requests
+            ])
+        soap_call_infos.sort(key=lambda x: x[5])
+        return soap_call_infos
 
     def debug_gateway(self) -> Dict:
         return {
+            'manufacturer_string': self.manufacturer_string,
             'gateway_address': self.base_ip,
             'gateway_descriptor': self.gateway_descriptor(),
             'gateway_xml': self._xml_response,
@@ -142,7 +152,7 @@ class Gateway:
             'soap_port': self.port,
             'registered_soap_commands': self._registered_commands,
             'unsupported_soap_commands': self._unsupported_actions,
-            'soap_requests': self._soap_requests
+            'soap_requests': self.soap_requests
         }
 
     @classmethod
@@ -163,7 +173,7 @@ class Gateway:
                 await gateway.discover_commands(soap_socket)
                 log.debug('found gateway device %s', datagram.location)
                 return gateway
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError, UPnPError):
                 log.debug("get %s timed out, looking for other devices", datagram.location)
                 ignored.add(datagram.location)
                 continue
@@ -189,8 +199,10 @@ class Gateway:
         return result
 
     async def discover_commands(self, soap_socket: socket.socket = None):
-        response, xml_bytes = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
+        response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
         self._xml_response = xml_bytes
+        if get_err is not None:
+            raise get_err
         self.spec_version = get_dict_val_case_insensitive(response, SPEC_VERSION)
         self.url_base = get_dict_val_case_insensitive(response, "urlbase")
         if not self.url_base:
@@ -207,9 +219,11 @@ class Gateway:
     async def register_commands(self, service: Service, soap_socket: socket.socket = None):
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
-        service_dict, xml_bytes = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
+        service_dict, xml_bytes, get_err = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
         self._service_descriptors[service.SCPDURL] = xml_bytes
 
+        if get_err is not None:
+            raise get_err
         if not service_dict:
             return
 
