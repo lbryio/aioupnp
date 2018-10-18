@@ -335,11 +335,17 @@ class UPnP:
         kwargs = kwargs or {}
         igd_args = igd_args
         timeout = int(timeout)
+        close_loop = False
         try:
-            asyncio.get_running_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            close_loop = True
+        if not loop and not close_loop:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            close_loop = True
 
         fut: asyncio.Future = asyncio.Future()
 
@@ -374,7 +380,10 @@ class UPnP:
         if not hasattr(UPnP, method) or not hasattr(getattr(UPnP, method), "_cli"):
             fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
             wrapper = lambda : None
-        asyncio.run(wrapper())
+
+        loop.run_until_complete(wrapper())
+        if close_loop:
+            loop.close()
         try:
             result = fut.result()
         except UPnPError as err:
