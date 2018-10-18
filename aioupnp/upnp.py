@@ -85,11 +85,11 @@ class UPnP:
 
     @cli
     async def add_port_mapping(self, external_port: int, protocol: str, internal_port: int, lan_address: str,
-                               description: str, lease_duration: int) -> None:
+                               description: str) -> None:
         return await self.gateway.commands.AddPortMapping(
-            NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol,
+            NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=True, NewPortMappingDescription=description, NewLeaseDuration=str(lease_duration)
+            NewEnabled=1, NewPortMappingDescription=description
         )
 
     @cli

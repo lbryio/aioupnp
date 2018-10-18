@@ -4,13 +4,10 @@ none_or_str = Union[None, str]
 
 
 class SOAPCommands:
-    def debug_commands(self) -> dict:
-        raise NotImplementedError()
-
     @staticmethod
     async def AddPortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
-                       NewInternalClient: str, NewEnabled: bool, NewPortMappingDescription: str,
-                       NewLeaseDuration: str = '') -> None:
+                       NewInternalClient: str, NewEnabled: int, NewPortMappingDescription: str,
+                       NewLeaseDuration: str = '0') -> None:
         """Returns None"""
         raise NotImplementedError()
 
