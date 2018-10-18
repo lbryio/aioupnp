@@ -219,6 +219,93 @@ class UPnP:
             f.write(await self.debug_gateway())
         return "Generated test data! -> %s" % device_path
 
+    @cli
+    async def get_natrsip_status(self) -> Tuple[bool, bool]:
+        """Returns (NewRSIPAvailable, NewNATEnabled)"""
+        return await self.gateway.commands.GetNATRSIPStatus()
+
+    @cli
+    async def set_connection_type(self, NewConnectionType: str) -> None:
+        """Returns None"""
+        return await self.gateway.commands.SetConnectionType(NewConnectionType)
+
+    @cli
+    async def get_connection_type_info(self) -> Tuple[str, str]:
+        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
+        return await self.gateway.commands.GetConnectionTypeInfo()
+
+    @cli
+    async def get_status_info(self) -> Tuple[str, str, int]:
+        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
+        return await self.gateway.commands.GetStatusInfo()
+
+    @cli
+    async def force_termination(self) -> None:
+        """Returns None"""
+        return await self.gateway.commands.ForceTermination()
+
+    @cli
+    async def request_connection(self) -> None:
+        """Returns None"""
+        return await self.gateway.commands.RequestConnection()
+
+    @cli
+    async def get_common_link_properties(self):
+        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
+        return await self.gateway.commands.GetCommonLinkProperties()
+
+    @cli
+    async def get_total_bytes_sent(self):
+        """Returns (NewTotalBytesSent)"""
+        return await self.gateway.commands.GetTotalBytesSent()
+
+    @cli
+    async def get_total_bytes_received(self):
+        """Returns (NewTotalBytesReceived)"""
+        return await self.gateway.commands.GetTotalBytesReceived()
+
+    @cli
+    async def get_total_packets_sent(self):
+        """Returns (NewTotalPacketsSent)"""
+        return await self.gateway.commands.GetTotalPacketsSent()
+
+    @cli
+    async def get_total_packets_received(self):
+        """Returns (NewTotalPacketsReceived)"""
+        return await self.gateway.commands.GetTotalPacketsReceived()
+
+    @cli
+    async def x_get_ics_statistics(self) -> Tuple[int, int, int, int, str, str]:
+        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
+        return await self.gateway.commands.X_GetICSStatistics()
+
+    @cli
+    async def get_default_connection_service(self):
+        """Returns (NewDefaultConnectionService)"""
+        return await self.gateway.commands.GetDefaultConnectionService()
+
+    @cli
+    async def set_default_connection_service(self, NewDefaultConnectionService: str) -> None:
+        """Returns (None)"""
+        return await self.gateway.commands.SetDefaultConnectionService(NewDefaultConnectionService)
+
+    @cli
+    async def set_enabled_for_internet(self, NewEnabledForInternet: bool) -> None:
+        return await self.gateway.commands.SetEnabledForInternet(NewEnabledForInternet)
+
+    @cli
+    async def get_enabled_for_internet(self) -> bool:
+        return await self.gateway.commands.GetEnabledForInternet()
+
+    @cli
+    async def get_maximum_active_connections(self, NewActiveConnectionIndex: int):
+        return await self.gateway.commands.GetMaximumActiveConnections(NewActiveConnectionIndex)
+
+    @cli
+    async def get_active_connections(self) -> Tuple[str, str]:
+        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
+        return await self.gateway.commands.GetActiveConnections()
+
     @classmethod
     def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
                 interface_name: str = 'default', kwargs: dict = None) -> None:
