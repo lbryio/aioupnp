@@ -56,6 +56,9 @@ jobs:
     osx_image: xcode9.4
     language: generic
     env: OS=mac
+    install:
+    - pip3 install pyinstaller
+    - pip3 install -e .
 
   - <<: *build
     name: "Windows"
