@@ -8,6 +8,18 @@ from aioupnp.fault import UPnPError
 log = logging.getLogger(__name__)
 
 
+def safe_type(t):
+    if t is typing.Tuple:
+        return tuple
+    if t is typing.List:
+        return list
+    if t is typing.Dict:
+        return dict
+    if t is typing.Set:
+        return set
+    return t
+
+
 class SOAPCommand:
     def __init__(self, gateway_address: str, service_port: int, control_url: str, service_id: bytes, method: str,
                  param_types: dict, return_types: dict, param_order: list, return_order: list,
@@ -28,7 +40,7 @@ class SOAPCommand:
         if set(kwargs.keys()) != set(self.param_types.keys()):
             raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_types.keys()))
         close_after_send = not self.return_types or self.return_types == [None]
-        soap_kwargs = {n: self.param_types[n](kwargs[n]) for n in self.param_types.keys()}
+        soap_kwargs = {n: safe_type(self.param_types[n])(kwargs[n]) for n in self.param_types.keys()}
         try:
             response, xml_bytes = await scpd_post(
                 self.control_url, self.gateway_address, self.service_port, self.method, self.param_order, self.service_id,
@@ -40,7 +52,7 @@ class SOAPCommand:
         self._requests.append((soap_kwargs, xml_bytes))
         if not response:
             return None
-        result = tuple([self.return_types[n](response.get(n)) for n in self.return_order])
+        result = tuple([safe_type(self.return_types[n])(response.get(n)) for n in self.return_order])
         if len(result) == 1:
             return result[0]
         return result

@@ -2,7 +2,7 @@ import logging
 import socket
 import asyncio
 from collections import OrderedDict
-from typing import Dict, List, Union, Type, Set
+from typing import Dict, List, Union, Type
 from aioupnp.util import get_dict_val_case_insensitive, BASE_PORT_REGEX, BASE_ADDRESS_REGEX
 from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands
@@ -221,10 +221,10 @@ class Gateway:
                 annotations = current.__annotations__
                 return_types = annotations.get('return', None)
                 if return_types:
-                    if isinstance(return_types, type):
-                        return_types = (return_types, )
-                    else:
+                    if hasattr(return_types, '__args__'):
                         return_types = tuple([return_type_lambas.get(a, a) for a in return_types.__args__])
+                    elif isinstance(return_types, type):
+                        return_types = (return_types, )
                     return_types = {r: t for r, t in zip(outputs, return_types)}
                 param_types = {}
                 for param_name, param_type in annotations.items():

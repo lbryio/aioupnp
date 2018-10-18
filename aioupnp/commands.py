@@ -7,7 +7,7 @@ class SOAPCommands:
     @staticmethod
     async def AddPortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
                        NewInternalClient: str, NewEnabled: int, NewPortMappingDescription: str,
-                       NewLeaseDuration: str = '0') -> None:
+                       NewLeaseDuration: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
@@ -17,7 +17,7 @@ class SOAPCommands:
         raise NotImplementedError()
 
     @staticmethod
-    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> Tuple[none_or_str, int, str, int, str,
+    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> Tuple[str, int, str, int, str,
                                                                             bool, str, int]:
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
