@@ -3,6 +3,8 @@ import socket
 import logging
 import json
 import asyncio
+import zlib
+import base64
 from collections import OrderedDict
 from typing import Tuple, Dict, List, Union
 from aioupnp.fault import UPnPError
@@ -186,6 +188,15 @@ class UPnP:
             "gateway": self.gateway.debug_gateway(),
             "client_address": self.lan_address,
         }, default=_encode, indent=2)
+
+    @property
+    def zipped_debugging_info(self) -> str:
+        return base64.b64encode(zlib.compress(
+            json.dumps({
+                "gateway": self.gateway.debug_gateway(),
+                "client_address": self.lan_address,
+            }, default=_encode, indent=2).encode()
+        )).decode()
 
     @cli
     async def generate_test_data(self):
