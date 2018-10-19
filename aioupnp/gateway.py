@@ -170,11 +170,12 @@ class Gateway:
                                           unicast)
             try:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address)
+                log.debug('get gateway descriptor %s', datagram.location)
                 await gateway.discover_commands(soap_socket)
                 log.debug('found gateway device %s', datagram.location)
                 return gateway
-            except (asyncio.TimeoutError, UPnPError):
-                log.debug("get %s timed out, looking for other devices", datagram.location)
+            except (asyncio.TimeoutError, UPnPError) as err:
+                log.debug("get %s failed (%s), looking for other devices", datagram.location, str(err))
                 ignored.add(datagram.location)
                 continue
 
@@ -219,11 +220,14 @@ class Gateway:
     async def register_commands(self, service: Service, soap_socket: socket.socket = None):
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
+
+        log.debug("get descriptor for %s from %s", service.serviceType, service.SCPDURL)
         service_dict, xml_bytes, get_err = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
         self._service_descriptors[service.SCPDURL] = xml_bytes
 
         if get_err is not None:
-            raise get_err
+            log.debug("failed to get descriptor for %s from %s", service.serviceType, service.SCPDURL)
+            return
         if not service_dict:
             return
 
@@ -259,3 +263,4 @@ class Gateway:
                 self._unsupported_actions[service.serviceType] = s
                 log.debug("available command for %s does not have a wrapper implemented: %s %s %s",
                           service.serviceType, name, inputs, outputs)
+            log.debug("registered service %s", service.serviceType)
