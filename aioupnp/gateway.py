@@ -160,6 +160,11 @@ class Gateway:
                                igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
                                soap_socket: socket.socket = None, unicast: bool = False):
         ignored: set = set()
+        required_commands = [
+            'AddPortMapping',
+            'DeletePortMapping',
+            'GetExternalIPAddress'
+        ]
         while True:
             if not igd_args:
                 m_search_args, datagram = await asyncio.wait_for(fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket,
@@ -172,8 +177,13 @@ class Gateway:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address)
                 log.debug('get gateway descriptor %s', datagram.location)
                 await gateway.discover_commands(soap_socket)
-                log.debug('found gateway device %s', datagram.location)
-                return gateway
+                requirements_met = all([required in gateway._registered_commands for required in required_commands])
+                if not requirements_met:
+                    log.debug("found gateway, but it does not implement required soap commands")
+                    continue
+                else:
+                    log.debug('found gateway device %s', datagram.location)
+                    return gateway
             except (asyncio.TimeoutError, UPnPError) as err:
                 log.debug("get %s failed (%s), looking for other devices", datagram.location, str(err))
                 ignored.add(datagram.location)
