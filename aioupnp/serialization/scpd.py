@@ -28,7 +28,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
                 'GET %s HTTP/1.1\r\n'
                 'Accept-Encoding: gzip\r\n'
                 'Host: %s\r\n'
-                # 'Connection: Close\r\n'
+                'Connection: Close\r\n'
                 '\r\n'
             ) % (path, host)
     ).encode()
