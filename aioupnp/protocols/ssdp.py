@@ -111,7 +111,7 @@ class SSDPProtocol(MulticastProtocol):
 async def listen_ssdp(lan_address: str, gateway_address: str, ssdp_socket: socket.socket = None,
                       ignored: typing.Set[str] = None, unicast: bool = False) -> typing.Tuple[DatagramTransport,
                                                                                               SSDPProtocol, str, str]:
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop_policy().get_event_loop()
     try:
         sock = ssdp_socket or SSDPProtocol.create_multicast_socket(lan_address)
         listen_result: typing.Tuple = await loop.create_datagram_endpoint(

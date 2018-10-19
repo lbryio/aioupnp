@@ -92,7 +92,7 @@ class SCPDHTTPClientProtocol(Protocol):
 
 async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[typing.Dict, bytes,
                                                                               typing.Optional[Exception]]:
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop_policy().get_event_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
@@ -118,7 +118,7 @@ async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[ty
 async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: list, service_id: bytes,
                     soap_socket: socket.socket = None, **kwargs) -> typing.Tuple[typing.Dict, bytes,
                                                                                  typing.Optional[Exception]]:
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop_policy().get_event_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     transport, protocol = await loop.create_connection(

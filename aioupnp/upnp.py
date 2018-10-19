@@ -346,18 +346,7 @@ class UPnP:
         kwargs = kwargs or {}
         igd_args = igd_args
         timeout = int(timeout)
-        close_loop = False
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            close_loop = True
-        if not loop and not close_loop:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            close_loop = True
-
+        loop = asyncio.get_event_loop_policy().get_event_loop()
         fut: asyncio.Future = asyncio.Future()
 
         async def wrapper():
@@ -393,8 +382,7 @@ class UPnP:
             wrapper = lambda : None
 
         loop.run_until_complete(wrapper())
-        if close_loop:
-            loop.close()
+        loop.close()
         try:
             result = fut.result()
         except UPnPError as err:
