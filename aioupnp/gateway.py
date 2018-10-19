@@ -227,6 +227,8 @@ class Gateway:
 
         if get_err is not None:
             log.debug("failed to get descriptor for %s from %s", service.serviceType, service.SCPDURL)
+            if xml_bytes:
+                log.debug("response: %s", xml_bytes.decode())
             return
         if not service_dict:
             return
