@@ -31,50 +31,50 @@ jobs:
     name: "Unit Tests w/ Python 3.6"
     python: "3.6"
 
-
-if: tag IS present
-  - &build
-    name: "Linux Release"
-    python: "3.6"
-    install:
-      - pip install pyinstaller
-      - pip install -e .
-
-    script:
-      - pyinstaller -F -n aioupnp aioupnp/__main__.py
-      - chmod +x dist/aioupnp
-      - zip -j dist/aioupnp-${OS}.zip dist/aioupnp
-
-    env: OS=linux
-
-    addons:
-      artifacts:
-        working_dir: dist
-        paths:
-          - aioupnp-${OS}.zip
-
-  - <<: *build
-    name: "Mac Release"
-    os: osx
-    osx_image: xcode9.4
-    language: generic
-    env: OS=mac
-    install:
-    - pip3 install pyinstaller
-    - pip3 install -e .
-
-  - <<: *build
-    name: "Windows Release"
-    language: generic
-    services:
-    - docker
-    install:
-    - docker pull cdrx/pyinstaller-windows:python3-32bit
-    script:
-    - docker run -v "$(pwd):/src/aioupnp" cdrx/pyinstaller-windows:python3-32bit aioupnp/wine_build.sh
-    - sudo zip -j dist/aioupnp-windows.zip dist/aioupnp.exe
-    addons:
-      artifacts:
-        working_dir: dist
-        paths:
-          - aioupnp-windows.zip
+#
+#if: tag IS present
+#  - &build
+#    name: "Linux Release"
+#    python: "3.6"
+#    install:
+#      - pip install pyinstaller
+#      - pip install -e .
+#
+#    script:
+#      - pyinstaller -F -n aioupnp aioupnp/__main__.py
+#      - chmod +x dist/aioupnp
+#      - zip -j dist/aioupnp-${OS}.zip dist/aioupnp
+#
+#    env: OS=linux
+#
+#    addons:
+#      artifacts:
+#        working_dir: dist
+#        paths:
+#          - aioupnp-${OS}.zip
+#
+#  - <<: *build
+#    name: "Mac Release"
+#    os: osx
+#    osx_image: xcode9.4
+#    language: generic
+#    env: OS=mac
+#    install:
+#    - pip3 install pyinstaller
+#    - pip3 install -e .
+#
+#  - <<: *build
+#    name: "Windows Release"
+#    language: generic
+#    services:
+#    - docker
+#    install:
+#    - docker pull cdrx/pyinstaller-windows:python3-32bit
+#    script:
+#    - docker run -v "$(pwd):/src/aioupnp" cdrx/pyinstaller-windows:python3-32bit aioupnp/wine_build.sh
+#    - sudo zip -j dist/aioupnp-windows.zip dist/aioupnp.exe
+#    addons:
+#      artifacts:
+#        working_dir: dist
+#        paths:
+#          - aioupnp-windows.zip
