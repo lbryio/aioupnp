@@ -382,7 +382,6 @@ class UPnP:
             wrapper = lambda : None
 
         loop.run_until_complete(wrapper())
-        loop.close()
         try:
             result = fut.result()
         except UPnPError as err:
