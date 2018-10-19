@@ -102,7 +102,7 @@ class Gateway:
     @property
     def manufacturer_string(self) -> str:
         if not self.devices:
-            raise NotImplementedError()
+            return "UNKNOWN GATEWAY"
         device = list(self.devices.values())[0]
         return "%s %s" % (device.manufacturer, device.modelName)
 
