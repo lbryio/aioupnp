@@ -179,7 +179,12 @@ class Gateway:
                 await gateway.discover_commands(soap_socket)
                 requirements_met = all([required in gateway._registered_commands for required in required_commands])
                 if not requirements_met:
-                    log.debug("found gateway, but it does not implement required soap commands")
+                    not_met = [
+                        required for required in required_commands if required not in gateway._registered_commands
+                    ]
+                    log.warning("found gateway %s at %s, but it does not implement required soap commands: %s",
+                                gateway.manufacturer_string, gateway.location, not_met)
+                    ignored.add(datagram.location)
                     continue
                 else:
                     log.debug('found gateway device %s', datagram.location)
