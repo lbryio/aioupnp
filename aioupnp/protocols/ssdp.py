@@ -159,7 +159,7 @@ async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int =
         packet_args = packet_args[batch_size:]
         log.debug("sending batch of %i M-SEARCH attempts", batch_size)
         try:
-            await asyncio.wait_for(protocol.m_search(gateway_address, batch_timeout, args), timeout)
+            await asyncio.wait_for(protocol.m_search(gateway_address, batch_timeout, args), batch_timeout)
             protocol.disconnect()
             return args
         except asyncio.TimeoutError:
