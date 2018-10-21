@@ -2,7 +2,62 @@ import unittest
 from collections import OrderedDict
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.fault import UPnPError
-from aioupnp.constants import UPNP_ORG_IGD, SSDP_DISCOVER
+from aioupnp.constants import UPNP_ORG_IGD
+
+
+class TestSSDPDatagram(unittest.TestCase):
+    def test_fail_to_init(self):
+        datagram_args = OrderedDict([
+            ('Host', "{}:{}".format('239.255.255.250', 1900)),
+            ('Man', '"ssdp:discover"'),
+            ('ST', 'ssdp:all'),
+            ('MX', 5),
+        ])
+
+        with self.assertRaises(UPnPError):
+            SSDPDatagram("?", datagram_args)
+
+    def test_fail_to_decode_missing_required(self):
+        packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'Host: 239.255.255.250:1900\r\n' \
+        b'ST: ssdp:all\r\n' \
+        b'MX: 5\r\n' \
+        b'\r\n'
+
+        with self.assertRaises(UPnPError):
+            SSDPDatagram.decode(packet)
+
+    def test_cli_args(self):
+        datagram_args = OrderedDict([
+            ('Host', "{}:{}".format('239.255.255.250', 1900)),
+            ('Man', '"ssdp:discover"'),
+            ('ST', 'ssdp:all'),
+            ('MX', 5),
+        ])
+        packet = SSDPDatagram("M-SEARCH", datagram_args)
+        self.assertEqual(
+            packet.get_cli_igd_kwargs(),
+            '--Host=239.255.255.250:1900 --Man="ssdp:discover" --ST=ssdp:all --MX=5'
+        )
+
+    def test_as_dict(self):
+        datagram_args = OrderedDict([
+            ('Host', "{}:{}".format('239.255.255.250', 1900)),
+            ('Man', '"ssdp:discover"'),
+            ('ST', 'ssdp:all'),
+            ('MX', 5),
+        ])
+        packet = SSDPDatagram("M-SEARCH", datagram_args)
+        self.assertDictEqual(
+            packet.as_dict(),
+            {
+                "Host": "239.255.255.250:1900",
+                "Man": "\"ssdp:discover\"",
+                "ST": "ssdp:all",
+                "MX": 5
+            }
+        )
 
 
 class TestMSearchDatagramSerialization(unittest.TestCase):

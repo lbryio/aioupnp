@@ -9,11 +9,11 @@ from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
-_template = "^(?i)(%s):[ ]*(.*)$"
+_template = "(?i)^(%s):[ ]*(.*)$"
 
 
 ssdp_datagram_patterns = {
-    'host': (re.compile("^(?i)(host):(.*)$"), str),
+    'host': (re.compile("(?i)^(host):(.*)$"), str),
     'st': (re.compile(_template % 'st'), str),
     'man': (re.compile(_template % 'man'), str),
     'mx': (re.compile(_template % 'mx'), int),
@@ -97,7 +97,7 @@ class SSDPDatagram(object):
         self.ext = None
         for k, v in kwargs.items():
             normalized = k.lower().replace("-", "_")
-            if not normalized.startswith("_") and hasattr(self, normalized) and getattr(self,normalized) is None:
+            if not normalized.startswith("_") and hasattr(self, normalized) and getattr(self, normalized) is None:
                 setattr(self, normalized, v)
         self._case_mappings: dict = {k.lower(): k for k in kwargs.keys()}
         for k in self._required_fields[self._packet_type]:
