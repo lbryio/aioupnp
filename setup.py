@@ -19,6 +19,7 @@ setup(
     description="UPnP for asyncio",
     keywords="upnp asyncio",
     long_description=long_description,
+    long_description_content_type='text/markdown',
     url="https://github.com/lbryio/aioupnp",
     license=__license__,
     packages=find_packages(),
