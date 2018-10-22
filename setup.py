@@ -27,4 +27,9 @@ setup(
     install_requires=[
         'netifaces',
     ],
+    extras_require={
+        'test': (
+            'mock',
+        )
+    }
 )

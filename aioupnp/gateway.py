@@ -271,7 +271,6 @@ class Gateway:
                     name, param_types, return_types, inputs, outputs, soap_socket)
                 setattr(command, "__doc__", current.__doc__)
                 setattr(self.commands, command.method, command)
-
                 self._registered_commands[command.method] = service.serviceType
                 log.debug("registered %s::%s", service.serviceType, command.method)
             except AttributeError:

@@ -61,8 +61,7 @@ class UPnP:
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       igd_args: OrderedDict = None, interface_name: str = 'default',
-                       ssdp_socket: socket.socket = None) -> Dict:
+                       igd_args: OrderedDict = None, interface_name: str = 'default') -> Dict:
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
             assert gateway_address and lan_address
@@ -70,10 +69,10 @@ class UPnP:
             raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
                                                                                                   str(err)))
         if not igd_args:
-            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket)
+            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout)
         else:
             igd_args = OrderedDict(igd_args)
-            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket)
+            datagram = await m_search(lan_address, gateway_address, igd_args, timeout)
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,

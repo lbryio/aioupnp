@@ -9,7 +9,7 @@ jobs:
     name: "mypy"
     before_install:
     - pip install mypy lxml
-    - pip install -e .
+    - pip install -e .[test]
 
     script:
     - mypy . --txt-report . --scripts-are-modules; cat index.txt; rm index.txt
@@ -19,7 +19,7 @@ jobs:
       name: "Unit Tests w/ Python 3.7"
       before_install:
       - pip install pylint coverage
-      - pip install -e .
+      - pip install -e .[test]
 
       script:
       - HOME=/tmp coverage run --source=aioupnp -m unittest -v
