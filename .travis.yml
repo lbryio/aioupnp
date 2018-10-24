@@ -22,7 +22,7 @@ jobs:
       - pip install -e .[test]
 
       script:
-      - HOME=/tmp coverage run --source=aioupnp -m unittest -v
+      - HOME=/tmp coverage run -m unittest discover -v tests
 
       after_success:
       - bash <(curl -s https://codecov.io/bash)
