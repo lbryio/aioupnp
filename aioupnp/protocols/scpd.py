@@ -1,5 +1,4 @@
 import logging
-import socket
 import typing
 import re
 from collections import OrderedDict
@@ -64,7 +63,7 @@ class SCPDHTTPClientProtocol(Protocol):
         for i, line in enumerate(self.response_buff.split(b'\r\n')):
             if not line:  # we hit the blank line between the headers and the body
                 if i == (len(self.response_buff.split(b'\r\n')) - 1):
-                    continue  # the body is still yet to be written
+                    return  # the body is still yet to be written
                 if not self._got_headers:
                     self._headers, self._response_code, self._response_msg = parse_headers(
                         b'\r\n'.join(self.response_buff.split(b'\r\n')[:i])
@@ -82,17 +81,17 @@ class SCPDHTTPClientProtocol(Protocol):
                 else:
                     self.finished.set_exception(
                         UPnPError(
-                                "too many bytes written to response (%i vs %i expected)" % (
-                                 len(body), self._content_length
-                                )
+                            "too many bytes written to response (%i vs %i expected)" % (
+                                len(body), self._content_length
+                            )
                         )
                     )
                 return
 
 
-async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[typing.Dict, bytes,
-                                                                              typing.Optional[Exception]]:
-    loop = asyncio.get_event_loop_policy().get_event_loop()
+async def scpd_get(control_url: str, address: str, port: int, loop=None) -> typing.Tuple[typing.Dict, bytes,
+                                                                                         typing.Optional[Exception]]:
+    loop = loop or asyncio.get_event_loop_policy().get_event_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
@@ -105,6 +104,9 @@ async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[ty
     except asyncio.TimeoutError:
         error = UPnPError("get request timed out")
         body = b''
+    except UPnPError as err:
+        error = err
+        body = protocol.response_buff
     finally:
         transport.close()
     if not error:
@@ -116,21 +118,22 @@ async def scpd_get(control_url: str, address: str, port: int) -> typing.Tuple[ty
 
 
 async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: list, service_id: bytes,
-                    soap_socket: socket.socket = None, **kwargs) -> typing.Tuple[typing.Dict, bytes,
-                                                                                 typing.Optional[Exception]]:
-    loop = asyncio.get_event_loop_policy().get_event_loop()
+                    loop=None, **kwargs) -> typing.Tuple[typing.Dict, bytes, typing.Optional[Exception]]:
+    loop = loop or asyncio.get_event_loop_policy().get_event_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     transport, protocol = await loop.create_connection(
         lambda : SCPDHTTPClientProtocol(
             packet, finished, soap_method=method, soap_service_id=service_id.decode(),
-        ), address, port, sock=soap_socket
+        ), address, port
     )
     assert isinstance(protocol, SCPDHTTPClientProtocol)
     try:
         body, response_code, response_msg = await asyncio.wait_for(finished, 1.0)
     except asyncio.TimeoutError:
         return {}, b'', UPnPError("Timeout")
+    except UPnPError as err:
+        return {}, protocol.response_buff, err
     finally:
         transport.close()
     try:

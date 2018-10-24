@@ -6,45 +6,23 @@ log = logging.getLogger(__name__)
 
 class CaseInsensitive:
     def __init__(self, **kwargs) -> None:
-        not_evaluated = {}
         for k, v in kwargs.items():
-            if k.startswith("_"):
-                not_evaluated[k] = v
-                continue
-            try:
+            if not k.startswith("_"):
                 getattr(self, k)
                 setattr(self, k, v)
-            except AttributeError as err:
-                not_evaluated[k] = v
-        if not_evaluated:
-            log.debug("%s did not apply kwargs: %s", self.__class__.__name__, not_evaluated)
-
-    def _get_attr_name(self, case_insensitive: str) -> str:
-        for k, v in self.__dict__.items():
-            if k.lower() == case_insensitive.lower():
-                return k
-        raise AttributeError(case_insensitive)
 
     def __getattr__(self, item):
-        if item in self.__dict__:
-            return self.__dict__[item]
-        for k, v in self.__class__.__dict__.items():
+        for k in self.__class__.__dict__.keys():
             if k.lower() == item.lower():
-                if k not in self.__dict__:
-                    self.__dict__[k] = v
-                return v
+                return self.__dict__.get(k)
         raise AttributeError(item)
 
     def __setattr__(self, item, value):
-        if item in self.__dict__:
-            self.__dict__[item] = value
-            return
-        to_update = None
-        for k, v in self.__dict__.items():
+        for k, v in self.__class__.__dict__.items():
             if k.lower() == item.lower():
-                to_update = k
-                break
-        self.__dict__[to_update or item] = value
+                self.__dict__[k] = value
+                return
+        raise AttributeError(item)
 
     def as_dict(self) -> dict:
         return {

@@ -16,6 +16,7 @@
     Cisco CGA4131COM
     Linksys WRT1200AC
     Netgear Nighthawk X4 AC2350
+    ASUS RT-N66U
 
 ## Installation
 

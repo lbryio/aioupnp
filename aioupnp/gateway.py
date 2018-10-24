@@ -9,7 +9,6 @@ from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
 from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
 from aioupnp.protocols.scpd import scpd_get
-from aioupnp.protocols.soap import SOAPCommand
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.util import flatten_keys
 from aioupnp.fault import UPnPError
@@ -156,9 +155,8 @@ class Gateway:
         }
 
     @classmethod
-    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
-                               soap_socket: socket.socket = None, unicast: bool = False):
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int=30,
+                                igd_args: OrderedDict=None, loop=None, unicast: bool=False):
         ignored: set = set()
         required_commands = [
             'AddPortMapping',
@@ -167,16 +165,17 @@ class Gateway:
         ]
         while True:
             if not igd_args:
-                m_search_args, datagram = await asyncio.wait_for(fuzzy_m_search(lan_address, gateway_address, timeout, ssdp_socket,
-                                                               ignored, unicast), timeout)
+                m_search_args, datagram = await asyncio.wait_for(
+                    fuzzy_m_search(lan_address, gateway_address, timeout, loop,  ignored, unicast),
+                    timeout
+                )
             else:
                 m_search_args = OrderedDict(igd_args)
-                datagram = await m_search(lan_address, gateway_address, igd_args, timeout, ssdp_socket, ignored,
-                                          unicast)
+                datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
             try:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address)
                 log.debug('get gateway descriptor %s', datagram.location)
-                await gateway.discover_commands(soap_socket)
+                await gateway.discover_commands(loop)
                 requirements_met = all([required in gateway._registered_commands for required in required_commands])
                 if not requirements_met:
                     not_met = [
@@ -196,17 +195,15 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: OrderedDict = None,  ssdp_socket: socket.socket = None,
-                               soap_socket: socket.socket = None, unicast: bool = None):
+                               igd_args: OrderedDict = None, loop=None, unicast: bool = None):
         if unicast is not None:
-            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, ssdp_socket,
-                                               soap_socket, unicast=unicast)
+            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop)
         done, pending = await asyncio.wait([
             cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket, unicast=True
+                lan_address, gateway_address, timeout, igd_args, loop, unicast=True
             ),
             cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket, unicast=False
+                lan_address, gateway_address, timeout, igd_args, loop, unicast=False
             )], return_when=asyncio.tasks.FIRST_COMPLETED
         )
         for task in list(pending):
@@ -214,8 +211,8 @@ class Gateway:
         result = list(done)[0].result()
         return result
 
-    async def discover_commands(self, soap_socket: socket.socket = None):
-        response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port)
+    async def discover_commands(self, loop=None):
+        response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
         self._xml_response = xml_bytes
         if get_err is not None:
             raise get_err
@@ -230,9 +227,9 @@ class Gateway:
         else:
             self._device = Device(self._devices, self._services)
         for service_type in self.services.keys():
-            await self.register_commands(self.services[service_type], soap_socket)
+            await self.register_commands(self.services[service_type], loop)
 
-    async def register_commands(self, service: Service, soap_socket: socket.socket = None):
+    async def register_commands(self, service: Service, loop=None):
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
 
@@ -252,27 +249,10 @@ class Gateway:
 
         for name, inputs, outputs in action_list:
             try:
-                current = getattr(self.commands, name)
-                annotations = current.__annotations__
-                return_types = annotations.get('return', None)
-                if return_types:
-                    if hasattr(return_types, '__args__'):
-                        return_types = tuple([return_type_lambas.get(a, a) for a in return_types.__args__])
-                    elif isinstance(return_types, type):
-                        return_types = (return_types, )
-                    return_types = {r: t for r, t in zip(outputs, return_types)}
-                param_types = {}
-                for param_name, param_type in annotations.items():
-                    if param_name == "return":
-                        continue
-                    param_types[param_name] = param_type
-                command = SOAPCommand(
-                    self.base_ip.decode(), self.port, service.controlURL, service.serviceType.encode(),
-                    name, param_types, return_types, inputs, outputs, soap_socket)
-                setattr(command, "__doc__", current.__doc__)
-                setattr(self.commands, command.method, command)
-                self._registered_commands[command.method] = service.serviceType
-                log.debug("registered %s::%s", service.serviceType, command.method)
+                self.commands.register(self.base_ip, self.port, name, service.controlURL, service.serviceType.encode(),
+                                       inputs, outputs, loop)
+                self._registered_commands[name] = service.serviceType
+                log.debug("registered %s::%s", service.serviceType, name)
             except AttributeError:
                 s = self._unsupported_actions.get(service.serviceType, [])
                 s.append(name)

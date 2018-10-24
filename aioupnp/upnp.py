@@ -11,7 +11,7 @@ from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
 from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
-from aioupnp.protocols.soap import SOAPCommand
+from aioupnp.commands import SOAPCommand
 from aioupnp.serialization.ssdp import SSDPDatagram
 
 log = logging.getLogger(__name__)
@@ -47,14 +47,13 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                       igd_args: OrderedDict = None, interface_name: str = 'default',
-                       ssdp_socket: socket.socket = None, soap_socket: socket.socket = None):
+                       igd_args: OrderedDict = None, interface_name: str = 'default', loop=None):
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
             raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
         gateway = await Gateway.discover_gateway(
-            lan_address, gateway_address, timeout, igd_args, ssdp_socket, soap_socket
+            lan_address, gateway_address, timeout, igd_args, loop
         )
         return cls(lan_address, gateway_address, gateway)
 
@@ -342,21 +341,31 @@ class UPnP:
     @classmethod
     def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
                 interface_name: str = 'default', kwargs: dict = None) -> None:
+        """
+        :param method: the command name
+        :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided
+        :param lan_address: the ip address of the local interface
+        :param gateway_address: the ip address of the gateway
+        :param timeout: timeout, in seconds
+        :param interface_name: name of the network interface, the default is aliased to 'default'
+        :param kwargs: keyword arguments for the command
+        """
         kwargs = kwargs or {}
         igd_args = igd_args
         timeout = int(timeout)
         loop = asyncio.get_event_loop_policy().get_event_loop()
         fut: asyncio.Future = asyncio.Future()
 
-        async def wrapper():
-            if method == 'm_search':
+        async def wrapper():  # wrap the upnp setup and call of the command in a coroutine
+
+            if method == 'm_search':  # if we're only m_searching don't do any device discovery
                 fn = lambda *_a, **_kw: cls.m_search(
                     lan_address, gateway_address, timeout, igd_args, interface_name
                 )
-            else:
+            else:  # automatically discover the gateway
                 try:
                     u = await cls.discover(
-                        lan_address, gateway_address, timeout, igd_args, interface_name
+                        lan_address, gateway_address, timeout, igd_args, interface_name, loop=loop
                     )
                 except UPnPError as err:
                     fut.set_exception(err)
@@ -366,7 +375,7 @@ class UPnP:
                 else:
                     fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
                     return
-            try:
+            try:  # call the command
                 result = await fn(**{k: fn.__annotations__[k](v) for k, v in kwargs.items()})
                 fut.set_result(result)
             except UPnPError as err:
