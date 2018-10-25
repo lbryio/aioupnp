@@ -181,7 +181,7 @@ class Gateway:
                     not_met = [
                         required for required in required_commands if required not in gateway._registered_commands
                     ]
-                    log.warning("found gateway %s at %s, but it does not implement required soap commands: %s",
+                    log.debug("found gateway %s at %s, but it does not implement required soap commands: %s",
                                 gateway.manufacturer_string, gateway.location, not_met)
                     ignored.add(datagram.location)
                     continue

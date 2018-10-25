@@ -22,7 +22,7 @@ setup(
     long_description_content_type='text/markdown',
     url="https://github.com/lbryio/aioupnp",
     license=__license__,
-    packages=find_packages(),
+    packages=find_packages(exclude=('tests',)),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
         'netifaces',

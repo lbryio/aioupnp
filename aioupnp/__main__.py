@@ -24,7 +24,8 @@ def get_help(command):
     )
 
 
-def main():
+def main(argv=None, loop=None):
+    argv = argv or sys.argv
     commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
     help_str = "\n".join(textwrap.wrap(
         " | ".join(commands), 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False
@@ -40,7 +41,7 @@ def main():
         "For help with a specific command:" \
         "  aioupnp help <command>\n" % (base_usage, help_str)
 
-    args = sys.argv[1:]
+    args = argv[1:]
     if args[0] in ['help', '-h', '--help']:
         if len(args) > 1:
             if args[1] in commands:
@@ -53,6 +54,7 @@ def main():
         'gateway_address': '',
         'lan_address': '',
         'timeout': 30,
+        'unicast': False
     }
 
     options = OrderedDict()
@@ -88,7 +90,7 @@ def main():
 
     UPnP.run_cli(
         command.replace('-', '_'), options, options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('interface'), kwargs
+        options.pop('timeout'), options.pop('interface'), options.pop('unicast'), kwargs, loop
     )
 
 

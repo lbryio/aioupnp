@@ -60,18 +60,20 @@ class UPnP:
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       igd_args: OrderedDict = None, interface_name: str = 'default') -> Dict:
-        try:
-            lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
-            assert gateway_address and lan_address
-        except Exception as err:
-            raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
-                                                                                                  str(err)))
+                       igd_args: OrderedDict = None, unicast: bool = True, interface_name: str = 'default',
+                       loop=None) -> Dict:
+        if not lan_address or not gateway_address:
+            try:
+                lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
+                assert gateway_address and lan_address
+            except Exception as err:
+                raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
+                                                                                                      str(err)))
         if not igd_args:
-            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout)
+            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, loop, unicast=unicast)
         else:
             igd_args = OrderedDict(igd_args)
-            datagram = await m_search(lan_address, gateway_address, igd_args, timeout)
+            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, unicast=unicast)
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
@@ -340,7 +342,7 @@ class UPnP:
 
     @classmethod
     def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                interface_name: str = 'default', kwargs: dict = None) -> None:
+                interface_name: str = 'default', unicast: bool = True, kwargs: dict = None, loop=None) -> None:
         """
         :param method: the command name
         :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided
@@ -349,18 +351,19 @@ class UPnP:
         :param timeout: timeout, in seconds
         :param interface_name: name of the network interface, the default is aliased to 'default'
         :param kwargs: keyword arguments for the command
+        :param loop: EventLoop, used for testing
         """
         kwargs = kwargs or {}
         igd_args = igd_args
         timeout = int(timeout)
-        loop = asyncio.get_event_loop_policy().get_event_loop()
+        loop = loop or asyncio.get_event_loop_policy().get_event_loop()
         fut: asyncio.Future = asyncio.Future()
 
         async def wrapper():  # wrap the upnp setup and call of the command in a coroutine
 
             if method == 'm_search':  # if we're only m_searching don't do any device discovery
                 fn = lambda *_a, **_kw: cls.m_search(
-                    lan_address, gateway_address, timeout, igd_args, interface_name
+                    lan_address, gateway_address, timeout, igd_args, unicast, interface_name, loop
                 )
             else:  # automatically discover the gateway
                 try:

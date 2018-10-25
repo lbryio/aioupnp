@@ -4,8 +4,8 @@ from aioupnp.protocols.m_search_patterns import packet_generator
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.constants import SSDP_IP_ADDRESS
 from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
-from . import TestBase
-from .mocks import mock_datagram_endpoint_factory
+from tests import TestBase
+from tests.mocks import mock_datagram_endpoint_factory
 
 
 class TestSSDP(TestBase):

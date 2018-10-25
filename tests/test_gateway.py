@@ -1,10 +1,11 @@
 from aioupnp.fault import UPnPError
 from aioupnp.protocols.scpd import scpd_post, scpd_get
-from . import TestBase
-from .mocks import mock_tcp_endpoint_factory
+from tests import TestBase
+from tests.mocks import mock_tcp_endpoint_factory
 from collections import OrderedDict
 from aioupnp.gateway import Gateway
 from aioupnp.serialization.ssdp import SSDPDatagram
+
 
 class TestDiscoverCommands(TestBase):
     gateway_address = "10.0.0.1"
