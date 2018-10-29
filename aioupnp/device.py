@@ -8,7 +8,6 @@ class CaseInsensitive:
     def __init__(self, **kwargs) -> None:
         for k, v in kwargs.items():
             if not k.startswith("_"):
-                getattr(self, k)
                 setattr(self, k, v)
 
     def __getattr__(self, item):
@@ -22,6 +21,9 @@ class CaseInsensitive:
             if k.lower() == item.lower():
                 self.__dict__[k] = value
                 return
+        if not item.startswith("_"):
+            self.__dict__[item] = value
+            return
         raise AttributeError(item)
 
     def as_dict(self) -> dict:

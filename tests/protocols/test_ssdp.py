@@ -5,7 +5,7 @@ from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.constants import SSDP_IP_ADDRESS
 from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
 from tests import TestBase
-from tests.mocks import mock_datagram_endpoint_factory
+from tests.mocks import mock_tcp_and_udp
 
 
 class TestSSDP(TestBase):
@@ -35,14 +35,14 @@ class TestSSDP(TestBase):
         }
         sent = []
 
-        with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", replies=replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, udp_replies=replies, udp_expected_addr="10.0.0.1", sent_udp_packets=sent):
             reply = await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop, unicast=True)
 
         self.assertEqual(reply.encode(), self.reply_packet.encode())
         self.assertListEqual(sent, [self.query_packet.encode().encode()])
 
         with self.assertRaises(UPnPError):
-            with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", replies=replies):
+            with mock_tcp_and_udp(self.loop, udp_expected_addr="10.0.0.1", udp_replies=replies):
                 await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop, unicast=False)
 
     async def test_m_search_reply_multicast(self):
@@ -51,21 +51,21 @@ class TestSSDP(TestBase):
         }
         sent = []
 
-        with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", replies=replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, udp_replies=replies, udp_expected_addr="10.0.0.1", sent_udp_packets=sent):
             reply = await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop)
 
         self.assertEqual(reply.encode(), self.reply_packet.encode())
         self.assertListEqual(sent, [self.query_packet.encode().encode()])
 
         with self.assertRaises(UPnPError):
-            with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", replies=replies):
+            with mock_tcp_and_udp(self.loop, udp_replies=replies, udp_expected_addr="10.0.0.1"):
                 await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop, unicast=True)
 
     async def test_packets_sent_fuzzy_m_search(self):
         sent = []
 
         with self.assertRaises(UPnPError):
-            with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", sent_packets=sent):
+            with mock_tcp_and_udp(self.loop, udp_expected_addr="10.0.0.1", sent_udp_packets=sent):
                 await fuzzy_m_search("10.0.0.2", "10.0.0.1", 1, self.loop)
 
         self.assertListEqual(sent, self.byte_packets)
@@ -76,7 +76,7 @@ class TestSSDP(TestBase):
         }
         sent = []
 
-        with mock_datagram_endpoint_factory(self.loop, "10.0.0.1", replies=replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, udp_expected_addr="10.0.0.1", udp_replies=replies, sent_udp_packets=sent):
             args, reply = await fuzzy_m_search("10.0.0.2", "10.0.0.1", 1, self.loop)
 
         self.assertEqual(reply.encode(), self.reply_packet.encode())

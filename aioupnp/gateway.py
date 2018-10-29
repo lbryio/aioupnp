@@ -221,8 +221,9 @@ class Gateway:
         if not self.url_base:
             self.url_base = self.base_address.decode()
         if response:
+            device_dict = get_dict_val_case_insensitive(response, "device")
             self._device = Device(
-                self._devices, self._services, **get_dict_val_case_insensitive(response, "device")
+                self._devices, self._services, **device_dict
             )
         else:
             self._device = Device(self._devices, self._services)

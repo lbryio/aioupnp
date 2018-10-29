@@ -1,7 +1,7 @@
 from aioupnp.fault import UPnPError
 from aioupnp.protocols.scpd import scpd_post, scpd_get
 from tests import TestBase
-from tests.mocks import mock_tcp_endpoint_factory
+from tests.mocks import mock_tcp_and_udp
 
 
 class TestSCPDGet(TestBase):
@@ -107,7 +107,7 @@ class TestSCPDGet(TestBase):
     async def test_scpd_get(self):
         sent = []
         replies = {self.get_request: self.response}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertEqual(None, err)
             self.assertDictEqual(self.expected_parsed, result)
@@ -115,7 +115,7 @@ class TestSCPDGet(TestBase):
     async def test_scpd_get_timeout(self):
         sent = []
         replies = {}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertTrue(isinstance(err, UPnPError))
             self.assertDictEqual({}, result)
@@ -124,7 +124,7 @@ class TestSCPDGet(TestBase):
     async def test_scpd_get_bad_xml(self):
         sent = []
         replies = {self.get_request: self.bad_response}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertDictEqual({}, result)
             self.assertEqual(self.bad_xml, raw)
@@ -134,7 +134,7 @@ class TestSCPDGet(TestBase):
     async def test_scpd_get_overrun_content_length(self):
         sent = []
         replies = {self.get_request: self.bad_response + b'\r\n'}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertDictEqual({}, result)
             self.assertEqual(self.bad_response + b'\r\n', raw)
@@ -183,7 +183,7 @@ class TestSCPDPost(TestBase):
     async def test_scpd_post(self):
         sent = []
         replies = {self.post_bytes: self.post_response}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
@@ -194,7 +194,7 @@ class TestSCPDPost(TestBase):
     async def test_scpd_post_timeout(self):
         sent = []
         replies = {}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
@@ -206,7 +206,7 @@ class TestSCPDPost(TestBase):
     async def test_scpd_post_bad_xml_response(self):
         sent = []
         replies = {self.post_bytes: self.bad_envelope_response}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
@@ -218,7 +218,7 @@ class TestSCPDPost(TestBase):
     async def test_scpd_post_overrun_response(self):
         sent = []
         replies = {self.post_bytes: self.post_response + b'\r\n'}
-        with mock_tcp_endpoint_factory(self.loop, replies, sent_packets=sent):
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
