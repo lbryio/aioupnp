@@ -165,9 +165,8 @@ class Gateway:
         ]
         while True:
             if not igd_args:
-                m_search_args, datagram = await asyncio.wait_for(
-                    fuzzy_m_search(lan_address, gateway_address, timeout, loop,  ignored, unicast),
-                    timeout
+                m_search_args, datagram = await fuzzy_m_search(
+                    lan_address, gateway_address, timeout, loop,  ignored, unicast
                 )
             else:
                 m_search_args = OrderedDict(igd_args)
