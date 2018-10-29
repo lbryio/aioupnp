@@ -189,6 +189,8 @@ class SSDPDatagram(object):
     @classmethod
     def _from_string(cls, datagram: str):
         lines = [l for l in datagram.split(line_separator) if l]
+        if not lines:
+            return
         if lines[0] == cls._start_lines[cls._M_SEARCH]:
             return cls._from_request(lines[1:])
         if lines[0] in [cls._start_lines[cls._NOTIFY], cls._start_lines[cls._NOTIFY] + " "]:

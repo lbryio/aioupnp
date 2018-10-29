@@ -28,6 +28,18 @@ class TestSSDPDatagram(unittest.TestCase):
         with self.assertRaises(UPnPError):
             SSDPDatagram.decode(packet)
 
+    def test_fail_to_decode_blank(self):
+        packet = b''
+
+        with self.assertRaises(UPnPError):
+            SSDPDatagram.decode(packet)
+
+    def test_fail_to_decode_one_line(self):
+        packet = b'M-SEARCH * HTTP/1.1'
+
+        with self.assertRaises(UPnPError):
+            SSDPDatagram.decode(packet)
+
     def test_cli_args(self):
         datagram_args = OrderedDict([
             ('Host', "{}:{}".format('239.255.255.250', 1900)),

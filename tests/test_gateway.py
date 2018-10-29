@@ -1,5 +1,3 @@
-from aioupnp.fault import UPnPError
-from aioupnp.protocols.scpd import scpd_post, scpd_get
 from tests import TestBase
 from tests.mocks import mock_tcp_endpoint_factory
 from collections import OrderedDict
