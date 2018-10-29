@@ -390,9 +390,8 @@ class UPnP:
 
         if not hasattr(UPnP, method) or not hasattr(getattr(UPnP, method), "_cli"):
             fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
-            wrapper = lambda : None
-
-        loop.run_until_complete(wrapper())
+        else:
+            loop.run_until_complete(wrapper())
         try:
             result = fut.result()
         except UPnPError as err:
