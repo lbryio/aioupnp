@@ -55,6 +55,7 @@ def parse_device_dict(xml_dict: dict) -> Dict:
             schema_key = m[1][0]
             root = m[2][5]
             xml_dict = flatten_keys(xml_dict, "{%s}" % schema_key)[root]
+            break
     result = {}
     for k, v in xml_dict.items():
         if isinstance(xml_dict[k], dict):
