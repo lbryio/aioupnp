@@ -156,11 +156,10 @@ class UPnP:
     async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
-        internal_port = internal_port or port
+        internal_port = int(internal_port or port)
         redirect_tups = []
         cnt = 0
         port = int(port)
-        internal_port = int(internal_port)
         redirect = await self._get_port_mapping_by_index(cnt)
         while redirect:
             redirect_tups.append(redirect)
@@ -168,13 +167,14 @@ class UPnP:
             redirect = await self._get_port_mapping_by_index(cnt)
 
         redirects = {
-            "%i:%s" % (ext_port, proto): (int_host, int_port, desc)
+            (ext_port, proto): (int_host, int_port, desc)
             for (ext_host, ext_port, proto, int_port, int_host, enabled, desc, _) in redirect_tups
         }
-        while ("%i:%s" % (port, protocol)) in redirects:
-            int_host, int_port, _ = redirects["%i:%s" % (port, protocol)]
+
+        while (port, protocol) in redirects:
+            int_host, int_port, _ = redirects[(port, protocol)]
             if int_host == self.lan_address and int_port == internal_port:
-                break
+                return int_port
             port += 1
 
         await self.add_port_mapping(  # set one up
