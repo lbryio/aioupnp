@@ -1,5 +1,4 @@
 import os
-import socket
 import logging
 import json
 import asyncio
@@ -157,6 +156,7 @@ class UPnP:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         internal_port = int(internal_port or port)
+        requested_port = int(internal_port)
         redirect_tups = []
         cnt = 0
         port = int(port)
@@ -172,11 +172,10 @@ class UPnP:
         }
 
         while (port, protocol) in redirects:
-            int_host, int_port, _ = redirects[(port, protocol)]
-            if int_host == self.lan_address and int_port == internal_port:
-                return int_port
+            int_host, int_port, desc = redirects[(port, protocol)]
+            if int_host == self.lan_address and int_port == requested_port and desc == description:
+                return port
             port += 1
-
         await self.add_port_mapping(  # set one up
                 port, protocol, internal_port, self.lan_address, description
         )
