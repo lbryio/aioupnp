@@ -11,13 +11,24 @@ base_dir = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(base_dir, 'README.md'), 'rb') as f:
     long_description = f.read().decode('utf-8')
 
+
 setup(
     name=__name__,
     version=__version__,
     author=__author__,
     author_email=__email__,
     description="UPnP for asyncio",
-    keywords="upnp asyncio",
+    keywords="upnp asyncio ssdp network scpd",
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: System :: Networking",
+        "Topic :: Communications :: File Sharing"
+    ],
     long_description=long_description,
     long_description_content_type='text/markdown',
     url="https://github.com/lbryio/aioupnp",
