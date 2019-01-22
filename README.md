@@ -59,23 +59,23 @@ aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:roo
 
 ### Examples
 
-To get the external ip address from the UPnP gateway
+#### To get the external ip address from the UPnP gateway
     
     aioupnp get_external_ip
     
-To list the active port mappings on the gateway
+#### To list the active port mappings on the gateway
 
     aioupnp get_redirects
    
-To debug the default gateway
+#### To debug the default gateway
 
     aioupnp --debug_logging m_search
 
-To debug a gateway on a non default network interface
+#### To debug a gateway on a non default network interface
 
     aioupnp --interface=vmnet1 --debug_logging m_search
 
-To debug a gateway on a non default network interface that isn't the router
+#### To debug a gateway on a non default network interface that isn't the router
 
     aioupnp --interface=vmnet1 --gateway_address=192.168.1.106 --debug_logging m_search
     
