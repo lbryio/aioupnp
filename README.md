@@ -66,8 +66,12 @@ aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:roo
 #### To list the active port mappings on the gateway
 
     aioupnp get_redirects
-   
-#### To debug the default gateway
+
+#### To debug the default gateway (very verbose)
+
+    aioupnp --debug_logging debug_gateway
+
+#### To debug the gateway discovery
 
     aioupnp --debug_logging m_search
 
