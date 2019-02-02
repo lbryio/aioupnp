@@ -196,6 +196,7 @@ class Gateway:
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
                                igd_args: OrderedDict = None, loop=None, unicast: bool = None):
         if unicast is not None:
+            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
             return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop)
         done, pending = await asyncio.wait([
             cls._discover_gateway(
