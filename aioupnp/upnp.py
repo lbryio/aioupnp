@@ -394,7 +394,7 @@ class UPnP:
         try:
             result = fut.result()
         except UPnPError as err:
-            print("aioupnp encountered an error:\n%s" % str(err))
+            print("aioupnp encountered an error: %s" % str(err))
             return
 
         if isinstance(result, (list, tuple, dict)):
