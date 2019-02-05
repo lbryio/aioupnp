@@ -155,8 +155,8 @@ class Gateway:
         }
 
     @classmethod
-    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int=30,
-                                igd_args: OrderedDict=None, loop=None, unicast: bool=False):
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
+                                igd_args: OrderedDict = None, loop=None, unicast: bool = False):
         ignored: set = set()
         required_commands = [
             'AddPortMapping',
@@ -181,7 +181,7 @@ class Gateway:
                         required for required in required_commands if required not in gateway._registered_commands
                     ]
                     log.debug("found gateway %s at %s, but it does not implement required soap commands: %s",
-                                gateway.manufacturer_string, gateway.location, not_met)
+                              gateway.manufacturer_string, gateway.location, not_met)
                     ignored.add(datagram.location)
                     continue
                 else:
@@ -197,26 +197,25 @@ class Gateway:
                                igd_args: OrderedDict = None, loop=None, unicast: bool = None):
         if unicast is not None:
             return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
-        loop = loop or asyncio.get_event_loop()
-        with_unicast = loop.create_task(cls._discover_gateway(
-            lan_address, gateway_address, timeout, igd_args, loop, unicast=True
-        ))
-        without_unicast = loop.create_task(cls._discover_gateway(
-            lan_address, gateway_address, timeout, igd_args, loop, unicast=False
-        ))
-        await asyncio.wait([with_unicast, without_unicast], return_when=asyncio.tasks.FIRST_COMPLETED)
-        if with_unicast and not with_unicast.done():
-            with_unicast.cancel()
-            if without_unicast.done():
-                return without_unicast.result()
-        elif without_unicast and not without_unicast.done():
-            without_unicast.cancel()
-            if with_unicast.done() and not with_unicast.cancelled():
-                return with_unicast.result()
-        else:
-            with_unicast.exception()
-            without_unicast.exception()
-            return with_unicast.result()
+
+        done, pending = await asyncio.wait([
+            cls._discover_gateway(
+                lan_address, gateway_address, timeout, igd_args, loop, unicast=True
+            ),
+            cls._discover_gateway(
+                lan_address, gateway_address, timeout, igd_args, loop, unicast=False
+            )
+        ], return_when=asyncio.tasks.FIRST_COMPLETED)
+
+        for task in pending:
+            task.cancel()
+        for task in done:
+            try:
+                task.exception()
+            except asyncio.CancelledError:
+                pass
+
+        return list(done)[0].result()
 
     async def discover_commands(self, loop=None):
         response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
