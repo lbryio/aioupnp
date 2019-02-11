@@ -1,3 +1,6 @@
+import asyncio
+
+from aioupnp.fault import UPnPError
 from tests import TestBase
 from tests.mocks import mock_tcp_and_udp
 from collections import OrderedDict
@@ -61,6 +64,16 @@ class TestDiscoverDLinkDIR890L(TestBase):
         'DeletePortMapping': 'urn:schemas-upnp-org:service:WANIPConnection:1',
         'GetExternalIPAddress': 'urn:schemas-upnp-org:service:WANIPConnection:1'
     }
+
+    async def test_discover_gateway(self):
+        with self.assertRaises(UPnPError) as e1:
+            with mock_tcp_and_udp(self.loop):
+                await Gateway.discover_gateway("10.0.0.2", "10.0.0.1", 2)
+        with self.assertRaises(UPnPError) as e2:
+            with mock_tcp_and_udp(self.loop):
+                await Gateway.discover_gateway("10.0.0.2", "10.0.0.1", 2, unicast=False)
+        self.assertEqual(str(e1.exception), "M-SEARCH for 10.0.0.1:1900 timed out")
+        self.assertEqual(str(e2.exception), "M-SEARCH for 10.0.0.1:1900 timed out")
 
     async def test_discover_commands(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):

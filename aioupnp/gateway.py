@@ -155,8 +155,8 @@ class Gateway:
         }
 
     @classmethod
-    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int=30,
-                                igd_args: OrderedDict=None, loop=None, unicast: bool=False):
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
+                                igd_args: OrderedDict = None, loop=None, unicast: bool = False):
         ignored: set = set()
         required_commands = [
             'AddPortMapping',
@@ -181,7 +181,7 @@ class Gateway:
                         required for required in required_commands if required not in gateway._registered_commands
                     ]
                     log.debug("found gateway %s at %s, but it does not implement required soap commands: %s",
-                                gateway.manufacturer_string, gateway.location, not_met)
+                              gateway.manufacturer_string, gateway.location, not_met)
                     ignored.add(datagram.location)
                     continue
                 else:
@@ -196,19 +196,26 @@ class Gateway:
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
                                igd_args: OrderedDict = None, loop=None, unicast: bool = None):
         if unicast is not None:
-            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop)
+            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
+
         done, pending = await asyncio.wait([
             cls._discover_gateway(
                 lan_address, gateway_address, timeout, igd_args, loop, unicast=True
             ),
             cls._discover_gateway(
                 lan_address, gateway_address, timeout, igd_args, loop, unicast=False
-            )], return_when=asyncio.tasks.FIRST_COMPLETED
-        )
-        for task in list(pending):
+            )
+        ], return_when=asyncio.tasks.FIRST_COMPLETED)
+
+        for task in pending:
             task.cancel()
-        result = list(done)[0].result()
-        return result
+        for task in done:
+            try:
+                task.exception()
+            except asyncio.CancelledError:
+                pass
+
+        return list(done)[0].result()
 
     async def discover_commands(self, loop=None):
         response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)

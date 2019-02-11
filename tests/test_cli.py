@@ -85,7 +85,7 @@ class TestCLI(TestBase):
 
     def test_m_search(self):
         actual_output = StringIO()
-        timeout_msg = "aioupnp encountered an error:\nM-SEARCH for 10.0.0.1:1900 timed out\n"
+        timeout_msg = "aioupnp encountered an error: M-SEARCH for 10.0.0.1:1900 timed out\n"
         with contextlib.redirect_stdout(actual_output):
             with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
                 main(
