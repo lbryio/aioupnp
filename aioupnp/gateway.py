@@ -1,5 +1,5 @@
 import logging
-import socket
+import typing
 import asyncio
 from collections import OrderedDict
 from typing import Dict, List, Union, Type
@@ -156,7 +156,8 @@ class Gateway:
 
     @classmethod
     async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                                igd_args: OrderedDict = None, loop=None, unicast: bool = False):
+                                igd_args: OrderedDict = None, loop=None,
+                                unicast: bool = False) -> typing.Optional['Gateway']:
         ignored: set = set()
         required_commands = [
             'AddPortMapping',
@@ -164,13 +165,16 @@ class Gateway:
             'GetExternalIPAddress'
         ]
         while True:
-            if not igd_args:
-                m_search_args, datagram = await fuzzy_m_search(
-                    lan_address, gateway_address, timeout, loop,  ignored, unicast
-                )
-            else:
-                m_search_args = OrderedDict(igd_args)
-                datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
+            try:
+                if not igd_args:
+                    m_search_args, datagram = await fuzzy_m_search(
+                        lan_address, gateway_address, timeout, loop,  ignored, unicast
+                    )
+                else:
+                    m_search_args = OrderedDict(igd_args)
+                    datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
+            except UPnPError:
+                return
             try:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address)
                 log.debug('get gateway descriptor %s', datagram.location)
@@ -194,28 +198,37 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: OrderedDict = None, loop=None, unicast: bool = None):
+                               igd_args: OrderedDict = None, loop=None, unicast: bool = None) -> 'Gateway':
         if unicast is not None:
-            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
-
-        done, pending = await asyncio.wait([
-            cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, loop, unicast=True
-            ),
-            cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, loop, unicast=False
+            task = asyncio.wait([
+                    cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
+                ])
+        else:
+            task = asyncio.wait([
+                cls._discover_gateway(
+                    lan_address, gateway_address, timeout, igd_args, loop, unicast=True
+                ),
+                cls._discover_gateway(
+                    lan_address, gateway_address, timeout, igd_args, loop, unicast=False
+                )], return_when=asyncio.tasks.FIRST_COMPLETED
             )
-        ], return_when=asyncio.tasks.FIRST_COMPLETED)
+        try:
+            done, pending = await task
+        except asyncio.TimeoutError:
+            raise UPnPError("failed to find a UPnP gateway")
 
         for task in pending:
             task.cancel()
+        gateway = None
         for task in done:
             try:
                 task.exception()
-            except asyncio.CancelledError:
+                gateway = task.result()
+            except (asyncio.CancelledError, UPnPError):
                 pass
-
-        return list(done)[0].result()
+        if not gateway:
+            raise UPnPError("failed to find a UPnP gateway")
+        return gateway
 
     async def discover_commands(self, loop=None):
         response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
