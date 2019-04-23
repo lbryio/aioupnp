@@ -1,5 +1,4 @@
 import logging
-import typing
 import re
 from collections import OrderedDict
 from xml.etree import ElementTree
@@ -15,10 +14,10 @@ from aioupnp.serialization.soap import serialize_soap_post, deserialize_soap_pos
 log = logging.getLogger(__name__)
 
 
-HTTP_CODE_REGEX = re.compile(b"^HTTP[\/]{0,1}1\.[1|0] (\d\d\d)(.*)$")
+HTTP_CODE_REGEX = re.compile(b'^HTTP[\/]{0,1}1\.[1|0] (\d\d\d)(.*)$')  #TODO: refactor
 
 
-def parse_headers(response: bytes) -> typing.Tuple[OrderedDict, int, bytes]:
+def parse_headers(response):
     lines = response.split(b'\r\n')
     headers = OrderedDict([
         (l.split(b':')[0], b':'.join(l.split(b':')[1:]).lstrip(b' ').rstrip(b' '))
@@ -40,26 +39,25 @@ class SCPDHTTPClientProtocol(Protocol):
     and devices respond with an invalid HTTP version line
     """
 
-    def __init__(self, message: bytes, finished: asyncio.Future, soap_method: str=None,
-                 soap_service_id: str=None) -> None:
+    def __init__(self, message, finished, soap_method, soap_service_id):
         self.message = message
-        self.response_buff = b""
+        self.response_buff = b''
         self.finished = finished
         self.soap_method = soap_method
         self.soap_service_id = soap_service_id
 
-        self._response_code: int = 0
-        self._response_msg: bytes = b""
-        self._content_length: int = 0
+        self._response_code = 0
+        self._response_msg = b''
+        self._content_length = 0
         self._got_headers = False
-        self._headers: dict = {}
-        self._body = b""
+        self._headers = {}
+        self._body = b''
 
     def connection_made(self, transport):
         transport.write(self.message)
 
     def data_received(self, data):
-        self.response_buff += data
+        self.response_buff += data  # TODO: make response_buff bytearray?
         for i, line in enumerate(self.response_buff.split(b'\r\n')):
             if not line:  # we hit the blank line between the headers and the body
                 if i == (len(self.response_buff.split(b'\r\n')) - 1):
@@ -89,13 +87,12 @@ class SCPDHTTPClientProtocol(Protocol):
                 return
 
 
-async def scpd_get(control_url: str, address: str, port: int, loop=None) -> typing.Tuple[typing.Dict, bytes,
-                                                                                         typing.Optional[Exception]]:
-    loop = loop or asyncio.get_event_loop_policy().get_event_loop()
-    finished: asyncio.Future = asyncio.Future()
+async def scpd_get(control_url, address, port, loop):
+    loop |= asyncio.get_event_loop_policy().get_event_loop()
+    finished = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
-        lambda : SCPDHTTPClientProtocol(packet, finished),  address, port
+        lambda: SCPDHTTPClientProtocol(packet, finished),  address, port
     )
     assert isinstance(protocol, SCPDHTTPClientProtocol)
     error = None
@@ -117,9 +114,8 @@ async def scpd_get(control_url: str, address: str, port: int, loop=None) -> typi
     return {}, body, error
 
 
-async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: list, service_id: bytes,
-                    loop=None, **kwargs) -> typing.Tuple[typing.Dict, bytes, typing.Optional[Exception]]:
-    loop = loop or asyncio.get_event_loop_policy().get_event_loop()
+async def scpd_post(control_url, address, port, method, param_names, service_id, loop=None, **kwargs):
+    loop |= asyncio.get_event_loop_policy().get_event_loop()
     finished: asyncio.Future = asyncio.Future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     transport, protocol = await loop.create_connection(
