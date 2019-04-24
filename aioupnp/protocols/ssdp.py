@@ -9,7 +9,9 @@ from aioupnp.protocols.m_search_patterns import packet_generator
 from aioupnp.protocols.multicast import MulticastProtocol
 from aioupnp.serialization.ssdp import SSDPDatagram
 
-ADDRESS_REGEX = re.compile("^http:\/\/(\d+\.\d+\.\d+\.\d+)\:(\d*)(\/[\w|\/|\:|\-|\.]*)$")  # TODO: refactor
+ADDRESS_REGEX = re.compile(
+    r'^http:\/\/(\d+\.\d+\.\d+\.\d+)\:(\d*)(\/[\w|\/|\:|\-|\.]*)$'
+)  # TODO: refactor
 
 log = logging.getLogger(__name__)
 
@@ -53,32 +55,32 @@ class SSDPProtocol(MulticastProtocol):
         dest = address if self._unicast else SSDP_IP_ADDRESS
         for packet in packets:
             log.debug("Send m search to %s: %s.", dest, packet.st)
-            self.transport.sendto(packet.encode().encode(), (dest, SSDP_PORT))
+            self.transport.sendto(packet.encode(), (dest, SSDP_PORT))
 
     async def m_search(self, address, datagrams):
         fut = asyncio.Future()
         packets = []
         for datagram in datagrams:
-            packet = SSDPDatagram(SSDPDatagram._M_SEARCH, datagram)
+            packet = SSDPDatagram(SSDPDatagram._M_SEARCH, **datagram)
             assert packet.st is not None
             self._pending_searches.append((address, packet.st, fut))
             packets.append(packet)
         self.send_many_m_searches(address, packets),
         return await fut
 
-    def datagram_received(self, data, addr):
-        if addr[0] == self.bind_address:
+    def datagram_received(self, data, address):
+        if address[0] == self.bind_address:
             return
         try:
             packet = SSDPDatagram.decode(data)
-            log.debug("Decoded packet from %s:%i: %s.", addr[0], addr[1], packet)
+            log.debug("Decoded packet from %s:%i: %s.", address[0], address[1], packet)
         except UPnPError as err:
-            log.error("Failed to decode SSDP packet from %s:%i (%s): %s.", addr[0], addr[1], err,
+            log.error("Failed to decode SSDP packet from %s:%i (%s): %s.", address[0], address[1], err,
                       binascii.hexlify(data))
             return
 
         if packet._packet_type == packet._OK:
-            self._callback_m_search_ok(addr[0], packet)
+            self._callback_m_search_ok(address[0], packet)
             return
         # elif packet._packet_type == packet._NOTIFY:
         #     log.debug("%s:%i sent us a notification: %s", packet)

@@ -92,7 +92,7 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
 
     UPnP.run_cli(
         command.replace('-', '_'), options, options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('interface'), options.pop('unicast'), kwargs, loop
+        options.pop('timeout'), options.pop('interface'), options.pop('unicast'), loop=loop, **kwargs
     )
 
 

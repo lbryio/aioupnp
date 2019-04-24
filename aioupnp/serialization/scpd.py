@@ -1,12 +1,12 @@
 import re
 from xml.etree import ElementTree
 
-from typing import Union, Pattern, Any, Mapping, List
+from typing import Union, Pattern, Dict, List, Tuple
 
 from aioupnp.constants import XML_VERSION
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_PATTERN: Union[Pattern, bytes] = re.compile("(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode())
+CONTENT_PATTERN: Union[Pattern, bytes] = re.compile(r'(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)'.encode())
 
 XML_ROOT_SANITY_PATTERN: Union[Pattern, str] = re.compile(
     r'(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))'
@@ -38,7 +38,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
     \r\n""".encode()
 
 
-def deserialize_scpd_get_response(content: bytes) -> Any[Mapping[bytes, str], Mapping[None]]:
+def deserialize_scpd_get_response(content: bytes) -> Dict:
     """deserialize SCPD GET response.
 
     :param str or bytes content:
@@ -52,13 +52,13 @@ def deserialize_scpd_get_response(content: bytes) -> Any[Mapping[bytes, str], Ma
     return {}
 
 
-def parse_device_dict(xml_dict: Mapping[str, str]) -> Any[Mapping[str, str], Mapping[None]]:
+def parse_device_dict(xml_dict: Union[Tuple[List, Dict], Dict]) -> Dict:
     """Parse device dictionary.
 
     :param dict xml_dict:
     :return dict result:
     """
-    keys: List[str] = [xml_dict.keys()]
+    keys: List[str] = xml_dict.keys()
     for k in keys:
         m = XML_ROOT_SANITY_PATTERN.findall(k)
         if len(m) == 3 and m[1][0] and m[2][5]:

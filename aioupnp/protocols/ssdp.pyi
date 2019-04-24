@@ -1,7 +1,6 @@
 from asyncio import Future, AbstractEventLoop, DatagramTransport
-from collections import OrderedDict
 
-from typing import runtime, Union, Pattern, Set, Tuple, NoReturn, List
+from typing import runtime, Union, Pattern, Set, Tuple, NoReturn, List, Dict
 
 from aioupnp.fault import UPnPError
 from aioupnp.serialization.ssdp import SSDPDatagram
@@ -27,7 +26,7 @@ class SSDPProtocol(MulticastProtocol):
     def send_many_m_searches(self, address: str, packets: List[SSDPDatagram]) -> NoReturn:
         ...
 
-    async def m_search(self, address: str, timeout: Union[float, int], datagrams: List[OrderedDict]) -> SSDPDatagram:
+    async def m_search(self, address: str, timeout: Union[float, int], datagrams: List) -> SSDPDatagram:
         fut: Future = Future()
         packets: List[SSDPDatagram] = []
         ...
@@ -35,11 +34,11 @@ class SSDPProtocol(MulticastProtocol):
 async def listen_ssdp(lan_address: str, gateway_address: str, loop: Union[AbstractEventLoop, None] = None, ignored: Union[Set, None] = None, unicast: bool = False) -> Tuple[DatagramTransport, SSDPProtocol, str, str]:
     ...
 
-async def m_search(lan_address: str, gateway_address: str, datagram_args: OrderedDict, timeout: Union[float, int], loop: Union[AbstractEventLoop, None], ignored: Union[Set, None], unicast: bool = False) -> SSDPDatagram:
+async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict, timeout: Union[float, int], loop: Union[AbstractEventLoop, None], ignored: Union[Set, None], unicast: bool = False) -> SSDPDatagram:
     ...
 
-async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Union[float, int] = 30, loop: Union[AbstractEventLoop, None] = None, ignored: Union[Set, None] = None, unicast: bool = False) -> Union[List[OrderedDict], UPnPError]:
+async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Union[float, int] = 30, loop: Union[AbstractEventLoop, None] = None, ignored: Union[Set, None] = None, unicast: bool = False) -> Union[List[Dict], UPnPError]:
     ...
 
-async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Union[float, int] = 30, loop: Union[AbstractEventLoop, None] = None, ignored: Union[Set, None] = None, unicast: bool = False) -> Union[Tuple[OrderedDict, SSDPDatagram], UPnPError]:
+async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Union[float, int] = 30, loop: Union[AbstractEventLoop, None] = None, ignored: Union[Set, None] = None, unicast: bool = False) -> Union[Tuple[Dict, SSDPDatagram], UPnPError]:
     ...
