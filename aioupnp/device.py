@@ -1,5 +1,5 @@
 import logging
-from typing import List, Any, Optional, Dict
+from typing import List, Union, Dict
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class CaseInsensitive:
             if not k.startswith("_"):
                 setattr(self, k, v)
 
-    def __getattr__(self, item: str) -> Any[str, Optional[AttributeError]]:
+    def __getattr__(self, item: str) -> Union[str, AttributeError]:
         """
 
         :param item:
@@ -27,7 +27,7 @@ class CaseInsensitive:
                 return self.__dict__.get(k)
         raise AttributeError(item)
 
-    def __setattr__(self, item: str, value: str) -> Any[None, Optional[AttributeError]]:
+    def __setattr__(self, item: str, value: str) -> Union[None, AttributeError]:
         """
 
         :param item:
@@ -43,7 +43,7 @@ class CaseInsensitive:
             return
         raise AttributeError(item)
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> Dict:
         """
 
         :return:
@@ -106,4 +106,4 @@ class Device(CaseInsensitive):
                         d = Device(devices, services, **_inner_kw)
                         devices.append(d)
                 else:
-                    log.warning("failed to parse device:\n%s", kw)
+                    log.warning("Failed to parse device:\n%s.", kw)

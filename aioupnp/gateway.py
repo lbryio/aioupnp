@@ -1,6 +1,6 @@
 import logging
 import socket
-from typing import Dict, List, Union, Type, Any, Optional, Set, Awaitable, TYPE_CHECKING, NoReturn
+from typing import Dict, List, Union, Type, Any, Optional, Set, Tuple, TYPE_CHECKING, NoReturn
 import asyncio
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop, TimeoutError
@@ -18,17 +18,18 @@ from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
-return_type_lambas = {
+return_type_lambas: Dict = {
     Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ['none', 'nil'] else None
 }
 
 
-def get_action_list(element_dict: Dict) -> List:  # [(<method>, [<input1>, ...], [<output1, ...]), ...]
+def get_action_list(element_dict: Union[Tuple[List, Dict], List]) -> List:
     """Get Action List.
 
     :param element_dict:
     :return:
     """
+    # [(<method>, [<input1>, ...], [<output1, ...]), ...]
     service_info = flatten_keys(element_dict, "{%s}" % SERVICE)
     if "actionList" in service_info:
         action_list = service_info["actionList"]
@@ -38,16 +39,16 @@ def get_action_list(element_dict: Dict) -> List:  # [(<method>, [<input1>, ...],
         return []
 
     result: list = []
-    if isinstance(action_list["action"], dict):
-        arg_dicts = action_list["action"]['argumentList']['argument']
-        if not isinstance(arg_dicts, list):  # when there is one arg
+    if isinstance(action_list[0]["action"], Dict):
+        arg_dicts = action_list[0]["action"]['argumentList']['argument']
+        if not isinstance(arg_dicts, List):  # when there is one arg
             arg_dicts = [arg_dicts]
         return [[
-            action_list["action"]['name'],
-            [i['name'] for i in arg_dicts if i['direction'] == 'in'],
-            [i['name'] for i in arg_dicts if i['direction'] == 'out']
+            action_list[0]["action"]['name'],
+            [i[0]['name'] for i in arg_dicts if i[0]['direction'] == 'in'],
+            [i[0]['name'] for i in arg_dicts if i[0]['direction'] == 'out']
         ]]
-    for action in action_list["action"]:
+    for action in action_list[0]["action"]:
         if not action.get('argumentList'):
             result.append((action['name'], [], []))
         else:
@@ -65,8 +66,7 @@ def get_action_list(element_dict: Dict) -> List:  # [(<method>, [<input1>, ...],
 class Gateway:
     """Gateway."""
 
-    def __init__(self, ok_packet: SSDPDatagram, m_search_args: OrderedDict, lan_address: str,
-                 gateway_address: str) -> None:
+    def __init__(self, ok_packet: SSDPDatagram, m_search_args: Dict, lan_address: str, gateway_address: str) -> None:
         """Gateway object.
 
         :param ok_packet:
@@ -102,7 +102,7 @@ class Gateway:
 
         self._unsupported_actions: Dict = {}
         self._registered_commands: Dict = {}
-        self.commands  = SOAPCommands()
+        self.commands = SOAPCommands()
 
     def gateway_descriptor(self) -> Dict:
         """Gateway Descriptor.
@@ -150,7 +150,7 @@ class Gateway:
             return {}
         return {device.udn: device for device in self._devices}
 
-    def get_service(self, service_type: str) -> Any[Type[Service], None]:
+    def get_service(self, service_type: str) -> Union[Type[Service], None]:
         for service in self._services:
             if service.serviceType.lower() == service_type.lower():
                 return service
@@ -189,9 +189,9 @@ class Gateway:
 
     @classmethod
     async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                                igd_args: Any[Optional[OrderedDict], None] = None,
-                                loop: Any[Optional[AbstractEventLoop], None] = None,
-                                unicast: bool = False) -> Any[__class__, None]:
+                                igd_args: Union[Dict, None] = None,
+                                loop: Union[AbstractEventLoop, None] = None,
+                                unicast: bool = False) -> Union[__class__, None]:
         ignored: Set = set()
         required_commands = ["AddPortMapping", "DeletePortMapping", "GetExternalIPAddress"]
         while True:
@@ -225,9 +225,9 @@ class Gateway:
 
     @classmethod
     async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: Any[Optional[OrderedDict], None] = None,
-                               loop = Any[Optional[AbstractEventLoop], None],
-                               unicast: Any[Optional[bool], None] = None) -> __class__():
+                               igd_args: Union[Dict, None] = None,
+                               loop = Union[AbstractEventLoop, None],
+                               unicast: Union[bool, None] = None) -> __class__:
         if unicast is not None:
             return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
 
@@ -250,7 +250,7 @@ class Gateway:
 
         return list(done)[0].result()
 
-    async def discover_commands(self, loop: Any[Optional[AbstractEventLoop], None] = None) -> NoReturn:
+    async def discover_commands(self, loop: Union[AbstractEventLoop, None] = None) -> NoReturn:
         response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
         self._xml_response = xml_bytes
         if get_err is not None:
@@ -269,16 +269,16 @@ class Gateway:
         for service_type in self.services.keys():
             await self.register_commands(self.services[service_type], loop)
 
-    async def register_commands(self, service: Service, loop: Any[Optional[AbstractEventLoop], None] = None) -> Any[None, Optional[UPnPError]]:
+    async def register_commands(self, service: Service, loop: Union[AbstractEventLoop, None] = None) -> Union[None, UPnPError]:
         if not service.SCPDURL:
-            raise UPnPError("No scpd url.")
+            raise UPnPError("No SCPD URL.")
 
-        log.debug("get descriptor for %s from %s", service.serviceType, service.SCPDURL)
+        log.debug("Grabbing file descriptor for %s from %s.", service.serviceType, service.SCPDURL)
         service_dict, xml_bytes, get_err = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
         self._service_descriptors[service.SCPDURL] = xml_bytes
 
         if get_err is not None:
-            log.debug("failed to get descriptor for %s from %s", service.serviceType, service.SCPDURL)
+            log.debug("Failed to fetch file descriptor for %s from %s.", service.serviceType, service.SCPDURL)
             if xml_bytes:
                 log.debug("Response: %s.", xml_bytes)
             return
@@ -292,11 +292,11 @@ class Gateway:
                 self.commands.register(self.base_ip, self.port, name, service.controlURL, service.serviceType.encode(),
                                        inputs, outputs, loop)
                 self._registered_commands[name] = service.serviceType
-                log.debug("registered %s::%s", service.serviceType, name)
+                log.debug("Registered %s::%s.", service.serviceType, name)
             except AttributeError:
                 s = self._unsupported_actions.get(service.serviceType, [])
                 s.append(name)
                 self._unsupported_actions[service.serviceType] = s
-                log.debug("available command for %s does not have a wrapper implemented: %s %s %s",
+                log.debug("Available command for %s does not have a wrapper implemented: %s %s %s.",
                           service.serviceType, name, inputs, outputs)
-            log.debug("registered service %s", service.serviceType)
+            log.debug("Registered service %s.", service.serviceType)

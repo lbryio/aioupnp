@@ -22,7 +22,7 @@ def cli(fn: Any) -> Any:
     return fn
 
 
-def _encode(x: Union[bytes, Exception, Any]) -> Any:
+def _encode(x: Union[bytes, Exception, str]) -> str:
     if isinstance(x, bytes):
         return x.decode()
     elif isinstance(x, Exception):
@@ -47,7 +47,7 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                       igd_args: OrderedDict = None, interface_name: str = 'default',
+                       igd_args: Union[Dict, None] = None, interface_name: str = 'default',
                        loop: Union[Optional[AbstractEventLoop], None] = None) -> __class__:
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -61,8 +61,8 @@ class UPnP:
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       igd_args: OrderedDict = None, unicast: bool = True, interface_name: str = 'default',
-                       loop: Union[Optional[AbstractEventLoop], None] = None) -> dict:
+                       igd_args: Union[Dict, None] = None, unicast: bool = True, interface_name: str = 'default',
+                       loop: Union[AbstractEventLoop, None] = None) -> Dict:
         if not lan_address or not gateway_address:
             try:
                 lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -71,14 +71,18 @@ class UPnP:
                 raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
                                                                                                       str(err)))
         if not igd_args:
-            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, loop, unicast=unicast)
+            igd_args, datagram = await fuzzy_m_search(
+                lan_address, gateway_address, timeout, loop, unicast=unicast, ignored=None
+            )
         else:
             igd_args = OrderedDict(igd_args)
-            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, unicast=unicast)
+            datagram = await m_search(
+                lan_address, gateway_address, igd_args, timeout, loop, unicast=unicast, ignored=None
+            )
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
-            'm_search_kwargs': SSDPDatagram("M-SEARCH", igd_args).get_cli_igd_kwargs(),
+            'm_search_kwargs': SSDPDatagram("M-SEARCH", **igd_args).get_cli_igd_kwargs(),
             'discover_reply': datagram.as_dict()
         }
 
@@ -114,7 +118,7 @@ class UPnP:
             return None
 
     @cli
-    async def get_redirects(self) -> List[dict]:
+    async def get_redirects(self) -> List[Dict]:
         redirects = []
         cnt = 0
         redirect = await self.get_port_mapping_by_index(cnt)
@@ -125,7 +129,7 @@ class UPnP:
         return redirects
 
     @cli
-    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> dict:
+    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Dict:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -185,7 +189,7 @@ class UPnP:
         return port
 
     @cli
-    async def debug_gateway(self) -> str:
+    async def debug_gateway(self) -> bytes:
         return json.dumps({
             "gateway": self.gateway.debug_gateway(),
             "client_address": self.lan_address,
@@ -286,7 +290,7 @@ class UPnP:
         return await self.gateway.commands.RequestConnection()
 
     @cli
-    async def get_common_link_properties(self) -> dict:
+    async def get_common_link_properties(self) -> Dict:
         """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
         return await self.gateway.commands.GetCommonLinkProperties()
 
@@ -343,8 +347,9 @@ class UPnP:
         return await self.gateway.commands.GetActiveConnections()
 
     @classmethod
-    def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                interface_name: str = 'default', unicast: bool = True, kwargs: dict = None, loop=None) -> None:
+    def run_cli(cls, method: str, igd_args: Dict, lan_address: str = '', gateway_address: str = '',
+                timeout: int = 30, interface_name: str = 'default', unicast: bool = True,
+                loop: Union[AbstractEventLoop, None] = None, **kwargs) -> None:
         """
         :param method: the command name
         :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided

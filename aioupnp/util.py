@@ -6,8 +6,8 @@ from xml.etree import ElementTree
 import netifaces
 
 
-BASE_ADDRESS_REGEX: Union[Pattern, str] = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
-BASE_PORT_REGEX: Union[Pattern, str] = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
+BASE_ADDRESS_REGEX: Union[Pattern, bytes] = re.compile(r'^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$'.encode())
+BASE_PORT_REGEX: Union[Pattern, bytes] = re.compile(r'^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$'.encode())
 
 
 def etree_to_dict(t: ElementTree.Element) -> Dict:
@@ -47,7 +47,7 @@ def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> Union[Dict, T
     return t
 
 
-def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError, str]:
+def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError, Dict]:
     match = list(filter(lambda x: x.lower() == k.lower(), d.keys()))
     if not match:
         return
@@ -80,7 +80,7 @@ def get_interfaces() -> Dict:
             address = addresses[netifaces.AF_INET][0]['addr']
             gateway_guess = ".".join(address.split(".")[:-1] + ["1"])
             r[interface_name] = (gateway_guess, address)
-    r['default'] = r[netifaces.gateways()['default'][netifaces.AF_INET][1]]
+    r['default'] = r[netifaces.gateways()[0]['default'][netifaces.AF_INET][1]]
     return r
 
 
