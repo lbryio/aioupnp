@@ -3,19 +3,21 @@ from xml.etree import ElementTree
 
 import typing
 
-from aioupnp.constants import XML_VERSION  # Unused import statements
+from aioupnp.constants import XML_VERSION
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_PATTERN: typing.Pattern[str] = re.compile("(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode())
-
-XML_ROOT_SANITY_PATTERN: typing.Pattern[str] = re.compile(
-    "(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))"
+CONTENT_PATTERN: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(
+    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode()
 )
 
-XML_OTHER_KEYS: typing.Pattern[str] = re.compile("{[\w|\:\/\.]*}|(\w*)")
+XML_ROOT_SANITY_PATTERN: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(
+    r'(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))'
+)
+
+XML_OTHER_KEYS: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
 
 
-def serialize_scpd_get(path: str, address: str) -> bytes:
+def serialize_scpd_get(path: typing.AnyStr, address: typing.AnyStr) -> typing.Any[typing.ByteString]:
     if "http://" in address:
         host = address.split("http://")[1]
     else:
@@ -32,7 +34,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
     \r\n""".encode()
 
 
-def deserialize_scpd_get_response(content: typing.AnyStr[bytes]) -> typing.Dict:
+def deserialize_scpd_get_response(content: typing.AnyStr) -> typing.Any[typing.Dict[typing.AnyStr], typing.Dict[None]]:
     if XML_VERSION.encode() in content:
         parsed = CONTENT_PATTERN.findall(content)
         content = b'' if not parsed else parsed[0][0]
@@ -41,7 +43,7 @@ def deserialize_scpd_get_response(content: typing.AnyStr[bytes]) -> typing.Dict:
     return {}
 
 
-def parse_device_dict(xml_dict: typing.Dict) -> typing.Dict:
+def parse_device_dict(xml_dict: typing.Dict[typing.AnyStr]) -> typing.Any[typing.Dict[typing.AnyStr], typing.Dict[None]]:
     keys: typing.List = [xml_dict.keys()]
     for k in keys:
         m = XML_ROOT_SANITY_PATTERN.findall(k)

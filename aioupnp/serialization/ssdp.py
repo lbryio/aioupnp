@@ -2,18 +2,18 @@ import re
 import logging
 import binascii
 import json
+from typing import Dict, NamedTuple, Pattern, Any, AnyStr, List, Union
 from collections import OrderedDict
-from typing import List
 from aioupnp.fault import UPnPError
 from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
-_template = "(?i)^(%s):[ ]*(.*)$"
+_template: Union[Pattern, str] = r'(?i)^(%s):[ ]*(.*)$'
 
 
-ssdp_datagram_patterns = {
-    'host': (re.compile("(?i)^(host):(.*)$"), str),
+ssdp_datagram_patterns: Dict[NamedTuple[Union[Pattern, str], Any[str, int]]] = {
+    'host': (re.compile(r'(?i)^(host):(.*)$'), str),
     'st': (re.compile(_template % 'st'), str),
     'man': (re.compile(_template % 'man'), str),
     'mx': (re.compile(_template % 'mx'), int),
@@ -25,13 +25,13 @@ ssdp_datagram_patterns = {
     'server': (re.compile(_template % 'server'), str),
 }
 
-vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
+vendor_pattern: Union[Pattern, str] = re.compile(r'^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$')
 
 
 class SSDPDatagram(object):
-    _M_SEARCH = "M-SEARCH"
-    _NOTIFY = "NOTIFY"
-    _OK = "OK"
+    _M_SEARCH: str = "M-SEARCH"
+    _NOTIFY: str = "NOTIFY"
+    _OK: str = "OK"
 
     _start_lines = {
         _M_SEARCH: "M-SEARCH * HTTP/1.1",
@@ -75,7 +75,7 @@ class SSDPDatagram(object):
         ]
     }
 
-    def __init__(self, packet_type, kwargs: OrderedDict = None) -> None:
+    def __init__(self, packet_type: AnyStr, kwargs: OrderedDict = None) -> None:
         if packet_type not in [self._M_SEARCH, self._NOTIFY, self._OK]:
             raise UPnPError("unknown packet type: {}".format(packet_type))
         self._packet_type = packet_type
@@ -104,26 +104,26 @@ class SSDPDatagram(object):
             if getattr(self, k) is None:
                 raise UPnPError("missing required field %s" % k)
 
-    def get_cli_igd_kwargs(self) -> str:
+    def get_cli_igd_kwargs(self) -> AnyStr:
         fields = []
         for field in self._field_order:
             v = getattr(self, field)
             fields.append("--%s=%s" % (self._case_mappings.get(field, field), v))
         return " ".join(fields)
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> AnyStr:
         return self.as_json()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Any[AnyStr, KeyError]:
         for i in self._required_fields[self._packet_type]:
             if i.lower() == item.lower():
                 return getattr(self, i)
         raise KeyError(item)
 
-    def get_friendly_name(self) -> str:
+    def get_friendly_name(self) -> AnyStr:
         return self._friendly_names[self._packet_type]
 
-    def encode(self, trailing_newlines: int = 2) -> str:
+    def encode(self, trailing_newlines: Any[int] = 2) -> AnyStr:
         lines = [self._start_lines[self._packet_type]]
         for attr_name in self._field_order:
             if attr_name not in self._required_fields[self._packet_type]:
@@ -144,11 +144,11 @@ class SSDPDatagram(object):
     def as_dict(self) -> OrderedDict:
         return self._lines_to_content_dict(self.encode().split(line_separator))
 
-    def as_json(self) -> str:
+    def as_json(self) -> AnyStr:
         return json.dumps(self.as_dict(), indent=2)
 
     @classmethod
-    def decode(cls, datagram: bytes):
+    def decode(cls, datagram: AnyStr) -> Any[AnyStr, UPnPError]:
         packet = cls._from_string(datagram.decode())
         if packet is None:
             raise UPnPError(
@@ -158,12 +158,14 @@ class SSDPDatagram(object):
             attr = getattr(packet, attr_name)
             if attr is None:
                 raise UPnPError(
-                    "required field for {} is missing from m-search response: {}".format(packet._packet_type, attr_name)
+                    "required field for {} is missing from m-search response: {}".format(
+                        packet._packet_type, attr_name
+                    )
                 )
         return packet
 
     @classmethod
-    def _lines_to_content_dict(cls, lines: list) -> OrderedDict:
+    def _lines_to_content_dict(cls, lines: List) -> Any[OrderedDict]:
         result: OrderedDict = OrderedDict()
         for line in lines:
             if not line:
@@ -187,7 +189,7 @@ class SSDPDatagram(object):
         return result
 
     @classmethod
-    def _from_string(cls, datagram: str):
+    def _from_string(cls, datagram: AnyStr) -> Any:
         lines = [l for l in datagram.split(line_separator) if l]
         if not lines:
             return
@@ -199,13 +201,13 @@ class SSDPDatagram(object):
             return cls._from_response(lines[1:])
 
     @classmethod
-    def _from_response(cls, lines: List):
+    def _from_response(cls, lines: List) -> Any:
         return cls(cls._OK, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_notify(cls, lines: List):
+    def _from_notify(cls, lines: List) -> Any:
         return cls(cls._NOTIFY, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_request(cls, lines: List):
+    def _from_request(cls, lines: List) -> Any:
         return cls(cls._M_SEARCH, cls._lines_to_content_dict(lines))

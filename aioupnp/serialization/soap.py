@@ -7,7 +7,7 @@ from aioupnp.constants import XML_VERSION, ENVELOPE, BODY
 from aioupnp.fault import handle_fault, UPnPError
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_NO_XML_VERSION_PATTERN: typing.Pattern[typing.AnyStr[bytes]] = re.compile(
+CONTENT_NO_XML_VERSION_PATTERN: typing.Union[typing.Pattern, bytes] = re.compile(
     "(\<s\:Envelope xmlns\:s=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)".encode()
 )
 
@@ -63,7 +63,7 @@ def deserialize_soap_post_response(response: bytes, method: str, service_id: str
     :param bytes response:
     :param str method:
     :param str service_id:
-    :return dict response or UPnPError: 
+    :return dict response or UPnPError:
     """
     parsed = CONTENT_NO_XML_VERSION_PATTERN.findall(response)
     content = b'' if not parsed else parsed[0][0]
