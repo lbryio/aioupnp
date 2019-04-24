@@ -1,16 +1,29 @@
 import re
 from xml.etree import ElementTree
-from aioupnp.util import etree_to_dict, flatten_keys
-from aioupnp.fault import handle_fault, UPnPError
-from aioupnp.constants import XML_VERSION, ENVELOPE, BODY
 
-CONTENT_NO_XML_VERSION_PATTERN = re.compile(
+import typing
+
+from aioupnp.constants import XML_VERSION, ENVELOPE, BODY
+from aioupnp.fault import handle_fault, UPnPError
+from aioupnp.util import etree_to_dict, flatten_keys
+
+CONTENT_NO_XML_VERSION_PATTERN: typing.Pattern[typing.AnyStr[bytes]] = re.compile(
     "(\<s\:Envelope xmlns\:s=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)".encode()
 )
 
 
-def serialize_soap_post(method: str, param_names: list, service_id: bytes, gateway_address: bytes,
-                        control_url: bytes, **kwargs) -> bytes:
+def serialize_soap_post(method: str, param_names: list, service_id: typing.AnyStr[bytes],
+                        gateway_address: typing.AnyStr[bytes], control_url: typing.AnyStr[bytes], **kwargs
+                        ) -> typing.AnyStr[bytes]:
+    """serialize SOAP post data
+    :param str method:
+    :param list param_names:
+    :param str or bytes service_id:
+    :param str or bytes gateway_address:
+    :param str or bytes control_url:
+    :param kwargs:
+    :return str or bytes:
+    """
     args = "".join("<%s>%s</%s>" % (n, kwargs.get(n), n) for n in param_names)
     soap_body = ('\r\n%s\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
                  's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
@@ -45,7 +58,13 @@ def serialize_soap_post(method: str, param_names: list, service_id: bytes, gatew
     ).encode()
 
 
-def deserialize_soap_post_response(response: bytes, method: str, service_id: str) -> dict:
+def deserialize_soap_post_response(response: bytes, method: str, service_id: str) -> typing.Any[typing.Dict, UPnPError]:
+    """Deserialize SOAP post response
+    :param bytes response:
+    :param str method:
+    :param str service_id:
+    :return dict response or UPnPError: 
+    """
     parsed = CONTENT_NO_XML_VERSION_PATTERN.findall(response)
     content = b'' if not parsed else parsed[0][0]
     content_dict = etree_to_dict(ElementTree.fromstring(content.decode()))
