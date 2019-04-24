@@ -1,7 +1,7 @@
 from asyncio import DatagramTransport, DatagramProtocol
 from socket import SocketType
 
-from typing import runtime, Any, NoReturn
+from typing import runtime, Union, NoReturn
 
 
 @runtime
@@ -9,7 +9,7 @@ class MulticastProtocol(DatagramProtocol):
     def __init__(self, multicast_address: str, bind_address: str) -> None:
         self.multicast_address: str = multicast_address
         self.bind_address: str = bind_address
-        self.transport: Any[DatagramTransport, None] = None
+        self.transport: Union[DatagramTransport, None] = None
 
     def sock(self) -> SocketType:
         ...

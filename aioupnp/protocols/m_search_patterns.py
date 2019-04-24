@@ -46,11 +46,11 @@ ST
 
 from collections import OrderedDict
 
-from typing import List, Any, Collection
+from typing import List, Union
 
 from aioupnp.constants import SSDP_DISCOVER, SSDP_HOST
 
-SEARCH_TARGETS: Collection = [
+SEARCH_TARGETS: List[str] = [
     'upnp:rootdevice',
     'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-wifialliance-org:device:WFADevice:1',
@@ -61,7 +61,7 @@ SEARCH_TARGETS: Collection = [
 ]
 
 
-def format_packet_args(order: List, **kwargs) -> OrderedDict:
+def format_packet_args(order: List, **kwargs: Union[str, str, int, str]) -> OrderedDict:
     """Format packet arguments.
 
     :param list order:
@@ -77,7 +77,7 @@ def format_packet_args(order: List, **kwargs) -> OrderedDict:
     return OrderedDict(args)
 
 
-def packet_generator() -> Any[OrderedDict]:
+def packet_generator() -> OrderedDict:
     """Generate Packets.
 
     :return dict:

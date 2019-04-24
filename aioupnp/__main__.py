@@ -3,7 +3,7 @@ import sys
 import textwrap
 from collections import OrderedDict
 from aioupnp.upnp import UPnP
-from typing import Any, Optional
+from typing import Union
 from asyncio import AbstractEventLoop
 
 log = logging.getLogger("aioupnp")
@@ -26,7 +26,7 @@ def get_help(command: str) -> str:
     )
 
 
-def main(argv: str = None, loop: Any[Optional[AbstractEventLoop], None] = None) -> None:
+def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
     argv = argv or sys.argv
     commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
     help_str = "\n".join(textwrap.wrap(
@@ -73,7 +73,7 @@ def main(argv: str = None, loop: Any[Optional[AbstractEventLoop], None] = None) 
             command = arg
             break
     if not command:
-        print("no command given")
+        print("No command given.")
         sys.exit(print(usage))
     kwargs = {}
     for arg in args[len(options)+1:]:

@@ -270,7 +270,7 @@ class SOAPCommands:
         """Returns (NewTotalBytesReceived)"""
         raise NotImplementedError()
 
-    GetTotalBytesRecieved = get_total_bytes_received
+    GetTotalBytesReceived = get_total_bytes_received
 
     @staticmethod
     async def get_total_packets_sent() -> Any:

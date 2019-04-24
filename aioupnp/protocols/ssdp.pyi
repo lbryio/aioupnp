@@ -37,7 +37,7 @@ class SSDPProtocol(MulticastProtocol):
 async def listen_ssdp(lan_address: str, gateway_address: str, loop: Any[AbstractEventLoop, None] = None, ignored: Any[Optional[Set[str]], None] = None, unicast: bool = False) -> Tuple[DatagramTransport, SSDPProtocol, str, str]:
     ...
 
-async def m_search(lan_address: str, gateway_address: str, datagram_args: OrderedDict[bytes], timeout: Any[float, int], loop: Any[Optional[AbstractEventLoop], None], ignored: Set[str], unicast: bool = False) -> SSDPDatagram:
+async def m_search(lan_address: str, gateway_address: str, datagram_args: OrderedDict, timeout: Union[float, int], loop: Union[AbstractEventLoop, None], ignored: Set, unicast: bool = False) -> SSDPDatagram:
     ...
 
 async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Any[float, int] = 30, loop: Any[Optional[AbstractEventLoop], None] = None, ignored: Any[Optional[Set[bytes]], None] = None, unicast: bool = False) -> List[OrderedDict]:

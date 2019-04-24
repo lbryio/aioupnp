@@ -2,10 +2,11 @@ import os
 import logging
 import json
 import asyncio
+from asyncio import AbstractEventLoop
 import zlib
 import base64
 from collections import OrderedDict
-from typing import Tuple, Dict, List, Union
+from typing import Tuple, Dict, List, Union, Optional, Any
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
@@ -16,12 +17,12 @@ from aioupnp.serialization.ssdp import SSDPDatagram
 log = logging.getLogger(__name__)
 
 
-def cli(fn):
+def cli(fn: Any) -> Any:
     fn._cli = True
     return fn
 
 
-def _encode(x):
+def _encode(x: Union[bytes, Exception, Any]) -> Any:
     if isinstance(x, bytes):
         return x.decode()
     elif isinstance(x, Exception):
@@ -46,11 +47,12 @@ class UPnP:
 
     @classmethod
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                       igd_args: OrderedDict = None, interface_name: str = 'default', loop=None):
+                       igd_args: OrderedDict = None, interface_name: str = 'default',
+                       loop: Union[Optional[AbstractEventLoop], None] = None) -> __class__:
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
-            raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
+            raise UPnPError("Failed to get LAN and Gateway addresses: %s." % str(err))
         gateway = await Gateway.discover_gateway(
             lan_address, gateway_address, timeout, igd_args, loop
         )
@@ -60,7 +62,7 @@ class UPnP:
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
                        igd_args: OrderedDict = None, unicast: bool = True, interface_name: str = 'default',
-                       loop=None) -> Dict:
+                       loop: Union[Optional[AbstractEventLoop], None] = None) -> dict:
         if not lan_address or not gateway_address:
             try:
                 lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -94,7 +96,7 @@ class UPnP:
         )
 
     @cli
-    async def get_port_mapping_by_index(self, index: int) -> Dict:
+    async def get_port_mapping_by_index(self, index: int) -> dict:
         result = await self._get_port_mapping_by_index(index)
         if result:
             if isinstance(self.gateway.commands.GetGenericPortMappingEntry, SOAPCommand):
@@ -112,7 +114,7 @@ class UPnP:
             return None
 
     @cli
-    async def get_redirects(self) -> List[Dict]:
+    async def get_redirects(self) -> List[dict]:
         redirects = []
         cnt = 0
         redirect = await self.get_port_mapping_by_index(cnt)
@@ -123,7 +125,7 @@ class UPnP:
         return redirects
 
     @cli
-    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Dict:
+    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> dict:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -152,7 +154,8 @@ class UPnP:
         )
 
     @cli
-    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
+    async def get_next_mapping(self, port: int, protocol: str, description: str,
+                               internal_port: Union[int, None] = None) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         internal_port = int(internal_port or port)
@@ -198,7 +201,7 @@ class UPnP:
         )).decode()
 
     @cli
-    async def generate_test_data(self):
+    async def generate_test_data(self) -> str:
         print("found gateway via M-SEARCH")
         try:
             external_ip = await self.get_external_ip()
@@ -258,9 +261,9 @@ class UPnP:
         return await self.gateway.commands.GetNATRSIPStatus()
 
     @cli
-    async def set_connection_type(self, NewConnectionType: str) -> None:
+    async def set_connection_type(self, new_connection_type: str) -> None:
         """Returns None"""
-        return await self.gateway.commands.SetConnectionType(NewConnectionType)
+        return await self.gateway.commands.SetConnectionType(new_connection_type)
 
     @cli
     async def get_connection_type_info(self) -> Tuple[str, str]:
@@ -283,27 +286,27 @@ class UPnP:
         return await self.gateway.commands.RequestConnection()
 
     @cli
-    async def get_common_link_properties(self):
+    async def get_common_link_properties(self) -> dict:
         """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
         return await self.gateway.commands.GetCommonLinkProperties()
 
     @cli
-    async def get_total_bytes_sent(self):
+    async def get_total_bytes_sent(self) -> int:
         """Returns (NewTotalBytesSent)"""
         return await self.gateway.commands.GetTotalBytesSent()
 
     @cli
-    async def get_total_bytes_received(self):
+    async def get_total_bytes_received(self) -> int:
         """Returns (NewTotalBytesReceived)"""
         return await self.gateway.commands.GetTotalBytesReceived()
 
     @cli
-    async def get_total_packets_sent(self):
+    async def get_total_packets_sent(self) -> int:
         """Returns (NewTotalPacketsSent)"""
         return await self.gateway.commands.GetTotalPacketsSent()
 
     @cli
-    async def get_total_packets_received(self):
+    async def get_total_packets_received(self) -> int:
         """Returns (NewTotalPacketsReceived)"""
         return await self.gateway.commands.GetTotalPacketsReceived()
 
@@ -313,26 +316,26 @@ class UPnP:
         return await self.gateway.commands.X_GetICSStatistics()
 
     @cli
-    async def get_default_connection_service(self):
+    async def get_default_connection_service(self) -> str:
         """Returns (NewDefaultConnectionService)"""
         return await self.gateway.commands.GetDefaultConnectionService()
 
     @cli
-    async def set_default_connection_service(self, NewDefaultConnectionService: str) -> None:
+    async def set_default_connection_service(self, new_default_connection_service: str) -> None:
         """Returns (None)"""
-        return await self.gateway.commands.SetDefaultConnectionService(NewDefaultConnectionService)
+        return await self.gateway.commands.SetDefaultConnectionService(new_default_connection_service)
 
     @cli
-    async def set_enabled_for_internet(self, NewEnabledForInternet: bool) -> None:
-        return await self.gateway.commands.SetEnabledForInternet(NewEnabledForInternet)
+    async def set_enabled_for_internet(self, new_enabled_for_internet: bool) -> None:
+        return await self.gateway.commands.SetEnabledForInternet(new_enabled_for_internet)
 
     @cli
     async def get_enabled_for_internet(self) -> bool:
         return await self.gateway.commands.GetEnabledForInternet()
 
     @cli
-    async def get_maximum_active_connections(self, NewActiveConnectionIndex: int):
-        return await self.gateway.commands.GetMaximumActiveConnections(NewActiveConnectionIndex)
+    async def get_maximum_active_connections(self, new_active_connection_index: int) -> int:
+        return await self.gateway.commands.GetMaximumActiveConnections(new_active_connection_index)
 
     @cli
     async def get_active_connections(self) -> Tuple[str, str]:
@@ -349,6 +352,7 @@ class UPnP:
         :param gateway_address: the ip address of the gateway
         :param timeout: timeout, in seconds
         :param interface_name: name of the network interface, the default is aliased to 'default'
+        :param unicast: Unicast
         :param kwargs: keyword arguments for the command
         :param loop: EventLoop, used for testing
         """

@@ -1,13 +1,13 @@
 import re
 import socket
 from collections import defaultdict
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Pattern, Union, List
 from xml.etree import ElementTree
 import netifaces
 
 
-BASE_ADDRESS_REGEX = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
-BASE_PORT_REGEX = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
+BASE_ADDRESS_REGEX: Union[Pattern, str] = re.compile("^(http:\/\/\d*\.\d*\.\d*\.\d*:\d*)\/.*$".encode())
+BASE_PORT_REGEX: Union[Pattern, str] = re.compile("^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$".encode())
 
 
 def etree_to_dict(t: ElementTree.Element) -> Dict:
@@ -33,7 +33,7 @@ def etree_to_dict(t: ElementTree.Element) -> Dict:
     return d
 
 
-def flatten_keys(d, strip):
+def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> Union[Dict, Tuple[List, Dict], List[Dict]]:
     if not isinstance(d, (list, dict)):
         return d
     if isinstance(d, list):
@@ -47,12 +47,12 @@ def flatten_keys(d, strip):
     return t
 
 
-def get_dict_val_case_insensitive(d, k):
+def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError, str]:
     match = list(filter(lambda x: x.lower() == k.lower(), d.keys()))
     if not match:
         return
     if len(match) > 1:
-        raise KeyError("overlapping keys")
+        raise KeyError("Overlapping Keys.")
     return d[match[0]]
 
 # import struct
@@ -67,7 +67,7 @@ def get_dict_val_case_insensitive(d, k):
 #     )[20:24])
 
 
-def get_interfaces():
+def get_interfaces() -> Dict:
     r = {
         interface_name: (router_address, netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]['addr'])
         for router_address, interface_name, _ in netifaces.gateways()[socket.AF_INET]
