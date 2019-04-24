@@ -1,12 +1,13 @@
-import re
-import binascii
 import asyncio
+import binascii
 import logging
-from aioupnp.fault import UPnPError
-from aioupnp.serialization.ssdp import SSDPDatagram
+import re
+
 from aioupnp.constants import SSDP_IP_ADDRESS, SSDP_PORT
-from aioupnp.protocols.multicast import MulticastProtocol
+from aioupnp.fault import UPnPError
 from aioupnp.protocols.m_search_patterns import packet_generator
+from aioupnp.protocols.multicast import MulticastProtocol
+from aioupnp.serialization.ssdp import SSDPDatagram
 
 ADDRESS_REGEX = re.compile("^http:\/\/(\d+\.\d+\.\d+\.\d+)\:(\d*)(\/[\w|\/|\:|\-|\.]*)$")  # TODO: refactor
 
@@ -51,11 +52,10 @@ class SSDPProtocol(MulticastProtocol):
     def send_many_m_searches(self, address, packets):
         dest = address if self._unicast else SSDP_IP_ADDRESS
         for packet in packets:
-            log.debug("send m search to %s: %s", dest, packet.st)
+            log.debug("Send m search to %s: %s.", dest, packet.st)
             self.transport.sendto(packet.encode().encode(), (dest, SSDP_PORT))
 
-    async def m_search(self, address, timeout, datagrams):
-        # FIXME: parameter timeout is not used.
+    async def m_search(self, address, datagrams):
         fut = asyncio.Future()
         packets = []
         for datagram in datagrams:
@@ -71,9 +71,9 @@ class SSDPProtocol(MulticastProtocol):
             return
         try:
             packet = SSDPDatagram.decode(data)
-            log.debug("decoded packet from %s:%i: %s", addr[0], addr[1], packet)
+            log.debug("Decoded packet from %s:%i: %s.", addr[0], addr[1], packet)
         except UPnPError as err:
-            log.error("failed to decode SSDP packet from %s:%i (%s): %s", addr[0], addr[1], err,
+            log.error("Failed to decode SSDP packet from %s:%i (%s): %s.", addr[0], addr[1], err,
                       binascii.hexlify(data))
             return
 
@@ -130,7 +130,7 @@ async def m_search(lan_address, gateway_address, datagram_args, timeout=1, loop=
             protocol.m_search(address=gateway_address, timeout=timeout, datagrams=[datagram_args]), timeout
         )
     except (asyncio.TimeoutError, asyncio.CancelledError):
-        raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
+        raise UPnPError("M-SEARCH for {}:{} timed out.".format(gateway_address, SSDP_PORT))
     finally:
         protocol.disconnect()
 
@@ -145,7 +145,7 @@ async def _fuzzy_m_search(lan_address, gateway_address, timeout=30, loop=None, i
     while packet_args:
         args = packet_args[:batch_size]
         packet_args = packet_args[batch_size:]
-        log.debug("sending batch of %i M-SEARCH attempts", batch_size)
+        log.debug("Sending batch of %i M-SEARCH attempts.", batch_size)
         try:
             await asyncio.wait_for(protocol.m_search(gateway_address, batch_timeout, args), batch_timeout)
             protocol.disconnect()
@@ -153,7 +153,7 @@ async def _fuzzy_m_search(lan_address, gateway_address, timeout=30, loop=None, i
         except asyncio.TimeoutError:
             continue
     protocol.disconnect()
-    raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
+    raise UPnPError("M-SEARCH for {}:{} timed out.".format(gateway_address, SSDP_PORT))
 
 
 async def fuzzy_m_search(lan_address, gateway_address, timeout=30, loop=None, ignored=None, unicast=False):
@@ -166,4 +166,4 @@ async def fuzzy_m_search(lan_address, gateway_address, timeout=30, loop=None, ig
             return args, packet
         except UPnPError:
             continue
-    raise UPnPError("failed to discover gateway")
+    raise UPnPError("Failed to discover gateway.")

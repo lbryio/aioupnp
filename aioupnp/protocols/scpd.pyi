@@ -1,8 +1,9 @@
-from asyncio import DatagramProtocol, Future, transports, protocols, DatagramTransport, AbstractEventLoop
+from asyncio import DatagramProtocol, Future, AbstractEventLoop
 from collections import OrderedDict
 
-from typing import Pattern, AnyStr, Any, Mapping, Union, List, Tuple, runtime, Optional, NoReturn, \
-                   SupportsBytes, Sized, SupportsInt, Generic, Awaitable, IO, BinaryIO, Text
+from typing import Pattern, Union, List, Tuple, runtime
+
+from aioupnp.fault import UPnPError
 
 HTTPD_CODE_REGEX: Union[Pattern, bytes]
 
@@ -26,16 +27,10 @@ class SCPDHTTPClientProtocol(DatagramProtocol):
         self._headers: OrderedDict = {}
         self._body: bytes = b''
 
-    def connection_made(self, transport: transports.DatagramTransport = DatagramTransport) -> NoReturn:
-        ...
 
-    def data_received(self, data: Union[bytes, Text]) -> NoReturn:
-        ...
-
-
-async def scpd_get(control_url: str, address: str, port: int, loop: Union[AbstractEventLoop, None] = None) -> Tuple[OrderedDict, str, Optional[Exception]]:
+async def scpd_get(control_url: str, address: str, port: int, loop: Union[AbstractEventLoop, None] = None) -> Union[Tuple[OrderedDict, str], UPnPError]:
     ...
 
 
-async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: List, service_id: bytes, loop: Union[AbstractEventLoop, None] = None, **kwargs: OrderedDict) -> Tuple[OrderedDict, str, Optional[Exception]]:
+async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: List, service_id: bytes, loop: Union[AbstractEventLoop, None] = None, **kwargs: OrderedDict) -> Union[Tuple[OrderedDict, str], UPnPError]:
     ...

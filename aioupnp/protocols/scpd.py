@@ -1,15 +1,15 @@
+import asyncio
 import logging
 import re
+from asyncio.protocols import Protocol
 from collections import OrderedDict
 from xml.etree import ElementTree
-import asyncio
-from asyncio.protocols import Protocol
+
 from aioupnp.fault import UPnPError
-from aioupnp.util import get_dict_val_case_insensitive
 from aioupnp.serialization.scpd import deserialize_scpd_get_response
 from aioupnp.serialization.scpd import serialize_scpd_get
 from aioupnp.serialization.soap import serialize_soap_post, deserialize_soap_post_response
-
+from aioupnp.util import get_dict_val_case_insensitive
 
 log = logging.getLogger(__name__)
 
