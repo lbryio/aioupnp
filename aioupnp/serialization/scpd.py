@@ -1,23 +1,21 @@
 import re
 from xml.etree import ElementTree
 
-import typing
+from typing import Union, Pattern, AnyStr, Any, Dict, List
 
 from aioupnp.constants import XML_VERSION
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_PATTERN: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(
-    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode()
-)
+CONTENT_PATTERN: Union[Pattern, AnyStr] = re.compile("(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode())
 
-XML_ROOT_SANITY_PATTERN: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(
+XML_ROOT_SANITY_PATTERN: Union[Pattern, AnyStr] = re.compile(
     r'(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))'
 )
 
-XML_OTHER_KEYS: typing.Union[typing.Pattern, typing.AnyStr] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
+XML_OTHER_KEYS: Union[Pattern, AnyStr] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
 
 
-def serialize_scpd_get(path: typing.AnyStr, address: typing.AnyStr) -> typing.Any[typing.ByteString]:
+def serialize_scpd_get(path: AnyStr, address: AnyStr) -> Any[AnyStr]:
     if "http://" in address:
         host = address.split("http://")[1]
     else:
@@ -34,7 +32,7 @@ def serialize_scpd_get(path: typing.AnyStr, address: typing.AnyStr) -> typing.An
     \r\n""".encode()
 
 
-def deserialize_scpd_get_response(content: typing.AnyStr) -> typing.Any[typing.Dict[typing.AnyStr], typing.Dict[None]]:
+def deserialize_scpd_get_response(content: AnyStr) -> Any[Dict[AnyStr], Dict[None]]:
     if XML_VERSION.encode() in content:
         parsed = CONTENT_PATTERN.findall(content)
         content = b'' if not parsed else parsed[0][0]
@@ -43,8 +41,8 @@ def deserialize_scpd_get_response(content: typing.AnyStr) -> typing.Any[typing.D
     return {}
 
 
-def parse_device_dict(xml_dict: typing.Dict[typing.AnyStr]) -> typing.Any[typing.Dict[typing.AnyStr], typing.Dict[None]]:
-    keys: typing.List = [xml_dict.keys()]
+def parse_device_dict(xml_dict: Dict[AnyStr]) -> Any[Dict[AnyStr], Dict[None]]:
+    keys: List[AnyStr] = [xml_dict.keys()]
     for k in keys:
         m = XML_ROOT_SANITY_PATTERN.findall(k)
         if len(m) == 3 and m[1][0] and m[2][5]:
@@ -52,7 +50,7 @@ def parse_device_dict(xml_dict: typing.Dict[typing.AnyStr]) -> typing.Any[typing
             root = m[2][5]
             xml_dict = flatten_keys(xml_dict, "{%s}" % schema_key)[root]
             break
-    result: typing.Dict = {}
+    result = {}
     for k, v in xml_dict.items():
         if isinstance(xml_dict[k], dict):
             inner_d = {}

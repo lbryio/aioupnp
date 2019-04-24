@@ -1,20 +1,20 @@
 import re
 from xml.etree import ElementTree
 
-import typing
+from typing import Union, Pattern, AnyStr, Any, List, Dict
 
 from aioupnp.constants import XML_VERSION, ENVELOPE, BODY
 from aioupnp.fault import handle_fault, UPnPError
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_NO_XML_VERSION_PATTERN: typing.Union[typing.Pattern, bytes] = re.compile(
+CONTENT_NO_XML_VERSION_PATTERN: Union[Pattern, AnyStr] = re.compile(
     "(\<s\:Envelope xmlns\:s=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)".encode()
 )
 
 
-def serialize_soap_post(method: str, param_names: list, service_id: typing.AnyStr[bytes],
-                        gateway_address: typing.AnyStr[bytes], control_url: typing.AnyStr[bytes], **kwargs
-                        ) -> typing.AnyStr[bytes]:
+def serialize_soap_post(method: AnyStr, param_names: List[AnyStr],
+                        service_id: AnyStr, gateway_address: AnyStr,
+                        control_url: AnyStr, **kwargs) -> AnyStr:
     """serialize SOAP post data
     :param str method:
     :param list param_names:
@@ -58,7 +58,8 @@ def serialize_soap_post(method: str, param_names: list, service_id: typing.AnySt
     ).encode()
 
 
-def deserialize_soap_post_response(response: bytes, method: str, service_id: str) -> typing.Any[typing.Dict, UPnPError]:
+def deserialize_soap_post_response(response: AnyStr, method: AnyStr,
+                                   service_id: AnyStr) -> Any[Dict[AnyStr], UPnPError]:
     """Deserialize SOAP post response
     :param bytes response:
     :param str method:

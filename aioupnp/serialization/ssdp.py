@@ -1,11 +1,13 @@
-import re
-import logging
 import binascii
 import json
-from typing import Dict, NamedTuple, Pattern, Any, AnyStr, List, Union
+import logging
+import re
 from collections import OrderedDict
-from aioupnp.fault import UPnPError
+
+from typing import Dict, NamedTuple, Pattern, Any, AnyStr, List, Union
+
 from aioupnp.constants import line_separator
+from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
