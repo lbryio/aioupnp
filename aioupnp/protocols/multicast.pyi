@@ -1,32 +1,31 @@
-import typing
-import socket
-import asyncio
+from asyncio import DatagramTransport, DatagramProtocol
+from socket import SocketType
 
-@typing.runtime
-class MulticastProtocol(asyncio.DatagramProtocol):
-    def __init__(self, multicast_address: str, bind_address: str) -> typing.NoReturn:
+from typing import runtime, Any, NoReturn
+
+
+@runtime
+class MulticastProtocol(DatagramProtocol):
+    def __init__(self, multicast_address: str, bind_address: str) -> None:
         self.multicast_address: str = multicast_address
         self.bind_address: str = bind_address
-        self.transport: asyncio.DatagramTransport = None
+        self.transport: Any[DatagramTransport, None] = None
 
-    def sock(self) -> socket.SocketType:
+    def sock(self) -> SocketType:
         ...
 
     def get_ttl(self) -> int:
         ...
 
-    def set_ttl(self, ttl: typing.Optional[int]) -> typing.NoReturn:
+    def set_ttl(self, ttl: int = 1) -> NoReturn:
         ...
 
-    def join_group(self, multicast_address: str, bind_address: str) -> typing.NoReturn:
+    def join_group(self, multicast_address: str, bind_address: str) -> NoReturn:
         ...
 
-    def leave_group(self, multicast_address: str, bind_address: str) -> typing.NoReturn:
-        ...
-
-    def connection_made(self, transport: asyncio.Transport) -> typing.NoReturn:
+    def leave_group(self, multicast_address: str, bind_address: str) -> NoReturn:
         ...
 
     @classmethod
-    def create_multicast_socket(cls, bind_address: str) -> socket.SocketType:
+    def create_multicast_socket(cls, bind_address: str) -> SocketType:
         ...

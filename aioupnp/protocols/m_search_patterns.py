@@ -44,11 +44,13 @@ ST
         characters in the domain name must be replaced with hyphens in accordance with RFC 2141.
 """
 
-import typing
-import collections
+from collections import OrderedDict
+
+from typing import List, Any, Collection
+
 from aioupnp.constants import SSDP_DISCOVER, SSDP_HOST
 
-SEARCH_TARGETS: typing.List[typing.AnyStr] = [
+SEARCH_TARGETS: Collection = [
     'upnp:rootdevice',
     'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-wifialliance-org:device:WFADevice:1',
@@ -59,17 +61,27 @@ SEARCH_TARGETS: typing.List[typing.AnyStr] = [
 ]
 
 
-def format_packet_args(order: typing.List, **kwargs) -> collections.OrderedDict:
-    args: typing.List = []
+def format_packet_args(order: List, **kwargs) -> OrderedDict:
+    """Format packet arguments.
+
+    :param list order:
+    :param dict kwargs:
+    :return dict:
+    """
+    args: List = []
     for o in order:
         for k, v in kwargs.items():
             if k.lower() == o.lower():
                 args.append((k, v))
                 break
-    return collections.OrderedDict(args)
+    return OrderedDict(args)
 
 
-def packet_generator() -> typing.Any[collections.OrderedDict]:
+def packet_generator() -> Any[OrderedDict]:
+    """Generate Packets.
+
+    :return dict:
+    """
     for st in SEARCH_TARGETS:
         order = ["HOST", "MAN", "MX", "ST"]
         yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)

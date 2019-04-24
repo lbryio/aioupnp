@@ -4,7 +4,7 @@ import logging
 import re
 from collections import OrderedDict
 
-from typing import Dict, NamedTuple, Pattern, Any, AnyStr, List, Union
+from typing import NamedTuple, Pattern, Any, List, Union, Mapping, Optional
 
 from aioupnp.constants import line_separator
 from aioupnp.fault import UPnPError
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 _template: Union[Pattern, str] = r'(?i)^(%s):[ ]*(.*)$'
 
-ssdp_datagram_patterns: Dict[NamedTuple[Union[Pattern, str], Any[str, int]]] = {
+ssdp_datagram_patterns: Mapping[NamedTuple[Union[Pattern, str], Any[str, int]]] = {
     "host": (re.compile(r'(?i)^(host):(.*)$'), str),
     "st": (re.compile(_template % 'st'), str),
     "man": (re.compile(_template % 'man'), str),
@@ -36,9 +36,9 @@ class SSDPDatagram(object):
     _NOTIFY: str = "NOTIFY"
     _OK: str = "OK"
 
-    _start_lines = {_M_SEARCH: "M-SEARCH * HTTP/1.1", _NOTIFY: "NOTIFY * HTTP/1.1", _OK: "HTTP/1.1 200 OK"}
-    _friendly_names = {_M_SEARCH: "m-search", _NOTIFY: "notify", _OK: "m-search response"}
-    _vendor_field_pattern = vendor_pattern
+    _start_lines: Mapping[str, str] = {_M_SEARCH: "M-SEARCH * HTTP/1.1", _NOTIFY: "NOTIFY * HTTP/1.1", _OK: "HTTP/1.1 200 OK"}
+    _friendly_names: Mapping[str, str] = {_M_SEARCH: "m-search", _NOTIFY: "notify", _OK: "m-search response"}
+    _vendor_field_pattern: Union[Pattern, str] = vendor_pattern
     _patterns = ssdp_datagram_patterns
 
     _required_fields = {
@@ -47,7 +47,7 @@ class SSDPDatagram(object):
         _OK: ["cache_control", "location", "server", "st", "usn"]  # "date", "ext"
     }
 
-    def __init__(self, packet_type: AnyStr, kwargs: OrderedDict = None) -> None:
+    def __init__(self, packet_type: str, kwargs: Mapping[str, str]) -> None:
         """SSDP Datagram.
 
         :param str or bytes packet_type:
@@ -56,7 +56,6 @@ class SSDPDatagram(object):
         if packet_type not in [self._M_SEARCH, self._NOTIFY, self._OK]:
             raise UPnPError("Unknown packet type: {}.".format(packet_type))
         self._packet_type = packet_type
-        kwargs = kwargs or OrderedDict()
         self._field_order: list = [
             k.lower().replace("-", "_") for k in kwargs.keys()
         ]
@@ -81,7 +80,7 @@ class SSDPDatagram(object):
             if getattr(self, k) is None:
                 raise UPnPError("Missing required field %s." % k)
 
-    def get_cli_igd_kwargs(self) -> AnyStr:
+    def get_cli_igd_kwargs(self) -> str:
         """Get CLI IGD kwargs.
 
         :return str kwargs:
@@ -92,14 +91,14 @@ class SSDPDatagram(object):
             fields.append("--%s=%s" % (self._case_mappings.get(field, field), v))
         return " ".join(fields)
 
-    def __repr__(self) -> AnyStr:
+    def __repr__(self) -> str:
         """repr(SSDP).
 
         :return str:
         """
         return self.as_json()
 
-    def __getitem__(self, item) -> Any[AnyStr, KeyError]:
+    def __getitem__(self, item: str) -> Any[str, Optional[KeyError]]:
         """SSDP.get().
 
         :return str or KeyError:
@@ -109,14 +108,14 @@ class SSDPDatagram(object):
                 return getattr(self, i)
         raise KeyError(item)
 
-    def get_friendly_name(self) -> AnyStr:
+    def get_friendly_name(self) -> str:
         """Return human friendly field name.
 
         :return str:
         """
         return self._friendly_names[self._packet_type]
 
-    def encode(self, trailing_newlines: Any[int] = 2) -> AnyStr:
+    def encode(self, trailing_newlines: int = 2) -> str:
         """Encode SSDP Datagram.
 
         :param int trailing_newlines:
@@ -139,14 +138,14 @@ class SSDPDatagram(object):
             serialized += line_separator
         return serialized
 
-    def as_dict(self) -> OrderedDict:
+    def as_dict(self) -> Mapping[str, str]:
         """Dictionary representation.
 
         :return dict:
         """
         return self._lines_to_content_dict(self.encode().split(line_separator))
 
-    def as_json(self) -> AnyStr:
+    def as_json(self) -> str:
         """JSON representation.
 
         :return bytes:
@@ -154,10 +153,10 @@ class SSDPDatagram(object):
         return json.dumps(self.as_dict(), indent=2)
 
     @classmethod
-    def decode(cls, datagram: AnyStr) -> Any[AnyStr, UPnPError]:
+    def decode(cls, datagram: bytes) -> Any[str, Optional[UPnPError]]:
         """Decode SSDP Datagram.
 
-        :param str or bytes datagram:
+        :param bytes datagram:
         :return str or UPnPError:
         """
         packet = cls._from_string(datagram.decode())
@@ -176,7 +175,7 @@ class SSDPDatagram(object):
         return packet
 
     @classmethod
-    def _lines_to_content_dict(cls, lines: List) -> Any[OrderedDict]:
+    def _lines_to_content_dict(cls, lines: List[str]) -> Mapping[str, str]:
         """Filter lines and return in dictionary.
 
         :param list lines:
@@ -205,7 +204,7 @@ class SSDPDatagram(object):
         return result
 
     @classmethod
-    def _from_string(cls, datagram: AnyStr) -> Any[None, Dict[AnyStr], Dict[None]]:
+    def _from_string(cls, datagram: str) -> Any[None, Mapping[str, str], Mapping[None]]:
         """Convert str repr.
 
         :param str datagram:
@@ -222,7 +221,7 @@ class SSDPDatagram(object):
             return cls._from_response(lines[1:])
 
     @classmethod
-    def _from_response(cls, lines: List) -> Any[Dict[AnyStr], Dict[None]]:
+    def _from_response(cls, lines: List[str]) -> __class__(_OK, Mapping[str, str]):
         """SSDP response repr.
 
         :param list lines:
@@ -231,7 +230,7 @@ class SSDPDatagram(object):
         return cls(cls._OK, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_notify(cls, lines: List) -> Any[Dict[AnyStr], Dict[None]]:
+    def _from_notify(cls, lines: List[str]) -> __class__(_NOTIFY, Mapping[str, str]):
         """SSDP Notify repr.
 
         :param list lines:
@@ -240,7 +239,7 @@ class SSDPDatagram(object):
         return cls(cls._NOTIFY, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_request(cls, lines: List) -> Any[Dict[AnyStr], Dict[None]]:
+    def _from_request(cls, lines: List[str]) -> __class__(_M_SEARCH, Mapping[str, str]):
         """SSDP Request repr.
 
         :param list lines:

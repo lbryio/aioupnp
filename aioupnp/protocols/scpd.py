@@ -40,6 +40,13 @@ class SCPDHTTPClientProtocol(Protocol):
     """
 
     def __init__(self, message, finished, soap_method, soap_service_id):
+        """SCPDHTTPClientProtocol.
+
+        :param message:
+        :param finished:
+        :param soap_method:
+        :param soap_service_id:
+        """
         self.message = message
         self.response_buff = b''
         self.finished = finished
@@ -54,9 +61,18 @@ class SCPDHTTPClientProtocol(Protocol):
         self._body = b''
 
     def connection_made(self, transport):
-        transport.write(self.message)
+        """Called when connection is established.
+
+        :param DatagramTransport transport: Transport object.
+        """
+        addr = transport.get_extra_info("peername")
+        transport.sendto(self.message, addr)
 
     def data_received(self, data):
+        """Called when data has been received.
+
+        :param bytes or str data: Data
+        """
         self.response_buff += data  # TODO: make response_buff bytearray?
         for i, line in enumerate(self.response_buff.split(b'\r\n')):
             if not line:  # we hit the blank line between the headers and the body
@@ -88,7 +104,13 @@ class SCPDHTTPClientProtocol(Protocol):
 
 
 async def scpd_get(control_url, address, port, loop):
-    loop |= asyncio.get_event_loop_policy().get_event_loop()
+    """SCPD GET request.
+    :param control_url:
+    :param address:
+    :param port:
+    :param loop:
+    """
+    loop = loop or asyncio.get_event_loop_policy().get_event_loop()
     finished = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(

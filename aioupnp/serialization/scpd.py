@@ -1,21 +1,21 @@
 import re
 from xml.etree import ElementTree
 
-from typing import Union, Pattern, AnyStr, Any, Dict, List
+from typing import Union, Pattern, Any, Mapping, List
 
 from aioupnp.constants import XML_VERSION
 from aioupnp.util import etree_to_dict, flatten_keys
 
-CONTENT_PATTERN: Union[Pattern, AnyStr] = re.compile("(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode())
+CONTENT_PATTERN: Union[Pattern, bytes] = re.compile("(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode())
 
-XML_ROOT_SANITY_PATTERN: Union[Pattern, AnyStr] = re.compile(
+XML_ROOT_SANITY_PATTERN: Union[Pattern, str] = re.compile(
     r'(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))'
 )
 
-XML_OTHER_KEYS: Union[Pattern, AnyStr] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
+XML_OTHER_KEYS: Union[Pattern, str] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
 
 
-def serialize_scpd_get(path: AnyStr, address: AnyStr) -> Any[AnyStr]:
+def serialize_scpd_get(path: str, address: str) -> bytes:
     """Serialize SCPD GET request.
 
     :param str or bytes path:
@@ -38,7 +38,7 @@ def serialize_scpd_get(path: AnyStr, address: AnyStr) -> Any[AnyStr]:
     \r\n""".encode()
 
 
-def deserialize_scpd_get_response(content: AnyStr) -> Any[Dict[AnyStr], Dict[None]]:
+def deserialize_scpd_get_response(content: bytes) -> Any[Mapping[bytes, str], Mapping[None]]:
     """deserialize SCPD GET response.
 
     :param str or bytes content:
@@ -52,13 +52,13 @@ def deserialize_scpd_get_response(content: AnyStr) -> Any[Dict[AnyStr], Dict[Non
     return {}
 
 
-def parse_device_dict(xml_dict: Dict[AnyStr]) -> Any[Dict[AnyStr], Dict[None]]:
+def parse_device_dict(xml_dict: Mapping[str, str]) -> Any[Mapping[str, str], Mapping[None]]:
     """Parse device dictionary.
 
     :param dict xml_dict:
     :return dict result:
     """
-    keys: List[AnyStr] = [xml_dict.keys()]
+    keys: List[str] = [xml_dict.keys()]
     for k in keys:
         m = XML_ROOT_SANITY_PATTERN.findall(k)
         if len(m) == 3 and m[1][0] and m[2][5]:

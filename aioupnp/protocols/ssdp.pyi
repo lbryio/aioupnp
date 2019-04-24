@@ -1,45 +1,47 @@
-import asyncio
-import typing
-import collections
-from . import multicast
+from asyncio import Future, Handle, AbstractEventLoop, DatagramTransport
+from collections import OrderedDict
+
+from typing import runtime, Union, Pattern, Set, Optional, AnyStr, Any, Tuple, NoReturn, List, SupportsFloat, SupportsBytes, SupportsInt, Generic, Text
+
 from aioupnp.serialization.ssdp import SSDPDatagram
+from .multicast import MulticastProtocol
 
-ADDRESS_REGEX = typing.Pattern[str]
+ADDRESS_REGEX: Union[Pattern, AnyStr]
 
-@typing.runtime
-class SSDPProtocol(multicast.MulticastProtocol):
-    def __init__(self, multicast_address: str, lan_address: str, ignored: typing.Set[str] = None, unicast: typing.Optional[bool] = False) -> typing.NoReturn:
+@runtime
+class SSDPProtocol(MulticastProtocol):
+    def __init__(self, multicast_address: str, lan_address: str, ignored: Set[str] = None, unicast: bool = False) -> NoReturn:
         super().__init__(multicast_address, lan_address)
         self._unicast: bool = unicast
-        self._ignored: typing.Set[str] = ignored or set()  # ignored locations
-        self._pending_searches: typing.List[typing.Tuple[str, str, asyncio.Future, asyncio.Handle]] = []
-        self.notifications: typing.List = []
+        self._ignored: Set[str] = ignored or set()  # ignored locations
+        self._pending_searches: List[Tuple[str, str, Future, Handle]] = []
+        self.notifications: Any[List[None], List[str]] = []
 
-    def disconnect(self) -> typing.NoReturn:
+    def disconnect(self) -> NoReturn:
         ...
 
-    def _callback_m_search_ok(self, address: str, packet: SSDPDatagram) -> typing.NoReturn:
+    def _callback_m_search_ok(self, address: str, packet: SSDPDatagram) -> NoReturn:
         ...
 
-    def send_many_m_searches(self, address: str, packets: typing.List[SSDPDatagram]) -> typing.NoReturn:
+    def send_many_m_searches(self, address: str, packets: List[SSDPDatagram]) -> NoReturn:
         ...
 
-    async def m_search(self, address: str, timeout: float, datagrams: typing.List[collections.OrderedDict]) -> SSDPDatagram:
-        fut: asyncio.Future = asyncio.Future()
-        packets: typing.List[SSDPDatagram] = []
+    async def m_search(self, address: str, timeout: Any[float, int], datagrams: List[OrderedDict[bytes]]) -> SSDPDatagram:
+        fut: Future = Future()
+        packets: List[SSDPDatagram] = []
         ...
 
-    def datagram_received(self, data: bytes, addr: str) -> typing.NoReturn:
+    def datagram_received(self, data: Union[Text, bytes], addr: str) -> NoReturn:
         ...
 
-async def listen_ssdp(lan_address: str, gateway_address: str, loop: asyncio.AbstractEventLoop = None, ignored: typing.Set[str] = None, unicast: bool = False) -> typing.Tuple[asyncio.DatagramTransport, SSDPProtocol, str, str]:
+async def listen_ssdp(lan_address: str, gateway_address: str, loop: Any[AbstractEventLoop, None] = None, ignored: Any[Optional[Set[str]], None] = None, unicast: bool = False) -> Tuple[DatagramTransport, SSDPProtocol, str, str]:
     ...
 
-async def m_search(lan_address: str, gateway_address: str, datagram_args: collections.OrderedDict, timeout: int, loop: asyncio.AbstractEventLoop, ignored: typing.Set[str], unicast: bool = False) -> SSDPDatagram:
+async def m_search(lan_address: str, gateway_address: str, datagram_args: OrderedDict[bytes], timeout: Any[float, int], loop: Any[Optional[AbstractEventLoop], None], ignored: Set[str], unicast: bool = False) -> SSDPDatagram:
     ...
 
-async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30, loop: asyncio.AbstractEventLoop = None, ignored: typing.Set[str] = None, unicast: bool = False) -> typing.List[collections.OrderedDict]:
+async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Any[float, int] = 30, loop: Any[Optional[AbstractEventLoop], None] = None, ignored: Any[Optional[Set[bytes]], None] = None, unicast: bool = False) -> List[OrderedDict]:
     ...
 
-async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30, loop: asyncio.AbstractEventLoop = None, ignored: typing.Set[str] = None, unicast: bool = False) -> typing.Tuple[collections.OrderedDict, SSDPDatagram]:
+async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: Any[float, int] = 30, loop: Any[Optional[AbstractEventLoop], None] = None, ignored: Any[Optional[Set[bytes]], None] = None, unicast: bool = False) -> Tuple[OrderedDict, SSDPDatagram]:
     ...
