@@ -15,7 +15,8 @@ CONTENT_NO_XML_VERSION_PATTERN: Union[Pattern, AnyStr] = re.compile(
 def serialize_soap_post(method: AnyStr, param_names: List[AnyStr],
                         service_id: AnyStr, gateway_address: AnyStr,
                         control_url: AnyStr, **kwargs) -> AnyStr:
-    """serialize SOAP post data
+    """Serialize SOAP post data.
+
     :param str method:
     :param list param_names:
     :param str or bytes service_id:
@@ -60,11 +61,12 @@ def serialize_soap_post(method: AnyStr, param_names: List[AnyStr],
 
 def deserialize_soap_post_response(response: AnyStr, method: AnyStr,
                                    service_id: AnyStr) -> Any[Dict[AnyStr], UPnPError]:
-    """Deserialize SOAP post response
+    """Deserialize SOAP post.
+
     :param bytes response:
     :param str method:
     :param str service_id:
-    :return dict response or UPnPError:
+    :return dict or UPnPError:
     """
     parsed = CONTENT_NO_XML_VERSION_PATTERN.findall(response)
     content = b'' if not parsed else parsed[0][0]

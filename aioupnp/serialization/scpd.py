@@ -16,6 +16,12 @@ XML_OTHER_KEYS: Union[Pattern, AnyStr] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
 
 
 def serialize_scpd_get(path: AnyStr, address: AnyStr) -> Any[AnyStr]:
+    """Serialize SCPD GET request.
+
+    :param str or bytes path:
+    :param str or bytes address:
+    :return bytes serialized SCPD GET request:
+    """
     if "http://" in address:
         host = address.split("http://")[1]
     else:
@@ -33,6 +39,11 @@ def serialize_scpd_get(path: AnyStr, address: AnyStr) -> Any[AnyStr]:
 
 
 def deserialize_scpd_get_response(content: AnyStr) -> Any[Dict[AnyStr], Dict[None]]:
+    """deserialize SCPD GET response.
+
+    :param str or bytes content:
+    :return dict response:
+    """
     if XML_VERSION.encode() in content:
         parsed = CONTENT_PATTERN.findall(content)
         content = b'' if not parsed else parsed[0][0]
@@ -42,6 +53,11 @@ def deserialize_scpd_get_response(content: AnyStr) -> Any[Dict[AnyStr], Dict[Non
 
 
 def parse_device_dict(xml_dict: Dict[AnyStr]) -> Any[Dict[AnyStr], Dict[None]]:
+    """Parse device dictionary.
+
+    :param dict xml_dict:
+    :return dict result:
+    """
     keys: List[AnyStr] = [xml_dict.keys()]
     for k in keys:
         m = XML_ROOT_SANITY_PATTERN.findall(k)
