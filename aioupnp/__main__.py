@@ -3,6 +3,8 @@ import sys
 import textwrap
 from collections import OrderedDict
 from aioupnp.upnp import UPnP
+from typing import Any, Optional
+from asyncio import AbstractEventLoop
 
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
@@ -16,7 +18,7 @@ base_usage = "\n".join(textwrap.wrap(
     100, subsequent_indent='  ', break_long_words=False)) + "\n"
 
 
-def get_help(command):
+def get_help(command: str) -> str:
     fn = getattr(UPnP, command)
     params = command + " " + " ".join(["[--%s=<%s>]" % (k, k) for k in fn.__annotations__ if k != 'return'])
     return base_usage + "\n".join(
@@ -24,7 +26,7 @@ def get_help(command):
     )
 
 
-def main(argv=None, loop=None):
+def main(argv: str = None, loop: Any[Optional[AbstractEventLoop], None] = None) -> None:
     argv = argv or sys.argv
     commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
     help_str = "\n".join(textwrap.wrap(

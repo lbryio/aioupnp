@@ -1,22 +1,39 @@
 import logging
-from typing import List
+from typing import List, Any, Optional, Dict
 
 log = logging.getLogger(__name__)
 
 
 class CaseInsensitive:
+    """Case Insensitive."""
+
     def __init__(self, **kwargs) -> None:
+        """CaseInsensitive
+
+        :param kwargs:
+        """
         for k, v in kwargs.items():
             if not k.startswith("_"):
                 setattr(self, k, v)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> Any[str, Optional[AttributeError]]:
+        """
+
+        :param item:
+        :return:
+        """
         for k in self.__class__.__dict__.keys():
             if k.lower() == item.lower():
                 return self.__dict__.get(k)
         raise AttributeError(item)
 
-    def __setattr__(self, item, value):
+    def __setattr__(self, item: str, value: str) -> Any[None, Optional[AttributeError]]:
+        """
+
+        :param item:
+        :param value:
+        :return:
+        """
         for k, v in self.__class__.__dict__.items():
             if k.lower() == item.lower():
                 self.__dict__[k] = value
@@ -27,12 +44,19 @@ class CaseInsensitive:
         raise AttributeError(item)
 
     def as_dict(self) -> dict:
+        """
+
+        :return:
+        """
         return {
             k: v for k, v in self.__dict__.items() if not k.startswith("_") and not callable(v)
         }
 
 
 class Service(CaseInsensitive):
+    """
+
+    """
     serviceType = None
     serviceId = None
     controlURL = None
@@ -41,13 +65,15 @@ class Service(CaseInsensitive):
 
 
 class Device(CaseInsensitive):
+    """Device."""
+
     serviceList = None
     deviceList = None
     deviceType = None
     friendlyName = None
     manufacturer = None
     manufacturerURL = None
-    modelDescription = None
+    modelDescription  = None
     modelName = None
     modelNumber = None
     modelURL = None
@@ -58,6 +84,12 @@ class Device(CaseInsensitive):
     iconList = None
 
     def __init__(self, devices: List, services: List, **kwargs) -> None:
+        """Device().
+
+        :param devices:
+        :param services:
+        :param kwargs:
+        """
         super(Device, self).__init__(**kwargs)
         if self.serviceList and "service" in self.serviceList:
             new_services = self.serviceList["service"]
