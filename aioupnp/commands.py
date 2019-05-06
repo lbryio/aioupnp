@@ -13,29 +13,23 @@ return_type_lambas = {
 }
 
 
-def safe_type(t: Union[Tuple, List, Mapping, Set]) -> Union[Tuple, List, Dict, Any]:
+def safe_type(t: Union[Tuple, List, Mapping, Set]) -> Union[Tuple, List, Dict, None]:
     """Return input if type safe.
 
     :param t:
     :return:
     """
-    if isinstance(t, Tuple):
-        return tuple(t)
-    if isinstance(t, List):
-        return list(t)
-    if isinstance(t, Mapping):
-        return dict(t)
-    if isinstance(t, Set):
-        return set(t)
-    return t
+    if isinstance(t, (tuple, list, dict, set)):
+        return type(t)
+    return None
 
 
 class SOAPCommand:
     """SOAP Command."""
 
     def __init__(self, gateway_address: str, service_port: int, control_url: str, service_id: bytes, method: str,
-                 param_types: Mapping, return_types: Mapping, param_order: List, return_order: List,
-                 loop: Optional[AbstractEventLoop] = None) -> None:
+                 param_types: Mapping[str, str], return_types: Mapping[str, str], param_order: List[str],
+                 return_order: List[str], loop: Optional[AbstractEventLoop] = None) -> None:
         """
 
         :param gateway_address:
@@ -54,12 +48,12 @@ class SOAPCommand:
         self.control_url: str = control_url
         self.service_id: bytes = service_id
         self.method: str = method
-        self.param_types: List = param_types
-        self.param_order: List = param_order
-        self.return_types: Mapping = return_types
-        self.return_order: Mapping = return_order
+        self.param_types: List[str] = param_types
+        self.param_order: List[str] = param_order
+        self.return_types: Mapping[str, str] = return_types
+        self.return_order: Mapping[str, str] = return_order
         self.loop: Optional[AbstractEventLoop] = loop
-        self._requests: List = []
+        self._requests: List[str] = []
 
     async def __call__(self, **kwargs: OrderedDict) -> Union[None, dict, list, tuple]:
         """Supports Call.
@@ -134,7 +128,7 @@ class SOAPCommands:
 
     def __init__(self):
         """SOAPCommand."""
-        self._registered: set = set()
+        self._registered: Set[str] = set()
 
     def register(self, base_ip: bytes, port: int, name: str, control_url: str,
                  service_type: bytes, inputs: List[str], outputs: List[str],
@@ -155,9 +149,9 @@ class SOAPCommands:
             raise AttributeError(name)
         current = getattr(self, name)
         annotations = current.__annotations__
-        return_types = annotations.get('return', None)
+        return_types = annotations.get("return", None)
         if return_types:
-            if hasattr(return_types, '__args__'):
+            if hasattr(return_types, "__args__"):
                 return_types = tuple([return_type_lambas.get(a, a) for a in return_types.__args__])
             elif isinstance(return_types, type):
                 return_types = (return_types,)
@@ -179,14 +173,14 @@ class SOAPCommands:
     async def add_port_mapping(new_remote_host: str, new_external_port: int, new_protocol: str, new_internal_port: int,
                        new_internal_client: str, new_enabled: int, new_port_mapping_description: str,
                        new_lease_duration: str) -> Any:
-        """Returns None"""
+        """Returns None."""
         raise NotImplementedError()
 
     AddPortMapping = add_port_mapping
 
     @staticmethod
     async def get_NATRSIP_status() -> Any:
-        """Returns (NewRSIPAvailable, NewNATEnabled)"""
+        """Returns (    NewRSIPAvailable, NewNATEnabled     )."""
         raise NotImplementedError()
 
     GetNATRSIPStatus = get_NATRSIP_status
@@ -194,8 +188,9 @@ class SOAPCommands:
     @staticmethod
     async def get_generic_port_mapping_entry(new_port_mapping_index: int) -> Any:
         """
-        Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
-                 NewPortMappingDescription, NewLeaseDuration)
+        Returns (   NewRemoteHost, NewExternalPort, NewProtocol,
+                    NewInternalPort, NewInternalClient, NewEnabled,
+                    NewPortMappingDescription, NewLeaseDuration     ).
         """
         raise NotImplementedError()
 
@@ -203,110 +198,113 @@ class SOAPCommands:
 
     @staticmethod
     async def get_specific_port_mapping_entry(new_remote_host: str, new_external_port: int, new_protocol: str) -> Any:
-        """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
+        """Returns (    NewInternalPort, NewInternalClient, NewEnabled,
+                        NewPortMappingDescription, NewLeaseDuration     )."""
         raise NotImplementedError()
 
     GetSpecificPortMappingEntry = get_specific_port_mapping_entry
 
     @staticmethod
     async def set_connection_type(new_conn_type: str) -> Any:
-        """Returns None"""
+        """Returns None."""
         raise NotImplementedError()
 
     SetConnectionType = set_connection_type
 
     @staticmethod
     async def get_external_ip_address() -> Any:
-        """Returns (NewExternalIPAddress)"""
+        """Returns NewExternalIPAddress."""
         raise NotImplementedError()
 
     GetExternalIPAddress = get_external_ip_address
 
     @staticmethod
     async def get_connection_type_info() -> Any:
-        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
+        """Returns (    NewConnectionType, NewPossibleConnectionTypes   )."""
         raise NotImplementedError()
 
     GetConnectionTypeInfo = get_connection_type_info
 
     @staticmethod
     async def get_status_info() -> Any:
-        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
+        """Returns (    NewConnectionStatus, NewLastConnectionError, NewUptime  )."""
         raise NotImplementedError()
 
     GetStatusInfo = get_status_info
 
     @staticmethod
     async def force_termination() -> Any:
-        """Returns None"""
+        """Returns None."""
         raise NotImplementedError()
 
     @staticmethod
     async def delete_port_mapping(new_remote_host: str, new_external_port: int, new_protocol: str) -> Any:
-        """Returns None"""
+        """Returns None."""
         raise NotImplementedError()
 
     DeletePortMapping = delete_port_mapping
 
     @staticmethod
     async def request_connection() -> Any:
-        """Returns None"""
+        """Returns None."""
         raise NotImplementedError()
 
     RequestConnection = request_connection
 
     @staticmethod
     async def get_common_link_properties() -> Any:
-        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
+        """Returns (    NewWANAccessType, NewLayer1UpstreamMaxBitRate,
+                        NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus    )."""
         raise NotImplementedError()
 
     GetCommonLinkProperties = get_common_link_properties
 
     @staticmethod
     async def get_total_bytes_sent() -> Any:
-        """Returns (NewTotalBytesSent)"""
+        """Returns (    NewTotalBytesSent   )."""
         raise NotImplementedError()
 
     GetTotalBytesSent = get_total_bytes_sent
 
     @staticmethod
     async def get_total_bytes_received() -> Any:
-        """Returns (NewTotalBytesReceived)"""
+        """Returns NewTotalBytesReceived."""
         raise NotImplementedError()
 
     GetTotalBytesReceived = get_total_bytes_received
 
     @staticmethod
     async def get_total_packets_sent() -> Any:
-        """Returns (NewTotalPacketsSent)"""
+        """Returns NewTotalPacketsSent."""
         raise NotImplementedError()
 
     GetTotalPacketsSent = get_total_packets_sent
 
     @staticmethod
     def get_total_packets_received() -> Any:
-        """Returns (NewTotalPacketsReceived)"""
+        """Returns NewTotalPacketsReceived."""
         raise NotImplementedError()
 
     GetTotalPacketsReceived = get_total_packets_received
 
     @staticmethod
-    async def x_get_ICS_statistics() -> Any:
-        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
+    async def x_get_ics_statistics() -> Any:
+        """Returns (    TotalBytesSent, TotalBytesReceived, TotalPacketsSent,
+                        TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime    )."""
         raise NotImplementedError()
 
-    X_GetICSStatistics = x_get_ICS_statistics
+    X_GetICSStatistics = x_get_ics_statistics
 
     @staticmethod
     async def get_default_connection_service() -> Any:
-        """Returns (NewDefaultConnectionService)"""
+        """Returns NewDefaultConnectionService."""
         raise NotImplementedError()
 
     GetDefaultConnectionService = get_default_connection_service
 
     @staticmethod
     async def set_default_connection_service(new_default_connection_service: str) -> Any:
-        """Returns (None)"""
+        """Returns None."""
         raise NotImplementedError()
 
     SetDefaultConnectionService = set_default_connection_service
@@ -314,9 +312,8 @@ class SOAPCommands:
     @staticmethod
     async def set_enabled_for_internet(new_enabled_for_internet: bool) -> Any:
         """
-
-        :param new_enabled_for_internet:
-        :return:
+        :param bool new_enabled_for_internet:
+        :return: None
         """
         raise NotImplementedError()
 
@@ -326,7 +323,7 @@ class SOAPCommands:
     async def get_enabled_for_internet() -> Any:
         """
 
-        :return bool?:
+        :return bool:
         """
         raise NotImplementedError()
 
@@ -337,7 +334,7 @@ class SOAPCommands:
         """
 
         :param new_active_connection_index:
-        :return:
+        :return: int?
         """
         raise NotImplementedError()
 
@@ -345,7 +342,7 @@ class SOAPCommands:
 
     @staticmethod
     async def get_active_connections() -> Any:
-        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
+        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID)."""
         raise NotImplementedError()
 
     GetActiveConnections = get_active_connections

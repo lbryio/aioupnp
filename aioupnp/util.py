@@ -1,7 +1,7 @@
 import re
 import socket
 from collections import defaultdict
-from typing import Tuple, Dict, Pattern, Union, List, Any
+from typing import Tuple, Dict, Pattern, Union, List, Any, Mapping, Optional
 from xml.etree import ElementTree
 import netifaces
 
@@ -10,7 +10,8 @@ BASE_ADDRESS_REGEX: Union[Pattern, bytes] = re.compile(r'^(http:\/\/\d*\.\d*\.\d
 BASE_PORT_REGEX: Union[Pattern, bytes] = re.compile(r'^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$'.encode())
 
 
-def etree_to_dict(t: ElementTree.Element) -> Union[Dict[None], Dict[str, Union[Dict[List[Any]], Any]]]:
+def etree_to_dict(t: ElementTree.Element) -> Dict:
+    """Return converted XML element tree."""
     d: dict = {}
     if t.attrib:
         d[t.tag] = {}
@@ -33,8 +34,7 @@ def etree_to_dict(t: ElementTree.Element) -> Union[Dict[None], Dict[str, Union[D
     return d
 
 
-def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> \
-        Union[Dict[Any], Tuple[List[Any], Dict[Any]], List[Dict[Any]]]:
+def flatten_keys(d: Union[Tuple[List, Mapping[Any, Any]], List], strip: str) -> Union[Dict, Tuple[List, Dict], List]:
     if not isinstance(d, (list, dict)):
         return d
     if isinstance(d, list):
@@ -48,7 +48,7 @@ def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> \
     return t
 
 
-def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError("Overlapping Keys."), Any]:
+def get_dict_val_case_insensitive(d: Dict, k: str) -> Any[Optional[KeyError]]:
     match = list(filter(lambda x: x.lower() == k.lower(), d.keys()))
     if not match:
         return
@@ -70,18 +70,18 @@ def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError("Over
 
 def get_interfaces() -> Dict[str, Union[Tuple[str, str], str]]:
     r = {
-        interface_name: (router_address, netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]['addr'])
+        interface_name: (router_address, netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]["addr"])
         for router_address, interface_name, _ in netifaces.gateways()[socket.AF_INET]
     }
     for interface_name in netifaces.interfaces():
-        if interface_name in ['lo', 'localhost'] or interface_name in r:
+        if interface_name in ["lo", "localhost"] or interface_name in r:
             continue
         addresses = netifaces.ifaddresses(interface_name)
         if netifaces.AF_INET in addresses:
-            address = addresses[netifaces.AF_INET][0]['addr']
+            address = addresses[netifaces.AF_INET][0]["addr"]
             gateway_guess = ".".join(address.split(".")[:-1] + ["1"])
             r[interface_name] = (gateway_guess, address)
-    r['default'] = r[netifaces.gateways()[0]['default'][netifaces.AF_INET][1]]
+    r['default'] = r[netifaces.gateways()[0]["default"][netifaces.AF_INET][1]]
     return r
 
 
@@ -89,4 +89,4 @@ def get_gateway_and_lan_addresses(interface_name: str) -> Tuple[str, str]:
     for iface_name, (gateway, lan) in get_interfaces().items():
         if interface_name == iface_name:
             return gateway, lan
-    return '', ''
+    return "", ""

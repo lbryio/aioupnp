@@ -68,9 +68,8 @@ class CaseInsensitive:
 
 
 class Service(CaseInsensitive):
-    """
+    """Service."""
 
-    """
     serviceType: str = None
     serviceId: str = None
     controlURL: str = None

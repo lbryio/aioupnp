@@ -31,23 +31,23 @@ def get_action_list(element_dict: OrderedDict) -> List:
     # [(<method>, [<input1>, ...], [<output1, ...]), ...]
     service_info = flatten_keys(element_dict[0], "{%s}" % SERVICE)
     if "actionList" in service_info:
-        action_list = service_info["actionList"]
+        action_list = service_info['actionList']
     else:
         return []
     if not len(action_list):  # it could be an empty string
         return []
 
     result: list = []
-    if isinstance(action_list[0]["action"], Dict):
-        arg_dicts = action_list[0]["action"]['argumentList']['argument']
+    if isinstance(action_list[0]['action'], Dict):
+        arg_dicts = action_list[0]['action']['argumentList']['argument']
         if not isinstance(arg_dicts, List):  # when there is one arg
             arg_dicts = [arg_dicts]
         return [[
-            action_list[0]["action"]['name'],
+            action_list[0]['action']['name'],
             [i[0]['name'] for i in arg_dicts if i[0]['direction'] == 'in'],
             [i[0]['name'] for i in arg_dicts if i[0]['direction'] == 'out']
         ]]
-    for action in action_list[0]["action"]:
+    for action in action_list[0]['action']:
         if not action.get('argumentList'):
             result.append((action['name'], [], []))
         else:
@@ -77,13 +77,13 @@ class Gateway:
         self._ok_packet: SSDPDatagram = ok_packet
         self._m_search_args: OrderedDict = m_search_args
         self._lan_address: str = lan_address
-        self.usn: bytes = (ok_packet.usn or '').encode()
-        self.ext: bytes = (ok_packet.ext or '').encode()
-        self.server: bytes = (ok_packet.server or '').encode()
-        self.location: bytes = (ok_packet.location or '').encode()
-        self.cache_control: bytes = (ok_packet.cache_control or '').encode()
-        self.date: bytes = (ok_packet.date or '').encode()
-        self.urn: bytes = (ok_packet.st or '').encode()
+        self.usn: bytes = (ok_packet.usn or "").encode()
+        self.ext: bytes = (ok_packet.ext or "").encode()
+        self.server: bytes = (ok_packet.server or "").encode()
+        self.location: bytes = (ok_packet.location or "").encode()
+        self.cache_control: bytes = (ok_packet.cache_control or "").encode()
+        self.date: bytes = (ok_packet.date or "").encode()
+        self.urn: bytes = (ok_packet.st or "").encode()
 
         self._xml_response: bytes = b''
         self._service_descriptors: Mapping[str, Any] = {}
@@ -169,7 +169,7 @@ class Gateway:
             ])
         return await soap_call_infos.sort(key=lambda x: x[5])
 
-    def debug_gateway(self) -> Dict[str, Union[int, str, OrderedDict, List]]:
+    def debug_gateway(self) -> Dict:
         return {
             'manufacturer_string': self.manufacturer_string,
             'gateway_address': self.base_ip,
@@ -187,7 +187,7 @@ class Gateway:
 
     @classmethod
     async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: Optional[float] = 30.0,
-                                igd_args: Optional[OrderedDict] = None, loop: Optional[AbstractEventLoop] = None,
+                                igd_args: Optional[Mapping] = None, loop: Optional[AbstractEventLoop] = None,
                                 unicast: Optional[bool] = False) -> Optional[__class__]:
         ignored: Set[Any] = set()
         required_commands: List[str] = ["AddPortMapping", "DeletePortMapping", "GetExternalIPAddress"]
@@ -206,7 +206,7 @@ class Gateway:
                 requirements_met = all([required in gateway._registered_commands for required in required_commands])
                 if not requirements_met:
                     not_met = [
-                        req for req in required_commands if req not in getattr(gateway, '_registered_commands')
+                        req for req in required_commands if req not in getattr(gateway, "_registered_commands")
                     ]
                     log.debug("Found gateway %s at: %s, however it does not implement required soap commands: %s.",
                               gateway.manufacturer_string, gateway.location, not_met)
@@ -262,8 +262,8 @@ class Gateway:
         for service_type in self.services.keys():
             await self.register_commands(self.services[service_type], loop)
 
-    async def register_commands(self, service: Service,
-                                loop: Optional[AbstractEventLoop] = None) -> NoReturn[Optional[UPnPError]]:
+    async def register_commands(self, service: Service, loop: Optional[AbstractEventLoop] = None
+                                ) -> Any[Optional[UPnPError]]:
         if not service.SCPDURL:
             raise UPnPError("No SCPD URL.")
         log.debug("Grabbing file descriptor for %s from: %s.", service.serviceType, service.SCPDURL)
@@ -283,7 +283,7 @@ class Gateway:
             try:
                 self.commands.register(self.base_ip, self.port, name, service.controlURL, service.serviceType.encode(),
                                        inputs, outputs, loop)
-                setattr(self._registered_commands, 'name', service.serviceType)
+                setattr(self._registered_commands, "name", service.serviceType)
                 log.debug("Registered %s::%s.", service.serviceType, name)
             except AttributeError:
                 s = self._unsupported_actions.get(service.serviceType, [])

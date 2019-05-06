@@ -20,9 +20,9 @@ base_usage = "\n".join(textwrap.wrap(
 
 def get_help(command: str) -> str:
     fn = getattr(UPnP, command)
-    params = command + " " + " ".join(["[--%s=<%s>]" % (k, k) for k in fn.__annotations__ if k != 'return'])
+    params = command + " " + " ".join(["[--%s=<%s>]" % (k, k) for k in fn.__annotations__ if k != "return"])
     return base_usage + "\n".join(
-        textwrap.wrap(params, 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False)
+        textwrap.wrap(params, 100, initial_indent="  ", subsequent_indent="  ", break_long_words=False)
     )
 
 
@@ -30,7 +30,7 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
     argv = argv or sys.argv
     commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
     help_str = "\n".join(textwrap.wrap(
-        " | ".join(commands), 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False
+        " | ".join(commands), 100, initial_indent="  ", subsequent_indent="  ", break_long_words=False
     ))
 
     usage = """\n%s\n

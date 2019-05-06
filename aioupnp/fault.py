@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Any, Mapping, Optional
 
 
-class UPnPError(Exception):
+class UPnPError(Exception, metaclass=ConnectionError):
     """UPnPError."""
     ...
 

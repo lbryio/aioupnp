@@ -6,7 +6,7 @@ from asyncio import AbstractEventLoop
 import zlib
 import base64
 from collections import OrderedDict
-from typing import Tuple, Dict, List, Union, Optional, Any, Awaitable
+from typing import Tuple, Dict, List, Union, Optional, Any, Awaitable, Mapping
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.util import get_gateway_and_lan_addresses
@@ -28,6 +28,7 @@ def cli(fn: Any[object]) -> object:
 
 
 def _encode(x: Union[bytes, Exception, str]) -> Union[str, TypeError]:
+    """Convenience function used internally to encode data."""
     if isinstance(x, bytes):
         return x.decode()
     elif isinstance(x, Exception):
@@ -37,14 +38,17 @@ def _encode(x: Union[bytes, Exception, str]) -> Union[str, TypeError]:
 
 
 class UPnP:
+    """Universal Plug N' Play protocol."""
+
     def __init__(self, lan_address: str, gateway_address: str, gateway: Gateway) -> None:
         self.lan_address = lan_address
         self.gateway_address = gateway_address
         self.gateway = gateway
 
     @classmethod
-    def get_lan_and_gateway(cls, lan_address: str = '', gateway_address: str = '',
-                            interface_name: str = 'default') -> Tuple[str, str]:
+    def get_lan_and_gateway(cls, lan_address: Optional[str] = "", gateway_address: Optional[str] = "",
+                            interface_name: Optional[str] = "default") -> Tuple[str, str]:
+        """Return LAN address and Gateway address respectively."""
         if not lan_address or not gateway_address:
             gateway_addr, lan_addr = get_gateway_and_lan_addresses(interface_name)
             lan_address = lan_address or lan_addr
@@ -52,9 +56,10 @@ class UPnP:
         return lan_address, gateway_address
 
     @classmethod
-    async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                       igd_args: Union[Dict[str, Any], None] = None, interface_name: str = 'default',
-                       loop: Union[Optional[AbstractEventLoop], None] = None) -> __class__:
+    async def discover(cls, lan_address: str = "", gateway_address: str = "", timeout: int = 30,
+                       igd_args: Optional[Mapping] = None, interface_name: Optional[str] = "default",
+                       loop: Optional[AbstractEventLoop] = None) -> __class__:
+        """Discovery."""
         try:
             lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         except Exception as err:
@@ -66,10 +71,11 @@ class UPnP:
 
     @classmethod
     @cli
-    async def m_search(cls, lan_address: Optional[str] = '', gateway_address: Optional[str] = '',
-                       timeout: Optional[int] = 1, igd_args: Optional[Union[Dict, None]] = None,
-                       unicast: bool = True, interface_name: str = 'default',
-                       loop: Optional[Union[AbstractEventLoop, None]] = None) -> Dict[str, Union[List, str, Dict]]:
+    async def m_search(cls, lan_address: Optional[str] = "", gateway_address: Optional[str] = "",
+                       timeout: Optional[int] = 1, igd_args: Optional[Mapping] = None,
+                       unicast: Optional[bool] = True, interface_name: Optional[str] = "default",
+                       loop: Optional[AbstractEventLoop] = None) -> Dict:
+        """M-Search."""
         if not lan_address or not gateway_address:
             try:
                 lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -95,11 +101,13 @@ class UPnP:
 
     @cli
     async def get_external_ip(self) -> Awaitable[str]:
+        """Returns external IP address."""
         return await self.gateway.commands.GetExternalIPAddress()
 
     @cli
     async def add_port_mapping(self, external_port: int, protocol: str, internal_port: int, lan_address: str,
                                description: str) -> Awaitable[None]:
+        """Adds port mapping."""
         return await self.gateway.commands.AddPortMapping(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
@@ -107,7 +115,8 @@ class UPnP:
         )
 
     @cli
-    async def get_port_mapping_by_index(self, index: int) -> Union[Dict[None], Dict[str, str]]:
+    async def get_port_mapping_by_index(self, index: int) -> Dict:
+        """Get port mapping by index."""
         result = await self._get_port_mapping_by_index(index)
         if result:
             if isinstance(self.gateway.commands.GetGenericPortMappingEntry, SOAPCommand):
@@ -116,8 +125,9 @@ class UPnP:
                 }
         return {}
 
-    async def _get_port_mapping_by_index(self, index: int) -> Union[None, Tuple[Union[None, str], int, str,
-                                                                                int, str, bool, str, int]]:
+    async def _get_port_mapping_by_index(self, index: int) -> Optional[Tuple[Optional[str], int, str, int, str, bool,
+                                                                             str, int]]:
+        """Internal coroutine to get port mapping by index."""
         try:
             redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
             return redirect
@@ -126,7 +136,8 @@ class UPnP:
             return None
 
     @cli
-    async def get_redirects(self) -> Union[List[None], List[Dict]]:
+    async def get_redirects(self) -> List:
+        """Returns redirected responses."""
         redirects = []
         cnt = 0
         redirect = await self.get_port_mapping_by_index(cnt)
@@ -137,7 +148,7 @@ class UPnP:
         return redirects
 
     @cli
-    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Union[Dict[None], Dict[Any]]:
+    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Dict:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -155,7 +166,7 @@ class UPnP:
         return {}
 
     @cli
-    async def delete_port_mapping(self, external_port: int, protocol: str) -> None:
+    async def delete_port_mapping(self, external_port: int, protocol: str) -> Awaitable[None]:
         """
         :param external_port: (int) external port to listen on
         :param protocol:      (str) 'UDP' | 'TCP'
@@ -167,7 +178,8 @@ class UPnP:
 
     @cli
     async def get_next_mapping(self, port: int, protocol: str, description: str,
-                               internal_port: Union[int, None] = None) -> Union[int, UPnPError]:
+                               internal_port: Optional[int] = None) -> Union[int, UPnPError]:
+        """Get next mapping."""
         assert protocol in ["UDP", "TCP"], UPnPError("Unsupported protocol: {}.".format(protocol))
         internal_port = int(internal_port or port)
         requested_port = int(internal_port)
@@ -195,6 +207,7 @@ class UPnP:
 
     @cli
     async def debug_gateway(self) -> bytes:
+        """"Return gateway information in JSON format."""
         return json.dumps({
             "gateway": self.gateway.debug_gateway(),
             "client_address": self.lan_address,
@@ -202,6 +215,7 @@ class UPnP:
 
     @property
     def zipped_debugging_info(self) -> str:
+        """Returns zipped debugging information."""
         return base64.b64encode(zlib.compress(
             json.dumps({
                 "gateway": self.gateway.debug_gateway(),
@@ -211,152 +225,160 @@ class UPnP:
 
     @cli
     async def generate_test_data(self) -> str:
-        print("found gateway via M-SEARCH")
+        """Generates test data."""
+        print("Found gateway via M-SEARCH.")
         try:
             external_ip = await self.get_external_ip()
-            print("got external ip: %s" % external_ip)
+            print("Got external IP Address: %s." % external_ip)
         except (UPnPError, NotImplementedError):
-            print("failed to get the external ip")
+            print("Failed to get the external IP address.")
         try:
             await self.get_redirects()
-            print("got redirects")
+            print("Got redirects.")
         except (UPnPError, NotImplementedError):
-            print("failed to get redirects")
+            print("Failed to get redirects.")
         try:
             await self.get_specific_port_mapping(4567, "UDP")
-            print("got specific mapping")
+            print("Got specific mapping.")
         except (UPnPError, NotImplementedError):
-            print("failed to get specific mapping")
+            print("Failed to get specific mapping.")
         try:
             ext_port = await self.get_next_mapping(4567, "UDP", "aioupnp test mapping")
-            print("set up external mapping to port %i" % ext_port)
+            print("Set up external mapping to port %i." % ext_port)
             try:
                 await self.get_specific_port_mapping(4567, "UDP")
-                print("got specific mapping")
+                print("Got specific mapping.")
             except (UPnPError, NotImplementedError):
-                print("failed to get specific mapping")
+                print("Failed to get specific mapping.")
             try:
                 await self.get_redirects()
-                print("got redirects")
+                print("Got redirects.")
             except (UPnPError, NotImplementedError):
-                print("failed to get redirects")
+                print("Failed to get redirects.")
             await self.delete_port_mapping(ext_port, "UDP")
-            print("deleted mapping")
+            print("Deleted mapping.")
         except (UPnPError, NotImplementedError):
-            print("failed to add and remove a mapping")
+            print("Failed to add and remove a mapping.")
         try:
             await self.get_redirects()
-            print("got redirects")
+            print("Got redirects.")
         except (UPnPError, NotImplementedError):
-            print("failed to get redirects")
+            print("Failed to get redirects.")
         try:
             await self.get_specific_port_mapping(4567, "UDP")
-            print("got specific mapping")
+            print("Got specific mapping.")
         except (UPnPError, NotImplementedError):
-            print("failed to get specific mapping")
+            print("Failed to get specific mapping.")
         if self.gateway.devices:
-            device = list(self.gateway.devices.values())[0]
+            device = list((await self.gateway.devices).values())[0]
             assert device.manufacturer and device.modelName
-            device_path = os.path.join(os.getcwd(), self.gateway.manufacturer_string)
+            device_path = os.path.join(os.getcwd(), await self.gateway.manufacturer_string)
         else:
             device_path = os.path.join(os.getcwd(), "UNKNOWN GATEWAY")
         with open(device_path, "w") as f:
-            f.write(await self.debug_gateway())
-        return "Generated test data! -> %s" % device_path
+            f.write((await self.debug_gateway()).decode())
+        return "Generated test data! -> %s." % device_path
 
     @cli
     async def get_natrsip_status(self) -> Tuple[bool, bool]:
-        """Returns (NewRSIPAvailable, NewNATEnabled)"""
+        """Returns (NewRSIPAvailable, NewNATEnabled)."""
         return await self.gateway.commands.GetNATRSIPStatus()
 
     @cli
     async def set_connection_type(self, new_connection_type: str) -> Awaitable[None]:
-        """Returns None"""
+        """Returns None."""
         return await self.gateway.commands.SetConnectionType(new_connection_type)
 
     @cli
     async def get_connection_type_info(self) -> Tuple[str, str]:
-        """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
+        """Returns (NewConnectionType, NewPossibleConnectionTypes)."""
         return await self.gateway.commands.GetConnectionTypeInfo()
 
     @cli
     async def get_status_info(self) -> Awaitable[Tuple[str, str, int]]:
-        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
+        """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)."""
         return await self.gateway.commands.GetStatusInfo()
 
     @cli
     async def force_termination(self) -> Awaitable[None]:
-        """Returns None"""
+        """Returns None."""
         return await self.gateway.commands.ForceTermination()
 
     @cli
     async def request_connection(self) -> Awaitable[None]:
-        """Returns None"""
+        """Returns None."""
         return await self.gateway.commands.RequestConnection()
 
     @cli
-    async def get_common_link_properties(self) -> Dict[Any]:
-        """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
+    async def get_common_link_properties(self) -> Dict:
+        """Returns (    NewWANAccessType, NewLayer1UpstreamMaxBitRate,
+                        NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus    )."""
         return await self.gateway.commands.GetCommonLinkProperties()
 
     @cli
     async def get_total_bytes_sent(self) -> Awaitable[int]:
-        """Returns (NewTotalBytesSent)"""
+        """Returns NewTotalBytesSent."""
         return await self.gateway.commands.GetTotalBytesSent()
 
     @cli
     async def get_total_bytes_received(self) -> Awaitable[int]:
-        """Returns (NewTotalBytesReceived)"""
+        """Returns NewTotalBytesReceived."""
         return await self.gateway.commands.GetTotalBytesReceived()
 
     @cli
     async def get_total_packets_sent(self) -> Awaitable[int]:
-        """Returns (NewTotalPacketsSent)"""
+        """Returns NewTotalPacketsSent."""
         return await self.gateway.commands.GetTotalPacketsSent()
 
     @cli
     async def get_total_packets_received(self) -> Awaitable[int]:
-        """Returns (NewTotalPacketsReceived)"""
+        """Returns NewTotalPacketsReceived."""
         return await self.gateway.commands.GetTotalPacketsReceived()
 
     @cli
     async def x_get_ics_statistics(self) -> Awaitable[Tuple[int, int, int, int, str, str]]:
-        """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
+        """Returns (    TotalBytesSent, TotalBytesReceived, TotalPacketsSent,
+                        TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime    )."""
         return await self.gateway.commands.X_GetICSStatistics()
 
     @cli
     async def get_default_connection_service(self) -> Awaitable[str]:
-        """Returns (NewDefaultConnectionService)"""
+        """Returns NewDefaultConnectionService."""
         return await self.gateway.commands.GetDefaultConnectionService()
 
     @cli
     async def set_default_connection_service(self, new_default_connection_service: str) -> Awaitable[None]:
-        """Returns (None)"""
+        """Returns None."""
         return await self.gateway.commands.SetDefaultConnectionService(new_default_connection_service)
 
     @cli
     async def set_enabled_for_internet(self, new_enabled_for_internet: bool) -> Awaitable[None]:
+        """
+        :param new_enabled_for_internet:
+        :return: bool
+        """
         return await self.gateway.commands.SetEnabledForInternet(new_enabled_for_internet)
 
     @cli
     async def get_enabled_for_internet(self) -> Awaitable[bool]:
+        """Get the value for the internet connectivity configuration."""
         return await self.gateway.commands.GetEnabledForInternet()
 
     @cli
     async def get_maximum_active_connections(self, new_active_connection_index: int) -> Awaitable[int]:
+        """Get MAX active connections the gateway is configured to support."""
         return await self.gateway.commands.GetMaximumActiveConnections(new_active_connection_index)
 
     @cli
     async def get_active_connections(self) -> Awaitable[Tuple[str, str]]:
-        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
+        """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID)."""
         return await self.gateway.commands.GetActiveConnections()
 
     @classmethod
-    def run_cli(cls, method: str, igd_args: Dict[str, Any], lan_address: Optional[str] = '',
-                gateway_address: Optional[str] = '', timeout: Optional[int] = 30,
-                interface_name: Optional[str] = 'default', unicast: Optional[bool] = True,
-                loop: Optional[Union[AbstractEventLoop, None]] = None, **kwargs: OrderedDict) -> \
-            Union[None, asyncio.Future]:
+    def run_cli(cls, method: str, igd_args: Mapping[str, Any], lan_address: Optional[str] = "",
+                gateway_address: Optional[str] = "", timeout: Optional[int] = 30,
+                interface_name: Optional[str] = "default", unicast: Optional[bool] = True,
+                loop: Optional[AbstractEventLoop] = None, **kwargs) -> Optional[asyncio.Future]:
         """
         :param method: the command name
         :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided
@@ -398,17 +420,17 @@ class UPnP:
             except UPnPError as err:
                 fut.set_exception(err)
             except Exception as err:
-                log.exception("uncaught error")
-                fut.set_exception(UPnPError("uncaught error: %s" % str(err)))
+                log.exception("Uncaught error.")
+                fut.set_exception(UPnPError("Uncaught error: %s." % str(err)))
 
         if not hasattr(UPnP, method) or not hasattr(getattr(UPnP, method), "_cli"):
-            fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
+            fut.set_exception(UPnPError("\"%s\" is not a recognized command." % method))
         else:
             loop.run_until_complete(wrapper())
         try:
             result = fut.result()
         except UPnPError as err:
-            print("aioupnp encountered an error: %s" % str(err))
+            print("aioupnp encountered an error: %s." % str(err))
             return
 
         if isinstance(result, (list, tuple, dict)):
