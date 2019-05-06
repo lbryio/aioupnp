@@ -10,9 +10,9 @@ CONTENT_PATTERN: Union[Pattern, bytes] = re.compile(r'(\<\?xml version=\"1\.0\"\
 
 XML_ROOT_SANITY_PATTERN: Union[Pattern, str] = re.compile(
     r'(?i)(\{|(urn:schemas-[\w|\d]*-(com|org|net))[:|-](device|service)[:|-]([\w|\d|\:|\-|\_]*)|\}([\w|\d|\:|\-|\_]*))'
-)
+)  # TODO: refactor
 
-XML_OTHER_KEYS: Union[Pattern, str] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')
+XML_OTHER_KEYS: Union[Pattern, str] = re.compile(r'{[\w|\:\/\.]*}|(\w*)')  # TODO: refactor
 
 
 def serialize_scpd_get(path: str, address: str) -> bytes:
@@ -30,12 +30,12 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
         host = host.split(":")[0]
     if not path.startswith("/"):
         path = "/" + path
-    return f"""
-    GET {host} HTTP/1.1\r\n'
-    Accept-Encoding: gzip\r\n'
-    Host: {path}\r\n
-    Connection: Close\r\n
-    \r\n""".encode()
+    return '\r\n'.join([
+        f'GET {host} HTTP/1.1',
+        "Accept-Encoding: gzip",
+        f'Host: {path}',
+        "Connection: Close",
+    ]).encode()
 
 
 def deserialize_scpd_get_response(content: bytes) -> Dict:
@@ -44,12 +44,12 @@ def deserialize_scpd_get_response(content: bytes) -> Dict:
     :param str or bytes content:
     :return dict response:
     """
-    if XML_VERSION.encode() in content:
-        parsed = CONTENT_PATTERN.findall(content)
-        content = b'' if not parsed else parsed[0][0]
-        xml_dict = etree_to_dict(ElementTree.fromstring(content.decode()))
-        return parse_device_dict(xml_dict)
-    return {}
+    if not XML_VERSION.encode() in content:
+        return {}
+    parsed = CONTENT_PATTERN.findall(content)
+    content = b'' if not parsed else parsed[0][0]
+    xml_dict = etree_to_dict(ElementTree.fromstring(content.decode()))
+    return parse_device_dict(xml_dict)
 
 
 def parse_device_dict(xml_dict: Union[Tuple[List, Dict], Dict]) -> Dict:

@@ -9,7 +9,7 @@ from asyncio import AbstractEventLoop
 log = logging.getLogger(__name__)
 none_or_str = Union[None, str]
 return_type_lambas = {
-    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ["none", "nil"] else None
+    Optional[str]: lambda x: x if x is not None and str(x).lower() not in ["none", "nil"] else None
 }
 
 
@@ -261,7 +261,7 @@ class SOAPCommands:
 
     @staticmethod
     async def get_total_bytes_sent() -> Any:
-        """Returns (    NewTotalBytesSent   )."""
+        """Returns NewTotalBytesSent."""
         raise NotImplementedError()
 
     GetTotalBytesSent = get_total_bytes_sent
