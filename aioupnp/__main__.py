@@ -8,7 +8,7 @@ from asyncio import AbstractEventLoop
 
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter('%(asctime)-15s-%(filename)s:%(lineno)s->%(message)s'))
+handler.setFormatter(logging.Formatter("%(asctime)-15s-%(filename)s:%(lineno)s->%(message)s"))
 log.addHandler(handler)
 log.setLevel(logging.WARNING)
 
@@ -33,18 +33,17 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
         " | ".join(commands), 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False
     ))
 
-    usage = \
-        "\n%s\n" \
-        "If m-search headers are provided as keyword arguments all of the headers to be used must be provided,\n" \
-        "in the order they are to be used. For example:\n" \
-        "  aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search\n\n" \
-        "Commands:\n" \
-        "%s\n\n" \
-        "For help with a specific command:" \
-        "  aioupnp help <command>\n" % (base_usage, help_str)
+    usage = """\n%s\n
+        If m-search headers are provided as keyword arguments all of the headers to be used must be provided,\n" \
+        in the order they are to be used. For example:\n
+        aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search\n\n" \
+        Commands:\n
+        %s\n\n
+        For help with a specific command:"\n
+        \taioupnp help <command>\n""" % (base_usage, help_str)
 
     args = argv[1:]
-    if args[0] in ['help', '-h', '--help']:
+    if args[0] in ["help", "-h", "--help"]:
         if len(args) > 1:
             if args[1] in commands:
                 sys.exit(get_help(args[1]))
@@ -52,9 +51,9 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
 
     defaults = {
         'debug_logging': False,
-        'interface': 'default',
-        'gateway_address': '',
-        'lan_address': '',
+        'interface': "default",
+        'gateway_address': "",
+        'lan_address': "",
         'timeout': 30,
         'unicast': False
     }
@@ -67,7 +66,7 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
                 k, v = arg.split("=")
             else:
                 k, v = arg, True
-            k = k.lstrip('--')
+            k = k.lstrip("--")
             options[k] = v
         else:
             command = arg
@@ -79,7 +78,7 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
     for arg in args[len(options)+1:]:
         if arg.startswith("--"):
             k, v = arg.split("=")
-            k = k.lstrip('--')
+            k = k.lstrip("--")
             kwargs[k] = v
         else:
             break
@@ -87,12 +86,12 @@ def main(argv: str = None, loop: Union[AbstractEventLoop, None] = None) -> None:
         if k not in options:
             options[k] = v
 
-    if options.pop('debug_logging'):
+    if options.pop("debug_logging"):
         log.setLevel(logging.DEBUG)
 
     UPnP.run_cli(
-        command.replace('-', '_'), options, options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('interface'), options.pop('unicast'), loop=loop, **kwargs
+        command.replace("-", "_"), options, options.pop("lan_address"), options.pop("gateway_address"),
+        options.pop("timeout"), options.pop("interface"), options.pop("unicast"), loop=loop, **kwargs
     )
 
 

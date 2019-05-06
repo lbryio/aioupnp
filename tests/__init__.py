@@ -7,7 +7,8 @@ try:
 except ImportError:
     # this is only available in py3.7
     def _cancel_all_tasks(loop):
-        pass
+        loop.set_task_factory(None)
+        loop.create_task(_cancel_all_tasks)
 
 
 class TestBase(unittest.TestCase):

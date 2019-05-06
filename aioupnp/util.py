@@ -1,7 +1,7 @@
 import re
 import socket
 from collections import defaultdict
-from typing import Tuple, Dict, Pattern, Union, List
+from typing import Tuple, Dict, Pattern, Union, List, Any
 from xml.etree import ElementTree
 import netifaces
 
@@ -10,7 +10,7 @@ BASE_ADDRESS_REGEX: Union[Pattern, bytes] = re.compile(r'^(http:\/\/\d*\.\d*\.\d
 BASE_PORT_REGEX: Union[Pattern, bytes] = re.compile(r'^http:\/\/\d*\.\d*\.\d*\.\d*:(\d*)\/.*$'.encode())
 
 
-def etree_to_dict(t: ElementTree.Element) -> Dict:
+def etree_to_dict(t: ElementTree.Element) -> Union[Dict[None], Dict[str, Union[Dict[List[Any]], Any]]]:
     d: dict = {}
     if t.attrib:
         d[t.tag] = {}
@@ -33,7 +33,8 @@ def etree_to_dict(t: ElementTree.Element) -> Dict:
     return d
 
 
-def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> Union[Dict, Tuple[List, Dict], List[Dict]]:
+def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> \
+        Union[Dict[Any], Tuple[List[Any], Dict[Any]], List[Dict[Any]]]:
     if not isinstance(d, (list, dict)):
         return d
     if isinstance(d, list):
@@ -47,7 +48,7 @@ def flatten_keys(d: Union[Tuple[List, Dict], List], strip: str) -> Union[Dict, T
     return t
 
 
-def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError, Dict]:
+def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError("Overlapping Keys."), Any]:
     match = list(filter(lambda x: x.lower() == k.lower(), d.keys()))
     if not match:
         return
@@ -67,7 +68,7 @@ def get_dict_val_case_insensitive(d: Dict, k: str) -> Union[None, KeyError, Dict
 #     )[20:24])
 
 
-def get_interfaces() -> Dict:
+def get_interfaces() -> Dict[str, Union[Tuple[str, str], str]]:
     r = {
         interface_name: (router_address, netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]['addr'])
         for router_address, interface_name, _ in netifaces.gateways()[socket.AF_INET]

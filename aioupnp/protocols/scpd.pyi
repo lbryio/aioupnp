@@ -1,7 +1,7 @@
 from asyncio import DatagramProtocol, Future, AbstractEventLoop
 from collections import OrderedDict
 
-from typing import Pattern, Union, List, Tuple, runtime
+from typing import Pattern, Union, List, Tuple, runtime, Optional
 
 from aioupnp.fault import UPnPError
 
@@ -14,7 +14,7 @@ def parse_headers(response: bytes) -> Tuple[OrderedDict, int, bytes]:
 
 @runtime
 class SCPDHTTPClientProtocol(DatagramProtocol):
-    def __init__(self, message: str, finished: Future, soap_method: Union[bytes, None] = None, soap_service_id: Union[bytes, None] = None) -> None:
+    def __init__(self, message: str, finished: Future, soap_method: Optional[bytes] = None, soap_service_id: Optional[bytes] = None) -> None:
         self.message: str = message
         self.response_buff: bytes = b''
         self.finished: Future = finished
@@ -28,9 +28,9 @@ class SCPDHTTPClientProtocol(DatagramProtocol):
         self._body: bytes = b''
 
 
-async def scpd_get(control_url: str, address: str, port: int, loop: Union[AbstractEventLoop, None] = None) -> Union[Tuple[OrderedDict, str], UPnPError]:
+async def scpd_get(control_url: str, address: str, port: int, loop: Optional[AbstractEventLoop] = None) -> Union[Tuple[OrderedDict, str], UPnPError]:
     ...
 
 
-async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: List, service_id: bytes, loop: Union[AbstractEventLoop, None] = None, **kwargs: OrderedDict) -> Union[Tuple[OrderedDict, str], UPnPError]:
+async def scpd_post(control_url: str, address: str, port: int, method: str, param_names: List, service_id: bytes, loop: Optional[AbstractEventLoop] = None, **kwargs: OrderedDict) -> Union[Tuple[OrderedDict, str], UPnPError]:
     ...

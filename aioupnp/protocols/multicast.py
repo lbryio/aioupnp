@@ -23,7 +23,7 @@ class MulticastProtocol(asyncio.DatagramProtocol):
 
         :return socket.socket:
         """
-        return self.transport.get_extra_info(name='socket')
+        return self.transport.get_extra_info(name="socket")
 
     def get_ttl(self):
         """Get Time-To-Live for the address.

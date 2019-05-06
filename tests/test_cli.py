@@ -31,7 +31,7 @@ class TestCLI(TestBase):
         ("MX", 1),
         ("ST", "urn:schemas-upnp-org:device:WANDevice:1")
     ])
-    reply = SSDPDatagram("OK", OrderedDict([
+    reply = SSDPDatagram("OK", **OrderedDict([
         ("CACHE_CONTROL", "max-age=1800"),
         ("LOCATION", "http://10.0.0.1:49152/InternetGatewayDevice.xml"),
         ("SERVER", "Linux, UPnP/1.0, DIR-890L Ver 1.20"),
@@ -50,7 +50,7 @@ class TestCLI(TestBase):
     }
 
     packet_args = list(packet_generator())
-    byte_packets = [SSDPDatagram("M-SEARCH", p).encode().encode() for p in packet_args]
+    byte_packets = [SSDPDatagram("M-SEARCH", p).encode() for p in packet_args]
 
     successful_args = OrderedDict([
         ("HOST", "239.255.255.250:1900"),
@@ -58,7 +58,7 @@ class TestCLI(TestBase):
         ("MX", 1),
         ("ST", "urn:schemas-upnp-org:device:WANDevice:1")
     ])
-    query_packet = SSDPDatagram("M-SEARCH", successful_args)
+    query_packet = SSDPDatagram("M-SEARCH", **successful_args)
 
     reply_args = OrderedDict([
         ("CACHE_CONTROL", "max-age=1800"),
@@ -67,38 +67,40 @@ class TestCLI(TestBase):
         ("ST", "urn:schemas-upnp-org:device:WANDevice:1"),
         ("USN", "uuid:22222222-3333-4444-5555-666666666666::urn:schemas-upnp-org:device:WANDevice:1")
     ])
-    reply_packet = SSDPDatagram("OK", reply_args)
+    reply_packet = SSDPDatagram("OK", **reply_args)
 
     udp_replies = {
-        (query_packet.encode().encode(), ("10.0.0.1", 1900)): reply_packet.encode().encode()
+        (query_packet.encode(), ("10.0.0.1", 1900)): reply_packet.encode()
     }
 
     def test_get_external_ip(self):
         actual_output = StringIO()
         with contextlib.redirect_stdout(actual_output):
             with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
-                main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'get-external-ip'),
-                    self.loop
+                main(self.loop)
+                self.loop.call_soon_threadsafe(
+                    actual_output, "--timeout=1", "--gateway_address=10.0.0.1",
+                    "--lan_address=10.0.0.2", "get-external-ip"
                 )
         self.assertEqual("11.22.33.44\n", actual_output.getvalue())
 
     def test_m_search(self):
         actual_output = StringIO()
-        timeout_msg = "aioupnp encountered an error: M-SEARCH for 10.0.0.1:1900 timed out\n"
+        timeout_msg = "aioupnp encountered an error: M-SEARCH for 10.0.0.1:1900 timed out.\n"
         with contextlib.redirect_stdout(actual_output):
-            with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
-                main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'm-search'),
-                    self.loop
+            with mock_tcp_and_udp(self.loop, "10.0.0.1", tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
+                main(self.loop)
+                self.loop.call_soon_threadsafe(
+                    actual_output, "--timeout=1", "--gateway_address=10.0.0.1", "--lan_address=10.0.0.2", "m-search"
                 )
         self.assertEqual(timeout_msg, actual_output.getvalue())
 
         actual_output = StringIO()
         with contextlib.redirect_stdout(actual_output):
-            with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
-                main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', '--unicast', 'm-search'),
-                    self.loop
+            with mock_tcp_and_udp(self.loop, "10.0.0.1", tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
+                main(self.loop)
+                self.loop.call_soon_threadsafe(
+                    actual_output, "--timeout=1", "--gateway_address=10.0.0.1",
+                    "--lan_address=10.0.0.2", "--unicast", "m-search"
                 )
         self.assertEqual(m_search_cli_result, actual_output.getvalue())

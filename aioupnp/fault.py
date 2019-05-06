@@ -1,14 +1,15 @@
 from aioupnp.util import flatten_keys
 from aioupnp.constants import FAULT, CONTROL
-from typing import Dict, Union
+from collections import OrderedDict
+from typing import Any, Mapping, Optional
 
 
 class UPnPError(Exception):
     """UPnPError."""
-    pass
+    ...
 
 
-def handle_fault(response: Dict) -> Union[Dict, UPnPError]:
+def handle_fault(response: OrderedDict) -> Any[Mapping, Optional[UPnPError]]:
     """Handle Fault.
 
     :param dict response: Response

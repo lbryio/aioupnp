@@ -1,31 +1,32 @@
 import logging
 import time
+from collections import OrderedDict
 from typing import Any, Optional
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Mapping, Set, Dict
 from aioupnp.protocols.scpd import scpd_post
 from asyncio import AbstractEventLoop
 
 log = logging.getLogger(__name__)
 none_or_str = Union[None, str]
 return_type_lambas = {
-    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ['none', 'nil'] else None
+    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ["none", "nil"] else None
 }
 
 
-def safe_type(t: Any[tuple, list, dict, set]) -> Any[type, list, dict, set]:
+def safe_type(t: Union[Tuple, List, Mapping, Set]) -> Union[Tuple, List, Dict, Any]:
     """Return input if type safe.
 
     :param t:
     :return:
     """
     if isinstance(t, Tuple):
-        return tuple
+        return tuple(t)
     if isinstance(t, List):
-        return list
-    if isinstance(t, dict):
-        return dict
-    if isinstance(t, set):
-        return set
+        return list(t)
+    if isinstance(t, Mapping):
+        return dict(t)
+    if isinstance(t, Set):
+        return set(t)
     return t
 
 
@@ -33,8 +34,8 @@ class SOAPCommand:
     """SOAP Command."""
 
     def __init__(self, gateway_address: str, service_port: int, control_url: str, service_id: bytes, method: str,
-                 param_types: dict, return_types: dict, param_order: list, return_order: list,
-                 loop: Any[Optional[AbstractEventLoop], None] = None) -> None:
+                 param_types: Mapping, return_types: Mapping, param_order: List, return_order: List,
+                 loop: Optional[AbstractEventLoop] = None) -> None:
         """
 
         :param gateway_address:
@@ -53,25 +54,28 @@ class SOAPCommand:
         self.control_url: str = control_url
         self.service_id: bytes = service_id
         self.method: str = method
-        self.param_types = param_types
-        self.param_order = param_order
-        self.return_types = return_types
-        self.return_order = return_order
-        self.loop: Any[AbstractEventLoop, None] = loop
-        self._requests: list = []
+        self.param_types: List = param_types
+        self.param_order: List = param_order
+        self.return_types: Mapping = return_types
+        self.return_order: Mapping = return_order
+        self.loop: Optional[AbstractEventLoop] = loop
+        self._requests: List = []
 
-    async def __call__(self, **kwargs) -> Union[None, dict, list, tuple]:
+    async def __call__(self, **kwargs: OrderedDict) -> Union[None, dict, list, tuple]:
         """Supports Call.
 
         :param kwargs:
         :return:
         """
-        if set(kwargs.keys()) != set(self.param_types.keys()):
-            raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_types.keys()))
-        soap_kwargs = {n: safe_type(self.param_types[n])(kwargs[n]) for n in self.param_types.keys()}
+        if set(kwargs.keys()) != set(getattr(self.param_types, 'keys')):
+            raise Exception("Argument mismatch: %s vs %s." % (kwargs.keys(), getattr(self.param_types, "keys")))
+        soap_kwargs = [{n: safe_type(self.param_types[n]), (kwargs[n] for n in self.param_types[n].keys())}]
+        # soap_kwargs = {kwargs.keys(): [n for n in iter(kwargs).values }
+        #for key, value in enumerate(kwargs):
+        #    soap_kwargs[key] = [safe_type(n.fromkeys(value[n])) for n in self.param_types.pop()]
         response, xml_bytes, err = await scpd_post(
             self.control_url, self.gateway_address, self.service_port, self.method, self.param_order,
-            self.service_id, self.loop, **soap_kwargs
+            self.service_id, self.loop, **soap_kwargs[0]
         )
         if err is not None:
             self._requests.append((soap_kwargs, xml_bytes, None, err, time.time()))
@@ -100,32 +104,32 @@ class SOAPCommands:
     """
 
     SOAP_COMMANDS: List[str] = [
-        'AddPortMapping',
-        'GetNATRSIPStatus',
-        'GetGenericPortMappingEntry',
-        'GetSpecificPortMappingEntry',
-        'SetConnectionType',
-        'GetExternalIPAddress',
-        'GetConnectionTypeInfo',
-        'GetStatusInfo',
-        'ForceTermination',
-        'DeletePortMapping',
-        'RequestConnection',
-        'GetCommonLinkProperties',
-        'GetTotalBytesSent',
-        'GetTotalBytesReceived',
-        'GetTotalPacketsSent',
-        'GetTotalPacketsReceived',
-        'X_GetICSStatistics',
-        'GetDefaultConnectionService',
-        'NewDefaultConnectionService',
-        'NewEnabledForInternet',
-        'SetDefaultConnectionService',
-        'SetEnabledForInternet',
-        'GetEnabledForInternet',
-        'NewActiveConnectionIndex',
-        'GetMaximumActiveConnections',
-        'GetActiveConnections'
+        "AddPortMapping",
+        "GetNATRSIPStatus",
+        "GetGenericPortMappingEntry",
+        "GetSpecificPortMappingEntry",
+        "SetConnectionType",
+        "GetExternalIPAddress",
+        "GetConnectionTypeInfo",
+        "GetStatusInfo",
+        "ForceTermination",
+        "DeletePortMapping",
+        "RequestConnection",
+        "GetCommonLinkProperties",
+        "GetTotalBytesSent",
+        "GetTotalBytesReceived",
+        "GetTotalPacketsSent",
+        "GetTotalPacketsReceived",
+        "X_GetICSStatistics",
+        "GetDefaultConnectionService",
+        "NewDefaultConnectionService",
+        "NewEnabledForInternet",
+        "SetDefaultConnectionService",
+        "SetEnabledForInternet",
+        "GetEnabledForInternet",
+        "NewActiveConnectionIndex",
+        "GetMaximumActiveConnections",
+        "GetActiveConnections"
     ]
 
     def __init__(self):
@@ -133,8 +137,8 @@ class SOAPCommands:
         self._registered: set = set()
 
     def register(self, base_ip: bytes, port: int, name: str, control_url: str,
-                 service_type: bytes, inputs: List, outputs: List,
-                 loop: Any[Optional[AbstractEventLoop], None] = None) -> None:
+                 service_type: bytes, inputs: List[str], outputs: List[str],
+                 loop: Optional[AbstractEventLoop] = None) -> None:
         """Register Service.
 
         :param base_ip:

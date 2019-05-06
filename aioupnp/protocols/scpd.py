@@ -82,7 +82,7 @@ class SCPDHTTPClientProtocol(Protocol):
                     self._headers, self._response_code, self._response_msg = parse_headers(
                         b'\r\n'.join(self.response_buff.split(b'\r\n')[:i])
                     )
-                    content_length = get_dict_val_case_insensitive(self._headers, b'Content-Length')
+                    content_length = get_dict_val_case_insensitive(self._headers, "Content-Length")
                     if content_length is None:
                         return
                     self._content_length = int(content_length or 0)
@@ -95,7 +95,7 @@ class SCPDHTTPClientProtocol(Protocol):
                 else:
                     self.finished.set_exception(
                         UPnPError(
-                            "too many bytes written to response (%i vs %i expected)" % (
+                            "Too many bytes written to response (%i vs %i expected)." % (
                                 len(body), self._content_length
                             )
                         )
@@ -114,7 +114,7 @@ async def scpd_get(control_url, address, port, loop):
     finished = asyncio.Future()
     packet = serialize_scpd_get(control_url, address)
     transport, protocol = await loop.create_connection(
-        lambda: SCPDHTTPClientProtocol(packet, finished),  address, port
+        lambda: SCPDHTTPClientProtocol(packet.decode(), finished),  address, port
     )
     assert isinstance(protocol, SCPDHTTPClientProtocol)
     error = None

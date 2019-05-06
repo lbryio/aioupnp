@@ -1,6 +1,5 @@
 import logging
-import socket
-from typing import Dict, List, Union, Type, Any, Optional, Set, Tuple, TYPE_CHECKING, NoReturn
+from typing import Dict, List, Union, Type, Any, Optional, Set, Tuple, TYPE_CHECKING, NoReturn, Awaitable, Mapping
 import asyncio
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop, TimeoutError
@@ -18,19 +17,19 @@ from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
-return_type_lambas: Dict = {
-    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ['none', 'nil'] else None
+return_type_lambas: Mapping[Type, str] = {
+    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ["none", "nil"] else None
 }
 
 
-def get_action_list(element_dict: Union[Tuple[List, Dict], List]) -> List:
+def get_action_list(element_dict: OrderedDict) -> List:
     """Get Action List.
 
     :param element_dict:
     :return:
     """
     # [(<method>, [<input1>, ...], [<output1, ...]), ...]
-    service_info = flatten_keys(element_dict, "{%s}" % SERVICE)
+    service_info = flatten_keys(element_dict[0], "{%s}" % SERVICE)
     if "actionList" in service_info:
         action_list = service_info["actionList"]
     else:
@@ -66,7 +65,8 @@ def get_action_list(element_dict: Union[Tuple[List, Dict], List]) -> List:
 class Gateway:
     """Gateway."""
 
-    def __init__(self, ok_packet: SSDPDatagram, m_search_args: Dict, lan_address: str, gateway_address: str) -> None:
+    def __init__(self, ok_packet: SSDPDatagram, m_search_args: OrderedDict,
+                 lan_address: str, gateway_address: str) -> None:
         """Gateway object.
 
         :param ok_packet:
@@ -86,52 +86,51 @@ class Gateway:
         self.urn: bytes = (ok_packet.st or '').encode()
 
         self._xml_response: bytes = b''
-        self._service_descriptors: Dict = {}
+        self._service_descriptors: Mapping[str, Any] = {}
         self.base_address: bytes = BASE_ADDRESS_REGEX.findall(self.location)[0]
         self.port: int = int(BASE_PORT_REGEX.findall(self.location)[0])
         self.base_ip: bytes = self.base_address.lstrip(b'http://').split(b':')[0]
-        assert self.base_ip == gateway_address.encode()
+        assert self.base_ip == gateway_address.encode(), print(f'base ip = {self.base_ip} = {gateway_address.encode()}')
         self.path: bytes = self.location.split(b'%s:%i/' % (self.base_ip, self.port))[1]
 
-        self.spec_version = None
-        self.url_base = None
+        self.spec_version: Optional[str] = None
+        self.url_base: Optional[str] = None
 
-        self._device: Any[None, Optional[Device]] = None
-        self._devices: List = []
-        self._services: List = []
+        self._device: Optional[Device] = None
+        self._devices: List[Device] = []
+        self._services: List[Service] = []
 
-        self._unsupported_actions: Dict = {}
-        self._registered_commands: Dict = {}
+        self._unsupported_actions: Mapping[str, Any] = {}
+        self._registered_commands: Mapping[str, Any] = {}
         self.commands = SOAPCommands()
 
-    def gateway_descriptor(self) -> Dict:
+    def gateway_descriptor(self) -> Mapping[str, str]:
         """Gateway Descriptor.
 
         :return: dict
         """
-        r = {
-            "server": self.server.decode(),
-            "urlBase": self.url_base,
-            "location": self.location.decode(),
-            "specVersion": self.spec_version,
-            "usn": self.usn.decode(),
-            "urn": self.urn.decode(),
+        return {
+            'server': self.server.decode(),
+            'urlBase': self.url_base,
+            'location': self.location.decode(),
+            'specVersion': self.spec_version,
+            'usn': self.usn.decode(),
+            'urn': self.urn.decode(),
         }
-        return r
 
     @property
-    def manufacturer_string(self) -> str:
+    async def manufacturer_string(self) -> str:
         """Manufacturer string.
 
         :return str: Manufacturer string.
         """
         if not self.devices:
             return "UNKNOWN GATEWAY"
-        device = list(self.devices.values())[0]
+        device = await asyncio.gather(getattr(self.devices, "values")[0])
         return "%s %s" % (device.manufacturer, device.modelName)
 
     @property
-    def services(self) -> Dict:
+    def services(self) -> Mapping[Type[Service], Service]:
         """Services.
 
         :return dict: Services.
@@ -141,7 +140,7 @@ class Gateway:
         return {service.serviceType: service for service in self._services}
 
     @property
-    def devices(self) -> Dict:
+    async def devices(self) -> Mapping[Type[Device], Device]:
         """Devices
 
         :return dict: Devices.
@@ -150,14 +149,14 @@ class Gateway:
             return {}
         return {device.udn: device for device in self._devices}
 
-    def get_service(self, service_type: str) -> Union[Type[Service], None]:
+    def get_service(self, service_type: str) -> Union[Service, None]:
         for service in self._services:
-            if service.serviceType.lower() == service_type.lower():
+            if service.serviceType.lower() is service_type.lower():
                 return service
         return None
 
     @property
-    def soap_requests(self) -> List:
+    async def soap_requests(self) -> Awaitable[List]:
         soap_call_infos = []
         for name in self._registered_commands.keys():
             if not hasattr(getattr(self.commands, name), "_requests"):
@@ -166,34 +165,32 @@ class Gateway:
                 (name, request_args, raw_response, decoded_response, soap_error, ts)
                 for (
                     request_args, raw_response, decoded_response, soap_error, ts
-                ) in getattr(self.commands, name)._requests
+                ) in getattr((self.commands, name), "_requests")
             ])
-        soap_call_infos.sort(key=lambda x: x[5])
-        return soap_call_infos
+        return await soap_call_infos.sort(key=lambda x: x[5])
 
-    def debug_gateway(self) -> Dict:
+    def debug_gateway(self) -> Dict[str, Union[int, str, OrderedDict, List]]:
         return {
-            "manufacturer_string": self.manufacturer_string,
-            "gateway_address": self.base_ip,
-            "gateway_descriptor": self.gateway_descriptor(),
-            "gateway_xml": self._xml_response,
-            "services_xml": self._service_descriptors,
-            "services": {service.SCPDURL: service.as_dict() for service in self._services},
-            "m_search_args": [(k, v) for (k, v) in self._m_search_args.items()],
-            "reply": self._ok_packet.as_dict(),
-            "soap_port": self.port,
-            "registered_soap_commands": self._registered_commands,
-            "unsupported_soap_commands": self._unsupported_actions,
-            "soap_requests": self.soap_requests
+            'manufacturer_string': self.manufacturer_string,
+            'gateway_address': self.base_ip,
+            'gateway_descriptor': self.gateway_descriptor(),
+            'gateway_xml': self._xml_response,
+            'services_xml': self._service_descriptors,
+            'services': {service.SCPDURL: service.as_dict() for service in self._services},
+            'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
+            'reply': self._ok_packet.as_dict(),
+            'soap_port': self.port,
+            'registered_soap_commands': self._registered_commands,
+            'unsupported_soap_commands': self._unsupported_actions,
+            'soap_requests': self.soap_requests
         }
 
     @classmethod
-    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                                igd_args: Union[Dict, None] = None,
-                                loop: Union[AbstractEventLoop, None] = None,
-                                unicast: bool = False) -> Union[__class__, None]:
-        ignored: Set = set()
-        required_commands = ["AddPortMapping", "DeletePortMapping", "GetExternalIPAddress"]
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: Optional[float] = 30.0,
+                                igd_args: Optional[OrderedDict] = None, loop: Optional[AbstractEventLoop] = None,
+                                unicast: Optional[bool] = False) -> Optional[__class__]:
+        ignored: Set[Any] = set()
+        required_commands: List[str] = ["AddPortMapping", "DeletePortMapping", "GetExternalIPAddress"]
         while True:
             if not igd_args:
                 m_search_args, datagram = await fuzzy_m_search(
@@ -204,30 +201,29 @@ class Gateway:
                 datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
             try:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address)
-                log.debug("Get gateway descriptor %s.", datagram.location)
+                log.debug("Got gateway descriptor: %s.", datagram.location)
                 await gateway.discover_commands(loop)
                 requirements_met = all([required in gateway._registered_commands for required in required_commands])
                 if not requirements_met:
                     not_met = [
-                        required for required in required_commands if required not in gateway._registered_commands
+                        req for req in required_commands if req not in getattr(gateway, '_registered_commands')
                     ]
-                    log.debug("Found gateway %s at %s, however it does not implement required soap commands: %s.",
+                    log.debug("Found gateway %s at: %s, however it does not implement required soap commands: %s.",
                               gateway.manufacturer_string, gateway.location, not_met)
                     ignored.add(datagram.location)
                     continue
                 else:
-                    log.debug("Found gateway device %s.", datagram.location)
+                    log.debug("Found gateway device: %s.", datagram.location)
                     return gateway
             except (TimeoutError, UPnPError) as err:
-                log.debug("Get %s failed (%s), looking for other devices.", datagram.location, str(err))
+                log.debug("Get %s failed: (%s), looking for other devices.", datagram.location, str(err))
                 ignored.add(datagram.location)
                 continue
 
     @classmethod
-    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: Union[Dict, None] = None,
-                               loop = Union[AbstractEventLoop, None],
-                               unicast: Union[bool, None] = None) -> __class__:
+    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: Optional[float] = 30.0,
+                               igd_args: Optional[OrderedDict] = None, loop: Optional[AbstractEventLoop] = None,
+                               unicast: Optional[bool] = None) -> Union[__class__, Awaitable[__class__]]:
         if unicast is not None:
             return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
 
@@ -247,10 +243,9 @@ class Gateway:
                 task.exception()
             except asyncio.CancelledError:
                 pass
-
         return list(done)[0].result()
 
-    async def discover_commands(self, loop: Union[AbstractEventLoop, None] = None) -> NoReturn:
+    async def discover_commands(self, loop: Optional[AbstractEventLoop] = None) -> NoReturn[Optional[UPnPError]]:
         response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
         self._xml_response = xml_bytes
         if get_err is not None:
@@ -261,42 +256,39 @@ class Gateway:
             self.url_base = self.base_address.decode()
         if response:
             device_dict = get_dict_val_case_insensitive(response, "device")
-            self._device = Device(
-                self._devices, self._services, **device_dict
-            )
+            self._device = Device(self._devices, self._services, **device_dict)
         else:
             self._device = Device(self._devices, self._services)
         for service_type in self.services.keys():
             await self.register_commands(self.services[service_type], loop)
 
-    async def register_commands(self, service: Service, loop: Union[AbstractEventLoop, None] = None) -> Union[None, UPnPError]:
+    async def register_commands(self, service: Service,
+                                loop: Optional[AbstractEventLoop] = None) -> NoReturn[Optional[UPnPError]]:
         if not service.SCPDURL:
             raise UPnPError("No SCPD URL.")
-
-        log.debug("Grabbing file descriptor for %s from %s.", service.serviceType, service.SCPDURL)
+        log.debug("Grabbing file descriptor for %s from: %s.", service.serviceType, service.SCPDURL)
         service_dict, xml_bytes, get_err = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port)
-        self._service_descriptors[service.SCPDURL] = xml_bytes
-
+        setattr(self._service_descriptors, service.SCPDURL, xml_bytes)
         if get_err is not None:
-            log.debug("Failed to fetch file descriptor for %s from %s.", service.serviceType, service.SCPDURL)
+            log.debug("Failed to fetch file descriptor for %s from: %s.", service.serviceType, service.SCPDURL)
             if xml_bytes:
                 log.debug("Response: %s.", xml_bytes)
             return
         if not service_dict:
             return
 
-        action_list = get_action_list(service_dict)
+        action_list: List[OrderedDict] = get_action_list(service_dict)
 
         for name, inputs, outputs in action_list:
             try:
                 self.commands.register(self.base_ip, self.port, name, service.controlURL, service.serviceType.encode(),
                                        inputs, outputs, loop)
-                self._registered_commands[name] = service.serviceType
+                setattr(self._registered_commands, 'name', service.serviceType)
                 log.debug("Registered %s::%s.", service.serviceType, name)
             except AttributeError:
                 s = self._unsupported_actions.get(service.serviceType, [])
                 s.append(name)
-                self._unsupported_actions[service.serviceType] = s
+                setattr(self._unsupported_actions, service.serviceType, s)
                 log.debug("Available command for %s does not have a wrapper implemented: %s %s %s.",
                           service.serviceType, name, inputs, outputs)
-            log.debug("Registered service %s.", service.serviceType)
+            log.debug("Registered service: %s.", service.serviceType)

@@ -2,6 +2,8 @@ import asyncio
 import contextlib
 import socket
 import mock
+from asyncio import AbstractEventLoop
+from typing import Union, Type, Any, Optional
 
 
 @contextlib.contextmanager
@@ -13,7 +15,7 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
     sent_tcp_packets = sent_tcp_packets if sent_tcp_packets is not None else []
     tcp_replies = tcp_replies or {}
 
-    async def create_connection(protocol_factory, host=None, port=None):
+    async def create_connection(protocol_factory, host: Optional[str] = None, port: Optional[int] = None):
         def write(p: asyncio.Protocol):
             def _write(data):
                 sent_tcp_packets.append(data)
