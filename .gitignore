@@ -6,3 +6,4 @@ dist/
 .coverage
 .mypy_cache/
 aioupnp.spec
+*.xml
