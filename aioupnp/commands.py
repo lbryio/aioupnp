@@ -1,64 +1,67 @@
-import logging
+import asyncio
 import time
 import typing
-from typing import Tuple, Union, List
+import functools
+import logging
+from typing import Tuple
 from aioupnp.protocols.scpd import scpd_post
+from aioupnp.device import Service
 
 log = logging.getLogger(__name__)
-none_or_str = Union[None, str]
-return_type_lambas = {
-    Union[None, str]: lambda x: x if x is not None and str(x).lower() not in ['none', 'nil'] else None
-}
 
 
-def safe_type(t):
-    if t is typing.Tuple:
-        return tuple
-    if t is typing.List:
-        return list
-    if t is typing.Dict:
-        return dict
-    if t is typing.Set:
-        return set
-    return t
+def soap_optional_str(x: typing.Optional[str]) -> typing.Optional[str]:
+    return x if x is not None and str(x).lower() not in ['none', 'nil'] else None
 
 
-class SOAPCommand:
-    def __init__(self, gateway_address: str, service_port: int, control_url: str, service_id: bytes, method: str,
-                 param_types: dict, return_types: dict, param_order: list, return_order: list, loop=None) -> None:
-        self.gateway_address = gateway_address
-        self.service_port = service_port
-        self.control_url = control_url
-        self.service_id = service_id
-        self.method = method
-        self.param_types = param_types
-        self.param_order = param_order
-        self.return_types = return_types
-        self.return_order = return_order
-        self.loop = loop
-        self._requests: typing.List = []
+def soap_bool(x: typing.Optional[str]) -> bool:
+    return False if not x or str(x).lower() in ['false', 'False'] else True
 
-    async def __call__(self, **kwargs) -> typing.Union[None, typing.Dict, typing.List, typing.Tuple]:
-        if set(kwargs.keys()) != set(self.param_types.keys()):
-            raise Exception("argument mismatch: %s vs %s" % (kwargs.keys(), self.param_types.keys()))
-        soap_kwargs = {n: safe_type(self.param_types[n])(kwargs[n]) for n in self.param_types.keys()}
+
+def recast_single_result(t, result):
+    if t is bool:
+        return soap_bool(result)
+    if t is str:
+        return soap_optional_str(result)
+    return t(result)
+
+
+def recast_return(return_annotation, result, result_keys: typing.List[str]):
+    if return_annotation is None:
+        return None
+    if len(result_keys) == 1:
+        assert len(result_keys) == 1
+        single_result = result[result_keys[0]]
+        return recast_single_result(return_annotation, single_result)
+
+    annotated_args: typing.List[type] = list(return_annotation.__args__)
+    assert len(annotated_args) == len(result_keys)
+    recast_results: typing.List[typing.Optional[typing.Union[str, int, bool, bytes]]] = []
+    for type_annotation, result_key in zip(annotated_args, result_keys):
+        recast_results.append(recast_single_result(type_annotation, result[result_key]))
+    return tuple(recast_results)
+
+
+def soap_command(fn):
+    @functools.wraps(fn)
+    async def wrapper(self: 'SOAPCommands', **kwargs):
+        if not self.is_registered(fn.__name__):
+            return fn(self, **kwargs)
+        service = self.get_service(fn.__name__)
+        assert service.controlURL is not None
+        assert service.serviceType is not None
         response, xml_bytes, err = await scpd_post(
-            self.control_url, self.gateway_address, self.service_port, self.method, self.param_order,
-            self.service_id, self.loop, **soap_kwargs
+            service.controlURL, self._base_address.decode(), self._port, fn.__name__, self._registered[service][fn.__name__][0],
+            service.serviceType.encode(), self._loop, **kwargs
         )
         if err is not None:
-            self._requests.append((soap_kwargs, xml_bytes, None, err, time.time()))
+
+            self._requests.append((fn.__name__, kwargs, xml_bytes, None, err, time.time()))
             raise err
-        if not response:
-            result = None
-        else:
-            recast_result = tuple([safe_type(self.return_types[n])(response.get(n)) for n in self.return_order])
-            if len(recast_result) == 1:
-                result = recast_result[0]
-            else:
-                result = recast_result
-        self._requests.append((soap_kwargs, xml_bytes, result, None, time.time()))
+        result = recast_return(fn.__annotations__.get('return'), response, self._registered[service][fn.__name__][1])
+        self._requests.append((fn.__name__, kwargs, xml_bytes, result, None, time.time()))
         return result
+    return wrapper
 
 
 class SOAPCommands:
@@ -72,7 +75,7 @@ class SOAPCommands:
     to their expected types.
     """
 
-    SOAP_COMMANDS = [
+    SOAP_COMMANDS: typing.List[str] = [
         'AddPortMapping',
         'GetNATRSIPStatus',
         'GetGenericPortMappingEntry',
@@ -91,59 +94,63 @@ class SOAPCommands:
         'GetTotalPacketsReceived',
         'X_GetICSStatistics',
         'GetDefaultConnectionService',
-        'NewDefaultConnectionService',
-        'NewEnabledForInternet',
         'SetDefaultConnectionService',
         'SetEnabledForInternet',
         'GetEnabledForInternet',
-        'NewActiveConnectionIndex',
         'GetMaximumActiveConnections',
         'GetActiveConnections'
     ]
 
-    def __init__(self):
-        self._registered = set()
+    def __init__(self, loop: asyncio.AbstractEventLoop, base_address: bytes, port: int) -> None:
+        self._loop = loop
+        self._registered: typing.Dict[Service,
+                                      typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]]] = {}
+        self._base_address = base_address
+        self._port = port
+        self._requests: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
+                                                 typing.Optional[typing.Dict[str, typing.Any]],
+                                                 typing.Optional[Exception], float]] = []
 
-    def register(self, base_ip: bytes, port: int, name: str, control_url: str,
-                 service_type: bytes, inputs: List, outputs: List, loop=None) -> None:
-        if name not in self.SOAP_COMMANDS or name in self._registered:
+    def is_registered(self, name: str) -> bool:
+        if name not in self.SOAP_COMMANDS:
+            raise ValueError("unknown command")
+        for service in self._registered.values():
+            if name in service:
+                return True
+        return False
+
+    def get_service(self, name: str) -> Service:
+        if name not in self.SOAP_COMMANDS:
+            raise ValueError("unknown command")
+        for service, commands in self._registered.items():
+            if name in commands:
+                return service
+        raise ValueError(name)
+
+    def register(self, name: str, service: Service, inputs: typing.List[str], outputs: typing.List[str]) -> None:
+        # control_url: str, service_type: bytes,
+        if name not in self.SOAP_COMMANDS:
             raise AttributeError(name)
-        current = getattr(self, name)
-        annotations = current.__annotations__
-        return_types = annotations.get('return', None)
-        if return_types:
-            if hasattr(return_types, '__args__'):
-                return_types = tuple([return_type_lambas.get(a, a) for a in return_types.__args__])
-            elif isinstance(return_types, type):
-                return_types = (return_types,)
-            return_types = {r: t for r, t in zip(outputs, return_types)}
-        param_types = {}
-        for param_name, param_type in annotations.items():
-            if param_name == "return":
-                continue
-            param_types[param_name] = param_type
-        command = SOAPCommand(
-            base_ip.decode(), port, control_url, service_type,
-            name, param_types, return_types, inputs, outputs, loop=loop
-        )
-        setattr(command, "__doc__", current.__doc__)
-        setattr(self, command.method, command)
-        self._registered.add(command.method)
+        if self.is_registered(name):
+            raise AttributeError(f"{name} is already a registered SOAP command")
+        if service not in self._registered:
+            self._registered[service] = {}
+        self._registered[service][name] = inputs, outputs
 
-    @staticmethod
-    async def AddPortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
-                       NewInternalClient: str, NewEnabled: int, NewPortMappingDescription: str,
-                       NewLeaseDuration: str) -> None:
+    @soap_command
+    async def AddPortMapping(self, NewRemoteHost: str, NewExternalPort: int, NewProtocol: str, NewInternalPort: int,
+                             NewInternalClient: str, NewEnabled: int, NewPortMappingDescription: str,
+                             NewLeaseDuration: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetNATRSIPStatus() -> Tuple[bool, bool]:
+    @soap_command
+    async def GetNATRSIPStatus(self) -> Tuple[bool, bool]:
         """Returns (NewRSIPAvailable, NewNATEnabled)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetGenericPortMappingEntry(NewPortMappingIndex: int) -> Tuple[str, int, str, int, str,
+    @soap_command
+    async def GetGenericPortMappingEntry(self, NewPortMappingIndex: int) -> Tuple[str, int, str, int, str,
                                                                             bool, str, int]:
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
@@ -151,100 +158,100 @@ class SOAPCommands:
         """
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetSpecificPortMappingEntry(NewRemoteHost: str, NewExternalPort: int,
+    @soap_command
+    async def GetSpecificPortMappingEntry(self, NewRemoteHost: str, NewExternalPort: int,
                                           NewProtocol: str) -> Tuple[int, str, bool, str, int]:
         """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def SetConnectionType(NewConnectionType: str) -> None:
+    @soap_command
+    async def SetConnectionType(self, NewConnectionType: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetExternalIPAddress() -> str:
+    @soap_command
+    async def GetExternalIPAddress(self) -> str:
         """Returns (NewExternalIPAddress)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetConnectionTypeInfo() -> Tuple[str, str]:
+    @soap_command
+    async def GetConnectionTypeInfo(self) -> Tuple[str, str]:
         """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetStatusInfo() -> Tuple[str, str, int]:
+    @soap_command
+    async def GetStatusInfo(self) -> Tuple[str, str, int]:
         """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def ForceTermination() -> None:
+    @soap_command
+    async def ForceTermination(self) -> None:
         """Returns None"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def DeletePortMapping(NewRemoteHost: str, NewExternalPort: int, NewProtocol: str) -> None:
+    @soap_command
+    async def DeletePortMapping(self, NewRemoteHost: str, NewExternalPort: int, NewProtocol: str) -> None:
         """Returns None"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def RequestConnection() -> None:
+    @soap_command
+    async def RequestConnection(self) -> None:
         """Returns None"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetCommonLinkProperties():
+    @soap_command
+    async def GetCommonLinkProperties(self) -> Tuple[str, int, int, str]:
         """Returns (NewWANAccessType, NewLayer1UpstreamMaxBitRate, NewLayer1DownstreamMaxBitRate, NewPhysicalLinkStatus)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetTotalBytesSent():
+    @soap_command
+    async def GetTotalBytesSent(self) -> int:
         """Returns (NewTotalBytesSent)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetTotalBytesReceived():
+    @soap_command
+    async def GetTotalBytesReceived(self) -> int:
         """Returns (NewTotalBytesReceived)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetTotalPacketsSent():
+    @soap_command
+    async def GetTotalPacketsSent(self) -> int:
         """Returns (NewTotalPacketsSent)"""
         raise NotImplementedError()
 
-    @staticmethod
-    def GetTotalPacketsReceived():
+    @soap_command
+    async def GetTotalPacketsReceived(self) -> int:
         """Returns (NewTotalPacketsReceived)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def X_GetICSStatistics() -> Tuple[int, int, int, int, str, str]:
+    @soap_command
+    async def X_GetICSStatistics(self) -> Tuple[int, int, int, int, str, str]:
         """Returns (TotalBytesSent, TotalBytesReceived, TotalPacketsSent, TotalPacketsReceived, Layer1DownstreamMaxBitRate, Uptime)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetDefaultConnectionService():
+    @soap_command
+    async def GetDefaultConnectionService(self) -> str:
         """Returns (NewDefaultConnectionService)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def SetDefaultConnectionService(NewDefaultConnectionService: str) -> None:
+    @soap_command
+    async def SetDefaultConnectionService(self, NewDefaultConnectionService: str) -> None:
         """Returns (None)"""
         raise NotImplementedError()
 
-    @staticmethod
-    async def SetEnabledForInternet(NewEnabledForInternet: bool) -> None:
+    @soap_command
+    async def SetEnabledForInternet(self, NewEnabledForInternet: bool) -> None:
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetEnabledForInternet() -> bool:
+    @soap_command
+    async def GetEnabledForInternet(self) -> bool:
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetMaximumActiveConnections(NewActiveConnectionIndex: int):
+    @soap_command
+    async def GetMaximumActiveConnections(self, NewActiveConnectionIndex: int):
         raise NotImplementedError()
 
-    @staticmethod
-    async def GetActiveConnections() -> Tuple[str, str]:
+    @soap_command
+    async def GetActiveConnections(self) -> Tuple[str, str]:
         """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
         raise NotImplementedError()

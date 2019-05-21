@@ -44,10 +44,11 @@ ST
         characters in the domain name must be replaced with hyphens in accordance with RFC 2141.
 """
 
+import typing
 from collections import OrderedDict
 from aioupnp.constants import SSDP_DISCOVER, SSDP_HOST
 
-SEARCH_TARGETS = [
+SEARCH_TARGETS: typing.List[str] = [
     'upnp:rootdevice',
     'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-wifialliance-org:device:WFADevice:1',
@@ -58,7 +59,8 @@ SEARCH_TARGETS = [
 ]
 
 
-def format_packet_args(order: list, **kwargs):
+def format_packet_args(order: typing.List[str],
+                       kwargs: typing.Dict[str, typing.Union[int, str]]) -> typing.Dict[str, typing.Union[int, str]]:
     args = []
     for o in order:
         for k, v in kwargs.items():
@@ -68,18 +70,18 @@ def format_packet_args(order: list, **kwargs):
     return OrderedDict(args)
 
 
-def packet_generator():
+def packet_generator() -> typing.Iterator[typing.Dict[str, typing.Union[int, str]]]:
     for st in SEARCH_TARGETS:
         order = ["HOST", "MAN", "MX", "ST"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
-        yield format_packet_args(order, Host=SSDP_HOST, Man='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
-        yield format_packet_args(order, Host=SSDP_HOST, Man=SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': '"%s"' % SSDP_DISCOVER, 'MX': 1, 'ST': st})
+        yield format_packet_args(order, {'Host': SSDP_HOST, 'Man': '"%s"' % SSDP_DISCOVER, 'MX': 1, 'ST': st})
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': SSDP_DISCOVER, 'MX': 1, 'ST': st})
+        yield format_packet_args(order, {'Host': SSDP_HOST, 'Man': SSDP_DISCOVER, 'MX': 1, 'ST': st})
 
         order = ["HOST", "MAN", "ST", "MX"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': '"%s"' % SSDP_DISCOVER, 'MX': 1, 'ST': st})
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': SSDP_DISCOVER, 'MX': 1, 'ST': st})
 
         order = ["HOST", "ST", "MAN", "MX"]
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN='"%s"' % SSDP_DISCOVER, MX=1, ST=st)
-        yield format_packet_args(order, HOST=SSDP_HOST, MAN=SSDP_DISCOVER, MX=1, ST=st)
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': '"%s"' % SSDP_DISCOVER, 'MX': 1, 'ST': st})
+        yield format_packet_args(order, {'HOST': SSDP_HOST, 'MAN': SSDP_DISCOVER, 'MX': 1, 'ST': st})

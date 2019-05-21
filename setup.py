@@ -37,7 +37,7 @@ setup(
     packages=find_packages(exclude=('tests',)),
     entry_points={'console_scripts': console_scripts},
     install_requires=[
-        'netifaces',
+        'netifaces', 'defusedxml'
     ],
     extras_require={
         'test': (

@@ -1,8 +1,11 @@
-import logging
 import sys
+import asyncio
+import logging
 import textwrap
+import typing
 from collections import OrderedDict
 from aioupnp.upnp import UPnP
+from aioupnp.commands import SOAPCommands
 
 log = logging.getLogger("aioupnp")
 handler = logging.StreamHandler()
@@ -16,17 +19,18 @@ base_usage = "\n".join(textwrap.wrap(
     100, subsequent_indent='  ', break_long_words=False)) + "\n"
 
 
-def get_help(command):
-    fn = getattr(UPnP, command)
-    params = command + " " + " ".join(["[--%s=<%s>]" % (k, k) for k in fn.__annotations__ if k != 'return'])
+def get_help(command: str) -> str:
+    annotations = UPnP.get_annotations(command)
+    params = command + " " + " ".join(["[--%s=<%s>]" % (k, str(v)) for k, v in annotations.items() if k != 'return'])
     return base_usage + "\n".join(
         textwrap.wrap(params, 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False)
     )
 
 
-def main(argv=None, loop=None):
-    argv = argv or sys.argv
-    commands = [n for n in dir(UPnP) if hasattr(getattr(UPnP, n, None), "_cli")]
+def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
+         loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> int:
+    argv = argv or list(sys.argv)
+    commands = list(SOAPCommands.SOAP_COMMANDS)
     help_str = "\n".join(textwrap.wrap(
         " | ".join(commands), 100, initial_indent='  ', subsequent_indent='  ', break_long_words=False
     ))
@@ -41,14 +45,16 @@ def main(argv=None, loop=None):
         "For help with a specific command:" \
         "  aioupnp help <command>\n" % (base_usage, help_str)
 
-    args = argv[1:]
+    args: typing.List[str] = [str(arg) for arg in argv[1:]]
     if args[0] in ['help', '-h', '--help']:
         if len(args) > 1:
             if args[1] in commands:
-                sys.exit(get_help(args[1]))
-        sys.exit(print(usage))
+                print(get_help(args[1]))
+                return 0
+        print(usage)
+        return 0
 
-    defaults = {
+    defaults: typing.Dict[str, typing.Union[bool, str, int]] = {
         'debug_logging': False,
         'interface': 'default',
         'gateway_address': '',
@@ -57,22 +63,22 @@ def main(argv=None, loop=None):
         'unicast': False
     }
 
-    options = OrderedDict()
+    options: typing.Dict[str, typing.Union[bool, str, int]] = OrderedDict()
     command = None
     for arg in args:
         if arg.startswith("--"):
             if "=" in arg:
                 k, v = arg.split("=")
+                options[k.lstrip('--')] = v
             else:
-                k, v = arg, True
-            k = k.lstrip('--')
-            options[k] = v
+                options[arg.lstrip('--')] = True
         else:
             command = arg
             break
     if not command:
         print("no command given")
-        sys.exit(print(usage))
+        print(usage)
+        return 0
     kwargs = {}
     for arg in args[len(options)+1:]:
         if arg.startswith("--"):
@@ -81,18 +87,24 @@ def main(argv=None, loop=None):
             kwargs[k] = v
         else:
             break
-    for k, v in defaults.items():
+    for k in defaults:
         if k not in options:
-            options[k] = v
+            options[k] = defaults[k]
 
     if options.pop('debug_logging'):
         log.setLevel(logging.DEBUG)
 
+    lan_address: str = str(options.pop('lan_address'))
+    gateway_address: str = str(options.pop('gateway_address'))
+    timeout: int = int(options.pop('timeout'))
+    interface: str = str(options.pop('interface'))
+    unicast: bool = bool(options.pop('unicast'))
+
     UPnP.run_cli(
-        command.replace('-', '_'), options, options.pop('lan_address'), options.pop('gateway_address'),
-        options.pop('timeout'), options.pop('interface'), options.pop('unicast'), kwargs, loop
+        command.replace('-', '_'), options, lan_address, gateway_address, timeout, interface, unicast, kwargs, loop
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

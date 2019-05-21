@@ -5,12 +5,11 @@ import asyncio
 import zlib
 import base64
 from collections import OrderedDict
-from typing import Tuple, Dict, List, Union
+from typing import Tuple, Dict, List, Union, Optional, Callable
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
-from aioupnp.util import get_gateway_and_lan_addresses
+from aioupnp.interfaces import get_gateway_and_lan_addresses
 from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
-from aioupnp.commands import SOAPCommand
 from aioupnp.serialization.ssdp import SSDPDatagram
 
 log = logging.getLogger(__name__)
@@ -36,6 +35,10 @@ class UPnP:
         self.gateway = gateway
 
     @classmethod
+    def get_annotations(cls, command: str) -> Dict[str, type]:
+        return getattr(Gateway.commands, command).__annotations__
+
+    @classmethod
     def get_lan_and_gateway(cls, lan_address: str = '', gateway_address: str = '',
                             interface_name: str = 'default') -> Tuple[str, str]:
         if not lan_address or not gateway_address:
@@ -59,8 +62,9 @@ class UPnP:
     @classmethod
     @cli
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       igd_args: OrderedDict = None, unicast: bool = True, interface_name: str = 'default',
-                       loop=None) -> Dict:
+                       igd_args: Optional[Dict[str, Union[int, str]]] = None,
+                       unicast: bool = True, interface_name: str = 'default',
+                       loop=None) -> Dict[str, Union[str, Dict[str, Union[int, str]]]]:
         if not lan_address or not gateway_address:
             try:
                 lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -97,13 +101,13 @@ class UPnP:
     async def get_port_mapping_by_index(self, index: int) -> Dict:
         result = await self._get_port_mapping_by_index(index)
         if result:
-            if isinstance(self.gateway.commands.GetGenericPortMappingEntry, SOAPCommand):
+            if self.gateway.commands.is_registered('GetGenericPortMappingEntry'):
                 return {
                     k: v for k, v in zip(self.gateway.commands.GetGenericPortMappingEntry.return_order, result)
                 }
         return {}
 
-    async def _get_port_mapping_by_index(self, index: int) -> Union[None, Tuple[Union[None, str], int, str,
+    async def _get_port_mapping_by_index(self, index: int) -> Union[None, Tuple[Optional[str], int, str,
                                                                                 int, str, bool, str, int]]:
         try:
             redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
@@ -134,7 +138,7 @@ class UPnP:
             result = await self.gateway.commands.GetSpecificPortMappingEntry(
                 NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol
             )
-            if result and isinstance(self.gateway.commands.GetSpecificPortMappingEntry, SOAPCommand):
+            if result and self.gateway.commands.is_registered('GetSpecificPortMappingEntry'):
                 return {k: v for k, v in zip(self.gateway.commands.GetSpecificPortMappingEntry.return_order, result)}
         except UPnPError:
             pass
@@ -152,7 +156,8 @@ class UPnP:
         )
 
     @cli
-    async def get_next_mapping(self, port: int, protocol: str, description: str, internal_port: int=None) -> int:
+    async def get_next_mapping(self, port: int, protocol: str, description: str,
+                               internal_port: Optional[int] = None) -> int:
         if protocol not in ["UDP", "TCP"]:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         internal_port = int(internal_port or port)
@@ -340,8 +345,9 @@ class UPnP:
         return await self.gateway.commands.GetActiveConnections()
 
     @classmethod
-    def run_cli(cls, method, igd_args: OrderedDict, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
-                interface_name: str = 'default', unicast: bool = True, kwargs: dict = None, loop=None) -> None:
+    def run_cli(cls, method, igd_args: Dict[str, Union[bool, str, int]], lan_address: str = '',
+                gateway_address: str = '', timeout: int = 30, interface_name: str = 'default',
+                unicast: bool = True, kwargs: Optional[Dict] = None, loop=None) -> None:
         """
         :param method: the command name
         :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided
@@ -356,7 +362,7 @@ class UPnP:
         igd_args = igd_args
         timeout = int(timeout)
         loop = loop or asyncio.get_event_loop_policy().get_event_loop()
-        fut: asyncio.Future = asyncio.Future()
+        fut: asyncio.Future = loop.create_future()
 
         async def wrapper():  # wrap the upnp setup and call of the command in a coroutine
 
