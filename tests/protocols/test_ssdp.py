@@ -4,11 +4,10 @@ from aioupnp.protocols.m_search_patterns import packet_generator
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.constants import SSDP_IP_ADDRESS
 from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
-from tests import TestBase
-from tests.mocks import mock_tcp_and_udp
+from tests import AsyncioTestCase, mock_tcp_and_udp
 
 
-class TestSSDP(TestBase):
+class TestSSDP(AsyncioTestCase):
     packet_args = list(packet_generator())
     byte_packets = [SSDPDatagram("M-SEARCH", p).encode().encode() for p in packet_args]
 

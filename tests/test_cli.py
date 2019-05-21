@@ -1,7 +1,6 @@
 import contextlib
 from io import StringIO
-from tests import TestBase
-from tests.mocks import mock_tcp_and_udp
+from tests import AsyncioTestCase, mock_tcp_and_udp
 from collections import OrderedDict
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.protocols.m_search_patterns import packet_generator
@@ -22,7 +21,7 @@ m_search_cli_result = """{
 }\n"""
 
 
-class TestCLI(TestBase):
+class TestCLI(AsyncioTestCase):
     gateway_address = "10.0.0.1"
     soap_port = 49152
     m_search_args = OrderedDict([
@@ -78,7 +77,7 @@ class TestCLI(TestBase):
         with contextlib.redirect_stdout(actual_output):
             with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
                 main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'get-external-ip'),
+                    [None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'get-external-ip'],
                     self.loop
                 )
         self.assertEqual("11.22.33.44\n", actual_output.getvalue())
@@ -89,7 +88,7 @@ class TestCLI(TestBase):
         with contextlib.redirect_stdout(actual_output):
             with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
                 main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'm-search'),
+                    [None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', 'm-search'],
                     self.loop
                 )
         self.assertEqual(timeout_msg, actual_output.getvalue())
@@ -98,7 +97,7 @@ class TestCLI(TestBase):
         with contextlib.redirect_stdout(actual_output):
             with mock_tcp_and_udp(self.loop, '10.0.0.1', tcp_replies=self.scpd_replies, udp_replies=self.udp_replies):
                 main(
-                    (None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', '--unicast', 'm-search'),
+                    [None, '--timeout=1', '--gateway_address=10.0.0.1', '--lan_address=10.0.0.2', '--unicast', 'm-search'],
                     self.loop
                 )
         self.assertEqual(m_search_cli_result, actual_output.getvalue())

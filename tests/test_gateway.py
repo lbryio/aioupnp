@@ -1,10 +1,7 @@
-import asyncio
-
 from aioupnp.fault import UPnPError
-from tests import TestBase
-from tests.mocks import mock_tcp_and_udp
+from tests import AsyncioTestCase, mock_tcp_and_udp
 from collections import OrderedDict
-from aioupnp.gateway import Gateway
+from aioupnp.gateway import Gateway, get_action_list
 from aioupnp.serialization.ssdp import SSDPDatagram
 
 
@@ -14,7 +11,137 @@ def gen_get_bytes(location: str, host: str) -> bytes:
     ).encode()
 
 
-class TestDiscoverDLinkDIR890L(TestBase):
+class TestParseActionList(AsyncioTestCase):
+    test_action_list = {'actionList': {
+        'action': [OrderedDict([('name', 'SetConnectionType'), ('argumentList', OrderedDict([('argument', OrderedDict(
+            [('name', 'NewConnectionType'), ('direction', 'in'), ('relatedStateVariable', 'ConnectionType')]))]))]),
+                   OrderedDict([('name', 'GetConnectionTypeInfo'), ('argumentList', OrderedDict([('argument', [
+                       OrderedDict([('name', 'NewConnectionType'), ('direction', 'out'),
+                                    ('relatedStateVariable', 'ConnectionType')]), OrderedDict(
+                           [('name', 'NewPossibleConnectionTypes'), ('direction', 'out'),
+                            ('relatedStateVariable', 'PossibleConnectionTypes')])])]))]),
+                   OrderedDict([('name', 'RequestConnection')]), OrderedDict([('name', 'ForceTermination')]),
+                   OrderedDict([('name', 'GetStatusInfo'), ('argumentList', OrderedDict([('argument', [OrderedDict(
+                       [('name', 'NewConnectionStatus'), ('direction', 'out'),
+                        ('relatedStateVariable', 'ConnectionStatus')]), OrderedDict(
+                       [('name', 'NewLastConnectionError'), ('direction', 'out'),
+                        ('relatedStateVariable', 'LastConnectionError')]), OrderedDict(
+                       [('name', 'NewUptime'), ('direction', 'out'), ('relatedStateVariable', 'Uptime')])])]))]),
+                   OrderedDict([('name', 'GetNATRSIPStatus'), ('argumentList', OrderedDict([('argument', [OrderedDict(
+                       [('name', 'NewRSIPAvailable'), ('direction', 'out'),
+                        ('relatedStateVariable', 'RSIPAvailable')]), OrderedDict(
+                       [('name', 'NewNATEnabled'), ('direction', 'out'),
+                        ('relatedStateVariable', 'NATEnabled')])])]))]), OrderedDict(
+                [('name', 'GetGenericPortMappingEntry'), ('argumentList', OrderedDict([('argument', [OrderedDict(
+                    [('name', 'NewPortMappingIndex'), ('direction', 'in'),
+                     ('relatedStateVariable', 'PortMappingNumberOfEntries')]), OrderedDict(
+                    [('name', 'NewRemoteHost'), ('direction', 'out'), ('relatedStateVariable', 'RemoteHost')]),
+                    OrderedDict(
+                        [('name', 'NewExternalPort'), ('direction', 'out'), ('relatedStateVariable', 'ExternalPort')]),
+                    OrderedDict(
+                        [('name', 'NewProtocol'), ('direction', 'out'),
+                         ('relatedStateVariable', 'PortMappingProtocol')]),
+                    OrderedDict([('name',
+                                  'NewInternalPort'),
+                                 ('direction',
+                                  'out'), (
+                                     'relatedStateVariable',
+                                     'InternalPort')]),
+                    OrderedDict([('name',
+                                  'NewInternalClient'),
+                                 ('direction',
+                                  'out'), (
+                                     'relatedStateVariable',
+                                     'InternalClient')]),
+                    OrderedDict([('name',
+                                  'NewEnabled'),
+                                 ('direction',
+                                  'out'), (
+                                     'relatedStateVariable',
+                                     'PortMappingEnabled')]),
+                    OrderedDict([('name',
+                                  'NewPortMappingDescription'),
+                                 ('direction',
+                                  'out'), (
+                                     'relatedStateVariable',
+                                     'PortMappingDescription')]),
+                    OrderedDict([('name',
+                                  'NewLeaseDuration'),
+                                 ('direction',
+                                  'out'), (
+                                     'relatedStateVariable',
+                                     'PortMappingLeaseDuration')])])]))]),
+                   OrderedDict([('name', 'GetSpecificPortMappingEntry'), ('argumentList', OrderedDict([('argument', [
+                       OrderedDict(
+                           [('name', 'NewRemoteHost'), ('direction', 'in'), ('relatedStateVariable', 'RemoteHost')]),
+                       OrderedDict([('name', 'NewExternalPort'), ('direction', 'in'),
+                                    ('relatedStateVariable', 'ExternalPort')]), OrderedDict(
+                           [('name', 'NewProtocol'), ('direction', 'in'),
+                            ('relatedStateVariable', 'PortMappingProtocol')]), OrderedDict(
+                           [('name', 'NewInternalPort'), ('direction', 'out'),
+                            ('relatedStateVariable', 'InternalPort')]), OrderedDict(
+                           [('name', 'NewInternalClient'), ('direction', 'out'),
+                            ('relatedStateVariable', 'InternalClient')]), OrderedDict(
+                           [('name', 'NewEnabled'), ('direction', 'out'),
+                            ('relatedStateVariable', 'PortMappingEnabled')]), OrderedDict(
+                           [('name', 'NewPortMappingDescription'), ('direction', 'out'),
+                            ('relatedStateVariable', 'PortMappingDescription')]), OrderedDict(
+                           [('name', 'NewLeaseDuration'), ('direction', 'out'),
+                            ('relatedStateVariable', 'PortMappingLeaseDuration')])])]))]), OrderedDict(
+                [('name', 'AddPortMapping'), ('argumentList', OrderedDict([('argument', [
+                    OrderedDict(
+                        [('name', 'NewRemoteHost'), ('direction', 'in'), ('relatedStateVariable', 'RemoteHost')]),
+                    OrderedDict(
+                        [('name', 'NewExternalPort'), ('direction', 'in'), ('relatedStateVariable', 'ExternalPort')]),
+                    OrderedDict(
+                        [('name', 'NewProtocol'), ('direction', 'in'),
+                         ('relatedStateVariable', 'PortMappingProtocol')]),
+                    OrderedDict(
+                        [('name', 'NewInternalPort'), ('direction', 'in'), ('relatedStateVariable', 'InternalPort')]),
+                    OrderedDict(
+                        [('name', 'NewInternalClient'), ('direction', 'in'),
+                         ('relatedStateVariable', 'InternalClient')]),
+                    OrderedDict(
+                        [('name', 'NewEnabled'), ('direction', 'in'), ('relatedStateVariable', 'PortMappingEnabled')]),
+                    OrderedDict([('name', 'NewPortMappingDescription'), ('direction', 'in'),
+                                 ('relatedStateVariable', 'PortMappingDescription')]), OrderedDict(
+                        [('name', 'NewLeaseDuration'), ('direction', 'in'),
+                         ('relatedStateVariable', 'PortMappingLeaseDuration')])])]))]), OrderedDict(
+                [('name', 'DeletePortMapping'), ('argumentList', OrderedDict([('argument', [
+                    OrderedDict(
+                        [('name', 'NewRemoteHost'), ('direction', 'in'), ('relatedStateVariable', 'RemoteHost')]),
+                    OrderedDict(
+                        [('name', 'NewExternalPort'), ('direction', 'in'), ('relatedStateVariable', 'ExternalPort')]),
+                    OrderedDict(
+                        [('name', 'NewProtocol'), ('direction', 'in'),
+                         ('relatedStateVariable', 'PortMappingProtocol')])])]))]),
+                   OrderedDict([('name', 'GetExternalIPAddress'),
+                                ('argumentList', OrderedDict(
+                                    [('argument', OrderedDict([('name', 'NewExternalIPAddress'),
+                                                               ('direction', 'out'),
+                                                               ('relatedStateVariable', 'ExternalIPAddress')]))]))])]}}
+
+    def test_parse_expected_action_list(self):
+        expected = [('SetConnectionType', ['NewConnectionType'], []),
+                    ('GetConnectionTypeInfo', [], ['NewConnectionType', 'NewPossibleConnectionTypes']),
+                    ('RequestConnection', [], []), ('ForceTermination', [], []),
+                    ('GetStatusInfo', [], ['NewConnectionStatus', 'NewLastConnectionError', 'NewUptime']),
+                    ('GetNATRSIPStatus', [], ['NewRSIPAvailable', 'NewNATEnabled']), (
+                    'GetGenericPortMappingEntry', ['NewPortMappingIndex'],
+                    ['NewRemoteHost', 'NewExternalPort', 'NewProtocol', 'NewInternalPort', 'NewInternalClient',
+                     'NewEnabled', 'NewPortMappingDescription', 'NewLeaseDuration']), (
+                    'GetSpecificPortMappingEntry', ['NewRemoteHost', 'NewExternalPort', 'NewProtocol'],
+                    ['NewInternalPort', 'NewInternalClient', 'NewEnabled', 'NewPortMappingDescription',
+                     'NewLeaseDuration']), ('AddPortMapping',
+                                            ['NewRemoteHost', 'NewExternalPort', 'NewProtocol', 'NewInternalPort',
+                                             'NewInternalClient', 'NewEnabled', 'NewPortMappingDescription',
+                                             'NewLeaseDuration'], []),
+                    ('DeletePortMapping', ['NewRemoteHost', 'NewExternalPort', 'NewProtocol'], []),
+                    ('GetExternalIPAddress', [], ['NewExternalIPAddress'])]
+        self.assertEqual(expected, get_action_list(self.test_action_list))
+
+
+class TestDiscoverDLinkDIR890L(AsyncioTestCase):
     gateway_address = "10.0.0.1"
     client_address = "10.0.0.2"
     soap_port = 49152

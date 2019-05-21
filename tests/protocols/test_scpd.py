@@ -1,10 +1,9 @@
 from aioupnp.fault import UPnPError
 from aioupnp.protocols.scpd import scpd_post, scpd_get
-from tests import TestBase
-from tests.mocks import mock_tcp_and_udp
+from tests import AsyncioTestCase, mock_tcp_and_udp
 
 
-class TestSCPDGet(TestBase):
+class TestSCPDGet(AsyncioTestCase):
     path, lan_address, port = '/IGDdevicedesc_brlan0.xml', '10.1.10.1', 49152
     get_request = b'GET /IGDdevicedesc_brlan0.xml HTTP/1.1\r\n' \
                   b'Accept-Encoding: gzip\r\nHost: 10.1.10.1\r\nConnection: Close\r\n\r\n'
@@ -142,7 +141,7 @@ class TestSCPDGet(TestBase):
             self.assertTrue(str(err).startswith('too many bytes written'))
 
 
-class TestSCPDPost(TestBase):
+class TestSCPDPost(AsyncioTestCase):
     param_names: list = []
     kwargs: dict = {}
     method, gateway_address, port = "GetExternalIPAddress", '10.0.0.1', 49152
