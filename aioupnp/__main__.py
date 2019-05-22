@@ -4,7 +4,7 @@ import logging
 import textwrap
 import typing
 from collections import OrderedDict
-from aioupnp.upnp import UPnP
+from aioupnp.upnp import run_cli, UPnP
 from aioupnp.commands import SOAPCommands
 
 log = logging.getLogger("aioupnp")
@@ -100,7 +100,7 @@ def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
     interface: str = str(options.pop('interface'))
     unicast: bool = bool(options.pop('unicast'))
 
-    UPnP.run_cli(
+    run_cli(
         command.replace('-', '_'), options, lan_address, gateway_address, timeout, interface, unicast, kwargs, loop
     )
     return 0
