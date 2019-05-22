@@ -93,28 +93,23 @@ class UPnP:
         )
         return None
 
-    async def get_port_mapping_by_index(self, index: int) -> Optional[Tuple[str, int, str, int, str, bool, str, int]]:
-        try:
-            redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
-            return redirect
-        except UPnPError:
-            return None
+    async def get_port_mapping_by_index(self, index: int) -> Tuple[str, int, str, int, str, bool, str, int]:
+        return await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
 
     async def get_redirects(self) -> List[Tuple[str, int, str, int, str, bool, str, int]]:
         redirects: List[Tuple[str, int, str, int, str, bool, str, int]] = []
         cnt = 0
-        redirect: Optional[Tuple[str, int, str, int, str, bool, str, int]] = None
         try:
-            redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=cnt)
+            redirect = await self.get_port_mapping_by_index(cnt)
         except UPnPError:
-            pass
+            return redirects
         while redirect is not None:
             redirects.append(redirect)
             cnt += 1
             try:
-                redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=cnt)
+                redirect = await self.get_port_mapping_by_index(cnt)
             except UPnPError:
-                pass
+                break
         return redirects
 
     async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Tuple[int, str, bool, str, int]:
@@ -144,22 +139,8 @@ class UPnP:
             raise UPnPError("unsupported protocol: {}".format(protocol))
         _internal_port = int(internal_port or port)
         requested_port = int(_internal_port)
-        redirect_tups: List[Tuple[str, int, str, int, str, bool, str, int]] = []
-        cnt = 0
         port = int(port)
-        redirect: Optional[Tuple[str, int, str, int, str, bool, str, int]] = None
-        try:
-            redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=cnt)
-        except UPnPError:
-            pass
-        while redirect is not None:
-            redirect_tups.append(redirect)
-            cnt += 1
-            try:
-                redirect = await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=cnt)
-            except UPnPError as err:
-                if "ArrayIndex" in str(err):
-                    break
+        redirect_tups = await self.get_redirects()
 
         redirects: Dict[Tuple[int, str], Tuple[str, int, str]] = {
             (ext_port, proto): (int_host, int_port, desc)
@@ -171,11 +152,7 @@ class UPnP:
             if int_host == self.lan_address and int_port == requested_port and desc == description:
                 return port
             port += 1
-        await self.gateway.commands.AddPortMapping(
-            NewRemoteHost='', NewExternalPort=port, NewProtocol=protocol,
-            NewInternalPort=_internal_port, NewInternalClient=self.lan_address,
-            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration='0'
-        )
+        await self.add_port_mapping(port, protocol, _internal_port, self.lan_address, description)
         return port
 
     # @cli
