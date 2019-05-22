@@ -12,7 +12,7 @@ jobs:
     - pip install -e .[test]
 
     script:
-    - mypy . --txt-report . --scripts-are-modules; cat index.txt; rm index.txt
+    - mypy aioupnp --txt-report . --scripts-are-modules; cat index.txt; rm index.txt
 
   - &tests
       stage: test

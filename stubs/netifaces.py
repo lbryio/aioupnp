@@ -36,8 +36,9 @@ version = '0.10.7'
 
 
 # functions
-
-def gateways(*args, **kwargs) -> typing.List:  # real signature unknown
+def gateways(*args, **kwargs) -> typing.Dict[typing.Union[str, int],
+                                             typing.Union[typing.Dict[int, typing.Tuple[str, str]],
+                                                          typing.List[typing.Tuple[str, str, bool]]]]:
     """
     Obtain a list of the gateways on this machine.
 
@@ -56,7 +57,7 @@ def gateways(*args, **kwargs) -> typing.List:  # real signature unknown
     pass
 
 
-def ifaddresses(*args, **kwargs) -> typing.Dict:  # real signature unknown
+def ifaddresses(*args, **kwargs) -> typing.Dict[int, typing.List[typing.Dict[str, str]]]:
     """
     Obtain information about the specified network interface.
 
@@ -67,7 +68,7 @@ def ifaddresses(*args, **kwargs) -> typing.Dict:  # real signature unknown
     pass
 
 
-def interfaces(*args, **kwargs) -> typing.List:  # real signature unknown
+def interfaces(*args, **kwargs) -> typing.List[str]:
     """ Obtain a list of the interfaces available on this machine. """
     pass
 

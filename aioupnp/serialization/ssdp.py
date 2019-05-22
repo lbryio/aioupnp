@@ -3,43 +3,67 @@ import logging
 import binascii
 import json
 from collections import OrderedDict
-from typing import List
+from typing import List, Optional, Dict, Union, Tuple, Callable
 from aioupnp.fault import UPnPError
 from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
 _template = "(?i)^(%s):[ ]*(.*)$"
-
-
-ssdp_datagram_patterns = {
-    'host': (re.compile("(?i)^(host):(.*)$"), str),
-    'st': (re.compile(_template % 'st'), str),
-    'man': (re.compile(_template % 'man'), str),
-    'mx': (re.compile(_template % 'mx'), int),
-    'nt': (re.compile(_template % 'nt'), str),
-    'nts': (re.compile(_template % 'nts'), str),
-    'usn': (re.compile(_template % 'usn'), str),
-    'location': (re.compile(_template % 'location'), str),
-    'cache_control': (re.compile(_template % 'cache[-|_]control'), str),
-    'server': (re.compile(_template % 'server'), str),
-}
-
 vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
 
 
-class SSDPDatagram(object):
+def match_vendor(line: str) -> Optional[Tuple[str, str]]:
+    match: List[Tuple[str, str, str]] = vendor_pattern.findall(line)
+    if match:
+        vendor_key: str = match[-1][0].lstrip(" ").rstrip(" ")
+        vendor_value: str = match[-1][2].lstrip(" ").rstrip(" ")
+        return vendor_key, vendor_value
+    return None
+
+
+def compile_find(pattern: str) -> Callable[[str], Optional[str]]:
+    p = re.compile(pattern)
+
+    def find(line: str) -> Optional[str]:
+        result: List[List[str]] = []
+        for outer in p.findall(line):
+            result.append([])
+            for inner in outer:
+                result[-1].append(inner)
+        if result:
+            return result[-1][-1].lstrip(" ").rstrip(" ")
+        return None
+
+    return find
+
+
+ssdp_datagram_patterns: Dict[str, Callable[[str], Optional[str]]] = {
+    'host': compile_find("(?i)^(host):(.*)$"),
+    'st': compile_find(_template % 'st'),
+    'man': compile_find(_template % 'man'),
+    'mx': compile_find(_template % 'mx'),
+    'nt': compile_find(_template % 'nt'),
+    'nts': compile_find(_template % 'nts'),
+    'usn': compile_find(_template % 'usn'),
+    'location': compile_find(_template % 'location'),
+    'cache_control': compile_find(_template % 'cache[-|_]control'),
+    'server': compile_find(_template % 'server'),
+}
+
+
+class SSDPDatagram:
     _M_SEARCH = "M-SEARCH"
     _NOTIFY = "NOTIFY"
     _OK = "OK"
 
-    _start_lines = {
+    _start_lines: Dict[str, str] = {
         _M_SEARCH: "M-SEARCH * HTTP/1.1",
         _NOTIFY: "NOTIFY * HTTP/1.1",
         _OK: "HTTP/1.1 200 OK"
     }
 
-    _friendly_names = {
+    _friendly_names: Dict[str, str] = {
         _M_SEARCH: "m-search",
         _NOTIFY: "notify",
         _OK: "m-search response"
@@ -47,9 +71,7 @@ class SSDPDatagram(object):
 
     _vendor_field_pattern = vendor_pattern
 
-    _patterns = ssdp_datagram_patterns
-
-    _required_fields = {
+    _required_fields: Dict[str, List[str]] = {
         _M_SEARCH: [
             'host',
             'man',
@@ -75,137 +97,137 @@ class SSDPDatagram(object):
         ]
     }
 
-    def __init__(self, packet_type, kwargs: OrderedDict = None) -> None:
+    def __init__(self, packet_type: str, kwargs: Optional[Dict[str, Union[str, int]]] = None) -> None:
         if packet_type not in [self._M_SEARCH, self._NOTIFY, self._OK]:
             raise UPnPError("unknown packet type: {}".format(packet_type))
         self._packet_type = packet_type
-        kwargs = kwargs or OrderedDict()
-        self._field_order: list = [
-            k.lower().replace("-", "_") for k in kwargs.keys()
+        kw: Dict[str, Union[str, int]] = kwargs or OrderedDict()
+        self._field_order: List[str] = [
+            k.lower().replace("-", "_") for k in kw.keys()
         ]
-        self.host = None
-        self.man = None
-        self.mx = None
-        self.st = None
-        self.nt = None
-        self.nts = None
-        self.usn = None
-        self.location = None
-        self.cache_control = None
-        self.server = None
-        self.date = None
-        self.ext = None
-        for k, v in kwargs.items():
+        self.host: Optional[str] = None
+        self.man: Optional[str] = None
+        self.mx: Optional[Union[str, int]] = None
+        self.st: Optional[str] = None
+        self.nt: Optional[str] = None
+        self.nts: Optional[str] = None
+        self.usn: Optional[str] = None
+        self.location: Optional[str] = None
+        self.cache_control: Optional[str] = None
+        self.server: Optional[str] = None
+        self.date: Optional[str] = None
+        self.ext: Optional[str] = None
+        for k, v in kw.items():
             normalized = k.lower().replace("-", "_")
-            if not normalized.startswith("_") and hasattr(self, normalized) and getattr(self, normalized) is None:
-                setattr(self, normalized, v)
-        self._case_mappings: dict = {k.lower(): k for k in kwargs.keys()}
+            if not normalized.startswith("_") and hasattr(self, normalized):
+                if getattr(self, normalized, None) is None:
+                    setattr(self, normalized, v)
+        self._case_mappings: Dict[str, str] = {k.lower(): k for k in kw.keys()}
         for k in self._required_fields[self._packet_type]:
-            if getattr(self, k) is None:
+            if getattr(self, k, None) is None:
                 raise UPnPError("missing required field %s" % k)
 
     def get_cli_igd_kwargs(self) -> str:
         fields = []
         for field in self._field_order:
-            v = getattr(self, field)
+            v = getattr(self, field, None)
+            if v is None:
+                raise UPnPError("missing required field %s" % field)
             fields.append("--%s=%s" % (self._case_mappings.get(field, field), v))
         return " ".join(fields)
 
     def __repr__(self) -> str:
         return self.as_json()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> Union[str, int]:
         for i in self._required_fields[self._packet_type]:
             if i.lower() == item.lower():
                 return getattr(self, i)
         raise KeyError(item)
 
-    def get_friendly_name(self) -> str:
-        return self._friendly_names[self._packet_type]
-
     def encode(self, trailing_newlines: int = 2) -> str:
         lines = [self._start_lines[self._packet_type]]
-        for attr_name in self._field_order:
-            if attr_name not in self._required_fields[self._packet_type]:
-                continue
-            attr = getattr(self, attr_name)
-            if attr is None:
-                raise UPnPError("required field for {} is missing: {}".format(self._packet_type, attr_name))
-            if attr_name == 'mx':
-                value = str(attr)
-            else:
-                value = attr
-            lines.append("{}: {}".format(self._case_mappings.get(attr_name.lower(), attr_name.upper()), value))
+        lines.extend(
+            f"{self._case_mappings.get(attr_name.lower(), attr_name.upper())}: {str(getattr(self, attr_name))}"
+            for attr_name in self._field_order if attr_name in self._required_fields[self._packet_type]
+        )
         serialized = line_separator.join(lines)
         for _ in range(trailing_newlines):
             serialized += line_separator
         return serialized
 
-    def as_dict(self) -> OrderedDict:
+    def as_dict(self) -> Dict[str, Union[str, int]]:
         return self._lines_to_content_dict(self.encode().split(line_separator))
 
     def as_json(self) -> str:
         return json.dumps(self.as_dict(), indent=2)
 
     @classmethod
-    def decode(cls, datagram: bytes):
+    def decode(cls, datagram: bytes) -> 'SSDPDatagram':
         packet = cls._from_string(datagram.decode())
         if packet is None:
             raise UPnPError(
                 "failed to decode datagram: {}".format(binascii.hexlify(datagram))
             )
         for attr_name in packet._required_fields[packet._packet_type]:
-            attr = getattr(packet, attr_name)
-            if attr is None:
+            if getattr(packet, attr_name, None) is None:
                 raise UPnPError(
                     "required field for {} is missing from m-search response: {}".format(packet._packet_type, attr_name)
                 )
         return packet
 
     @classmethod
-    def _lines_to_content_dict(cls, lines: list) -> OrderedDict:
-        result: OrderedDict = OrderedDict()
+    def _lines_to_content_dict(cls, lines: List[str]) -> Dict[str, Union[str, int]]:
+        result: Dict[str, Union[str, int]] = OrderedDict()
+        matched_keys: List[str] = []
         for line in lines:
             if not line:
                 continue
             matched = False
-            for name, (pattern, field_type) in cls._patterns.items():
-                if name not in result and pattern.findall(line):
-                    match = pattern.findall(line)[-1][-1]
-                    result[line[:len(name)]] = field_type(match.lstrip(" ").rstrip(" "))
-                    matched = True
-                    break
-
+            for name, pattern in ssdp_datagram_patterns.items():
+                if name not in matched_keys:
+                    if name.lower() == 'mx':
+                        _matched_int = pattern(line)
+                        if _matched_int is not None:
+                            match_int = int(_matched_int)
+                            result[line[:len(name)]] = match_int
+                            matched = True
+                            matched_keys.append(name)
+                            break
+                    else:
+                        match = pattern(line)
+                        if match is not None:
+                            result[line[:len(name)]] = match
+                            matched = True
+                            matched_keys.append(name)
+                            break
             if not matched:
-                if cls._vendor_field_pattern.findall(line):
-                    match = cls._vendor_field_pattern.findall(line)[-1]
-                    vendor_key = match[0].lstrip(" ").rstrip(" ")
-                    # vendor_domain = match[1].lstrip(" ").rstrip(" ")
-                    value = match[2].lstrip(" ").rstrip(" ")
-                    if vendor_key not in result:
-                        result[vendor_key] = value
+                matched_vendor = match_vendor(line)
+                if matched_vendor and matched_vendor[0] not in result:
+                    result[matched_vendor[0]] = matched_vendor[1]
         return result
 
     @classmethod
-    def _from_string(cls, datagram: str):
+    def _from_string(cls, datagram: str) -> Optional['SSDPDatagram']:
         lines = [l for l in datagram.split(line_separator) if l]
         if not lines:
-            return
+            return None
         if lines[0] == cls._start_lines[cls._M_SEARCH]:
             return cls._from_request(lines[1:])
         if lines[0] in [cls._start_lines[cls._NOTIFY], cls._start_lines[cls._NOTIFY] + " "]:
             return cls._from_notify(lines[1:])
         if lines[0] == cls._start_lines[cls._OK]:
             return cls._from_response(lines[1:])
+        return None
 
     @classmethod
-    def _from_response(cls, lines: List):
+    def _from_response(cls, lines: List) -> 'SSDPDatagram':
         return cls(cls._OK, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_notify(cls, lines: List):
+    def _from_notify(cls, lines: List) -> 'SSDPDatagram':
         return cls(cls._NOTIFY, cls._lines_to_content_dict(lines))
 
     @classmethod
-    def _from_request(cls, lines: List):
+    def _from_request(cls, lines: List) -> 'SSDPDatagram':
         return cls(cls._M_SEARCH, cls._lines_to_content_dict(lines))

@@ -3,6 +3,9 @@
 _trial_temp/
 build/
 dist/
+html/
+index.html
+mypy-html.css
 .coverage
 .mypy_cache/
 aioupnp.spec

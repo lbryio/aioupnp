@@ -28,6 +28,26 @@ class TestSOAPSerialization(unittest.TestCase):
                     b"\r\n" \
                     b"<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body>\n<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\r\n<NewExternalIPAddress>11.22.33.44</NewExternalIPAddress>\r\n</u:GetExternalIPAddressResponse>\r\n</s:Body> </s:Envelope>"
 
+    blank_response = b"HTTP/1.1 200 OK\r\n" \
+                    b"CONTENT-LENGTH: 148\r\n" \
+                    b"CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n" \
+                    b"DATE: Thu, 18 Oct 2018 01:20:23 GMT\r\n" \
+                    b"EXT:\r\n" \
+                    b"SERVER: Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22\r\n" \
+                    b"X-User-Agent: redsonic\r\n" \
+                    b"\r\n" \
+                    b"<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body>\n</s:Body> </s:Envelope>"
+
+    blank_response_body = b"HTTP/1.1 200 OK\r\n" \
+                    b"CONTENT-LENGTH: 280\r\n" \
+                    b"CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n" \
+                    b"DATE: Thu, 18 Oct 2018 01:20:23 GMT\r\n" \
+                    b"EXT:\r\n" \
+                    b"SERVER: Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22\r\n" \
+                    b"X-User-Agent: redsonic\r\n" \
+                    b"\r\n" \
+                    b"<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body>\n<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\"></u:GetExternalIPAddressResponse>\r\n</s:Body> </s:Envelope>"
+
     error_response = b"HTTP/1.1 500 Internal Server Error\r\n" \
                      b"Server: WebServer\r\n" \
                      b"Date: Thu, 11 Oct 2018 22:16:17 GMT\r\n" \
@@ -43,11 +63,28 @@ class TestSOAPSerialization(unittest.TestCase):
             self.method, self.param_names, self.st, self.gateway_address, self.path, **self.kwargs
         ), self.post_bytes)
 
+    def test_serialize_post_http_host(self):
+        self.assertEqual(serialize_soap_post(
+            self.method, self.param_names, self.st, b'http://' + self.gateway_address, self.path, **self.kwargs
+        ), self.post_bytes)
+
     def test_deserialize_post_response(self):
         self.assertDictEqual(
             deserialize_soap_post_response(self.post_response, self.method, service_id=self.st.decode()),
             {'NewExternalIPAddress': '11.22.33.44'}
         )
+
+    def test_deserialize_error_response_field_not_found(self):
+        with self.assertRaises(UPnPError) as e:
+            deserialize_soap_post_response(self.post_response, self.method + 'derp', service_id=self.st.decode())
+        self.assertTrue(str(e.exception).startswith('unknown response fields for GetExternalIPAddressderp'))
+
+    def test_deserialize_blank_response(self):
+        # TODO: these seem like they should error... this test will break and have to be updated
+        self.assertDictEqual({}, deserialize_soap_post_response(self.blank_response, self.method,
+                                                                service_id=self.st.decode()))
+        self.assertDictEqual({}, deserialize_soap_post_response(self.blank_response_body, self.method,
+                                                                service_id=self.st.decode()))
 
     def test_raise_from_error_response(self):
         raised = False
