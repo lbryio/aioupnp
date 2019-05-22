@@ -2,4 +2,3 @@
 omit =
   tests/*
   stubs/*
-  stubs/defusedxml/*
