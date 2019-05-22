@@ -4,7 +4,6 @@ import asyncio
 import logging
 import typing
 import socket
-from collections import OrderedDict
 from asyncio.transports import DatagramTransport
 from aioupnp.fault import UPnPError
 from aioupnp.serialization.ssdp import SSDPDatagram
@@ -25,7 +24,7 @@ class SSDPProtocol(MulticastProtocol):
         self.transport: typing.Optional[DatagramTransport] = None
         self._unicast = unicast
         self._ignored: typing.Set[str] = ignored or set()  # ignored locations
-        self._pending_searches: typing.List[typing.Tuple[str, str, asyncio.Future[SSDPDatagram], asyncio.Handle]] = []
+        self._pending_searches: typing.List[typing.Tuple[str, str, 'asyncio.Future[SSDPDatagram]', asyncio.Handle]] = []
         self.notifications: typing.List[SSDPDatagram] = []
         self.connected = asyncio.Event(loop=self.loop)
 
@@ -54,12 +53,12 @@ class SSDPProtocol(MulticastProtocol):
         if packet.location in self._ignored:
             return None
         # TODO: fix this
-        tmp: typing.List[typing.Tuple[str, str, asyncio.Future[SSDPDatagram], asyncio.Handle]] = []
-        set_futures: typing.List[asyncio.Future[SSDPDatagram]] = []
+        tmp: typing.List[typing.Tuple[str, str, 'asyncio.Future[SSDPDatagram]', asyncio.Handle]] = []
+        set_futures: typing.List['asyncio.Future[SSDPDatagram]'] = []
         while len(self._pending_searches):
-            t: typing.Tuple[str, str, asyncio.Future[SSDPDatagram], asyncio.Handle] = self._pending_searches.pop()
+            t: typing.Tuple[str, str, 'asyncio.Future[SSDPDatagram]', asyncio.Handle] = self._pending_searches.pop()
             if (address == t[0]) and (t[1] in [packet.st, "upnp:rootdevice"]):
-                f: asyncio.Future[SSDPDatagram] = t[2]
+                f = t[2]
                 if f not in set_futures:
                     set_futures.append(f)
                     if not f.done():
@@ -80,7 +79,7 @@ class SSDPProtocol(MulticastProtocol):
 
     async def m_search(self, address: str, timeout: float,
                        datagrams: typing.List[typing.Dict[str, typing.Union[str, int]]]) -> SSDPDatagram:
-        fut: asyncio.Future[SSDPDatagram] = asyncio.Future(loop=self.loop)
+        fut: 'asyncio.Future[SSDPDatagram]' = asyncio.Future(loop=self.loop)
         for datagram in datagrams:
             packet = SSDPDatagram("M-SEARCH", datagram)
             assert packet.st is not None

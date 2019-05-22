@@ -69,8 +69,6 @@ def parse_location(location: bytes) -> typing.Tuple[bytes, int]:
 
 
 class Gateway:
-    commands: SOAPCommands
-
     def __init__(self, ok_packet: SSDPDatagram, m_search_args: typing.Dict[str, typing.Union[int, str]],
                  lan_address: str, gateway_address: str,
                  loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
@@ -144,10 +142,10 @@ class Gateway:
 
     @property
     def soap_requests(self) -> typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                        typing.Optional[typing.Dict[str, typing.Any]],
+                                                        typing.Optional[typing.Tuple],
                                                         typing.Optional[Exception], float]]:
         soap_call_infos: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                  typing.Optional[typing.Dict[str, typing.Any]],
+                                                  typing.Optional[typing.Tuple],
                                                   typing.Optional[Exception], float]] = []
         soap_call_infos.extend([
             (name, request_args, raw_response, decoded_response, soap_error, ts)
@@ -241,7 +239,7 @@ class Gateway:
                 task.exception()
             except asyncio.CancelledError:
                 pass
-        results: typing.List[asyncio.Future['Gateway']] = list(done)
+        results: typing.List['asyncio.Future[Gateway]'] = list(done)
         return results[0].result()
 
     async def discover_commands(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:

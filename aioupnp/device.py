@@ -6,7 +6,8 @@ log = logging.getLogger(__name__)
 
 
 class CaseInsensitive:
-    def __init__(self, **kwargs: typing.Dict[str, typing.Union[str, typing.Dict[str, typing.Any], typing.List[typing.Any]]]) -> None:
+    def __init__(self, **kwargs: typing.Dict[str, typing.Union[str, typing.Dict[str, typing.Any],
+                                                               typing.List[typing.Any]]]) -> None:
         keys: typing.List[str] = list(kwargs.keys())
         for k in keys:
             if not k.startswith("_"):

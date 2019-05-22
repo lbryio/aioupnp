@@ -36,7 +36,8 @@ def flatten_keys(to_flatten: str_any_dict, strip: str) -> str_any_dict:
     return copy
 
 
-def get_dict_val_case_insensitive(source: typing.Dict[typing.AnyStr, typing.AnyStr], key: typing.AnyStr) -> typing.Optional[typing.AnyStr]:
+def get_dict_val_case_insensitive(source: typing.Dict[typing.AnyStr, typing.AnyStr],
+                                  key: typing.AnyStr) -> typing.Optional[typing.AnyStr]:
     match: typing.List[typing.AnyStr] = list(filter(lambda x: x.lower() == key.lower(), source.keys()))
     if not len(match):
         return None

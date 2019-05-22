@@ -29,6 +29,9 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
                 sent_tcp_packets.append(data)
                 if data in tcp_replies:
                     loop.call_later(tcp_delay_reply, p.data_received, tcp_replies[data])
+                    return
+                else:
+                    pass
 
             return _write
 

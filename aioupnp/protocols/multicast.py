@@ -10,7 +10,7 @@ def _get_sock(transport: typing.Optional[BaseTransport]) -> typing.Optional[sock
     if transport is None or not hasattr(transport, "_extra"):
         return None
     sock: typing.Optional[socket.socket] = transport.get_extra_info('socket', None)
-    assert sock is None or isinstance(sock, socket.SocketType) or isinstance(sock, mock.MagicMock)
+    assert sock is None or isinstance(sock, (socket.SocketType, mock.MagicMock))
     return sock
 
 

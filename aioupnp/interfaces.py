@@ -8,15 +8,17 @@ def get_netifaces():
     return netifaces
 
 
-def ifaddresses(iface: str):
+def ifaddresses(iface: str) -> typing.Dict[int, typing.List[typing.Dict[str, str]]]:
     return get_netifaces().ifaddresses(iface)
 
 
-def _get_interfaces():
+def _get_interfaces() -> typing.List[str]:
     return get_netifaces().interfaces()
 
 
-def _get_gateways():
+def _get_gateways() -> typing.Dict[typing.Union[str, int],
+                                             typing.Union[typing.Dict[int, typing.Tuple[str, str]],
+                                                          typing.List[typing.Tuple[str, str, bool]]]]:
     return get_netifaces().gateways()
 
 
@@ -26,7 +28,7 @@ def get_interfaces() -> typing.Dict[str, typing.Tuple[str, str]]:
     assert isinstance(infos, list), TypeError(f"expected list from netifaces, got a dict")
     interface_infos: typing.List[typing.Tuple[str, str, bool]] = infos
     result: typing.Dict[str, typing.Tuple[str, str]] = OrderedDict(
-        (interface_name, (router_address, ifaddresses(interface_name)[netifaces.AF_INET][0]['addr']))
+        (interface_name, (router_address, ifaddresses(interface_name)[socket.AF_INET][0]['addr']))
         for router_address, interface_name, _ in interface_infos
     )
     for interface_name in _get_interfaces():
@@ -40,7 +42,7 @@ def get_interfaces() -> typing.Dict[str, typing.Tuple[str, str]]:
     _default = gateways['default']
     assert isinstance(_default, dict), TypeError(f"expected dict from netifaces, got a list")
     default: typing.Dict[int, typing.Tuple[str, str]] = _default
-    result['default'] = result[default[netifaces.AF_INET][1]]
+    result['default'] = result[default[socket.AF_INET][1]]
     return result
 
 
