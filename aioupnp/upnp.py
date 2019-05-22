@@ -5,13 +5,14 @@ import logging
 import json
 import asyncio
 from collections import OrderedDict
-from typing import Tuple, Dict, List, Union, Optional
+from typing import Tuple, Dict, List, Union, Optional, Any
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.interfaces import get_gateway_and_lan_addresses
 from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
 from aioupnp.serialization.ssdp import SSDPDatagram
-from aioupnp.commands import SOAPCommands
+from aioupnp.commands import GetGenericPortMappingEntryResponse, GetSpecificPortMappingEntryResponse
+
 
 log = logging.getLogger(__name__)
 
@@ -31,11 +32,27 @@ class UPnP:
         self.gateway = gateway
 
     @classmethod
-    def get_annotations(cls, command: str) -> Dict[str, type]:
-        return getattr(SOAPCommands, command).__annotations__
+    def get_annotations(cls, command: str) -> Tuple[Dict[str, Any], Optional[str]]:
+        if command == "m_search":
+            return cls.m_search.__annotations__, cls.m_search.__doc__
+        if command == "get_external_ip":
+            return cls.get_external_ip.__annotations__, cls.get_external_ip.__doc__
+        if command == "add_port_mapping":
+            return cls.add_port_mapping.__annotations__, cls.add_port_mapping.__doc__
+        if command == "get_port_mapping_by_index":
+            return cls.get_port_mapping_by_index.__annotations__, cls.get_port_mapping_by_index.__doc__
+        if command == "get_redirects":
+            return cls.get_redirects.__annotations__, cls.get_redirects.__doc__
+        if command == "get_specific_port_mapping":
+            return cls.get_specific_port_mapping.__annotations__, cls.get_specific_port_mapping.__doc__
+        if command == "delete_port_mapping":
+            return cls.delete_port_mapping.__annotations__, cls.delete_port_mapping.__doc__
+        if command == "get_next_mapping":
+            return cls.get_next_mapping.__annotations__, cls.get_next_mapping.__doc__
+        raise AttributeError(command)
 
-    @classmethod
-    def get_lan_and_gateway(cls, lan_address: str = '', gateway_address: str = '',
+    @staticmethod
+    def get_lan_and_gateway(lan_address: str = '', gateway_address: str = '',
                             interface_name: str = 'default') -> Tuple[str, str]:
         if not lan_address or not gateway_address:
             gateway_addr, lan_addr = get_gateway_and_lan_addresses(interface_name)
@@ -55,10 +72,28 @@ class UPnP:
 
     @classmethod
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       igd_args: Optional[Dict[str, Union[int, str]]] = None,
                        unicast: bool = True, interface_name: str = 'default',
+                       igd_args: Optional[Dict[str, Union[str, int]]] = None,
                        loop: Optional[asyncio.AbstractEventLoop] = None
-                       ) -> Dict[str, Union[str, Dict[str, Union[int, str]]]]:
+                       ) -> Dict[str, Union[str, Dict[str, Union[str, int]]]]:
+        """
+        Perform a M-SEARCH for a upnp gateway.
+
+        :param lan_address: (str) the local interface ipv4 address
+        :param gateway_address: (str) the gateway ipv4 address
+        :param timeout: (int) m search timeout
+        :param unicast: (bool) use unicast
+        :param interface_name: (str) name of the network interface
+        :param igd_args: (dict) case sensitive M-SEARCH headers. if used all headers to be used must be provided.
+
+        :return: {
+            'lan_address': (str) lan address,
+            'gateway_address': (str) gateway address,
+            'm_search_kwargs': (str) equivalent igd_args ,
+            'discover_reply': (dict) SSDP response datagram
+        }
+        """
+
         if not lan_address or not gateway_address:
             try:
                 lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -79,10 +114,25 @@ class UPnP:
         }
 
     async def get_external_ip(self) -> str:
+        """
+        Get the external ip address from the gateway
+
+        :return: (str) external ip
+        """
         return await self.gateway.commands.GetExternalIPAddress()
 
     async def add_port_mapping(self, external_port: int, protocol: str, internal_port: int, lan_address: str,
                                description: str) -> None:
+        """
+        Add a new port mapping
+
+        :param external_port: (int) external port to map
+        :param protocol: (str) UDP | TCP
+        :param internal_port: (int) internal port
+        :param lan_address: (str) internal lan address
+        :param description: (str) mapping description
+        :return: None
+        """
         await self.gateway.commands.AddPortMapping(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
@@ -90,11 +140,42 @@ class UPnP:
         )
         return None
 
-    async def get_port_mapping_by_index(self, index: int) -> Tuple[str, int, str, int, str, bool, str, int]:
+    async def get_port_mapping_by_index(self, index: int) -> GetGenericPortMappingEntryResponse:
+        """
+        Get information about a port mapping by index number
+
+        :param index: (int) mapping index number
+        :return: NamedTuple[
+            gateway_address: str
+            external_port: int
+            protocol: str
+            internal_port: int
+            lan_address: str
+            enabled: bool
+            description: str
+            lease_time: int
+        ]
+        """
         return await self.gateway.commands.GetGenericPortMappingEntry(NewPortMappingIndex=index)
 
-    async def get_redirects(self) -> List[Tuple[str, int, str, int, str, bool, str, int]]:
-        redirects: List[Tuple[str, int, str, int, str, bool, str, int]] = []
+    async def get_redirects(self) -> List[GetGenericPortMappingEntryResponse]:
+        """
+        Get information about all mapped ports
+
+        :return: List[
+            NamedTuple[
+                gateway_address: str
+                external_port: int
+                protocol: str
+                internal_port: int
+                lan_address: str
+                enabled: bool
+                description: str
+                lease_time: int
+            ]
+        ]
+        """
+        redirects: List[GetGenericPortMappingEntryResponse] = []
         cnt = 0
         try:
             redirect = await self.get_port_mapping_by_index(cnt)
@@ -109,11 +190,19 @@ class UPnP:
                 break
         return redirects
 
-    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> Tuple[int, str, bool, str, int]:
+    async def get_specific_port_mapping(self, external_port: int, protocol: str) -> GetSpecificPortMappingEntryResponse:
         """
-        :param external_port: (int) external port to listen on
-        :param protocol:      (str) 'UDP' | 'TCP'
-        :return: (int) <internal port>, (str) <lan ip>, (bool) <enabled>, (str) <description>, (int) <lease time>
+        Get information about a port mapping by port number and protocol
+
+        :param external_port: (int) port number
+        :param protocol: (str) UDP | TCP
+        :return: NamedTuple[
+            internal_port: int
+            lan_address: str
+            enabled: bool
+            description: str
+            lease_time: int
+        ]
         """
         return await self.gateway.commands.GetSpecificPortMappingEntry(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol
@@ -121,25 +210,31 @@ class UPnP:
 
     async def delete_port_mapping(self, external_port: int, protocol: str) -> None:
         """
-        :param external_port: (int) external port to listen on
-        :param protocol:      (str) 'UDP' | 'TCP'
+        Delete a port mapping
+
+        :param external_port: (int) port number of mapping
+        :param protocol: (str) TCP | UDP
         :return: None
         """
         await self.gateway.commands.DeletePortMapping(
             NewRemoteHost="", NewExternalPort=external_port, NewProtocol=protocol
         )
+
         return None
 
     async def get_next_mapping(self, port: int, protocol: str, description: str,
                                internal_port: Optional[int] = None) -> int:
         """
-        :param port:          (int) external port to redirect from
-        :param protocol:      (str) 'UDP' | 'TCP'
-        :param description:   (str) mapping description
-        :param internal_port: (int) internal port to redirect to
+        Get a new port mapping. If the requested port is not available, increment until the next free port is mapped
 
-        :return: (int) <mapped port>
+        :param port: (int) external port
+        :param protocol: (str) UDP | TCP
+        :param description: (str) mapping description
+        :param internal_port: (int) internal port
+
+        :return: (int) mapped port
         """
+
         _internal_port = int(internal_port or port)
         requested_port = int(_internal_port)
         port = int(port)
@@ -264,21 +359,22 @@ class UPnP:
     #     return await self.gateway.commands.GetActiveConnections()
 
 
-def run_cli(method, igd_args: Dict[str, Union[bool, str, int]], lan_address: str = '',
-            gateway_address: str = '', timeout: int = 30, interface_name: str = 'default',
-            unicast: bool = True, kwargs: Optional[Dict] = None,
-            loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
-    """
-    :param method: the command name
-    :param igd_args: ordered case sensitive M-SEARCH headers, if provided all headers to be used must be provided
-    :param lan_address: the ip address of the local interface
-    :param gateway_address: the ip address of the gateway
-    :param timeout: timeout, in seconds
-    :param interface_name: name of the network interface, the default is aliased to 'default'
-    :param kwargs: keyword arguments for the command
-    :param loop: EventLoop, used for testing
-    """
+cli_commands = [
+    'm_search',
+    'get_external_ip',
+    'add_port_mapping',
+    'get_port_mapping_by_index',
+    'get_redirects',
+    'get_specific_port_mapping',
+    'delete_port_mapping',
+    'get_next_mapping'
+]
 
+
+def run_cli(method: str, igd_args: Dict[str, Union[bool, str, int]], lan_address: str = '',
+            gateway_address: str = '', timeout: int = 30, interface_name: str = 'default',
+            unicast: bool = True, kwargs: Optional[Dict[str, str]] = None,
+            loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
 
     kwargs = kwargs or {}
     igd_args = igd_args
@@ -287,20 +383,9 @@ def run_cli(method, igd_args: Dict[str, Union[bool, str, int]], lan_address: str
     fut: 'asyncio.Future' = asyncio.Future(loop=loop)
 
     async def wrapper():  # wrap the upnp setup and call of the command in a coroutine
-        cli_commands = [
-            'm_search',
-            'get_external_ip',
-            'add_port_mapping',
-            'get_port_mapping_by_index',
-            'get_redirects',
-            'get_specific_port_mapping',
-            'delete_port_mapping',
-            'get_next_mapping'
-        ]
-
         if method == 'm_search':  # if we're only m_searching don't do any device discovery
             fn = lambda *_a, **_kw: UPnP.m_search(
-                lan_address, gateway_address, timeout, igd_args, unicast, interface_name, loop
+                lan_address, gateway_address, timeout, unicast, interface_name, igd_args, loop
             )
         else:  # automatically discover the gateway
             try:

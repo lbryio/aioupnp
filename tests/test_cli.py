@@ -21,6 +21,139 @@ m_search_cli_result = """{
 }\n"""
 
 
+m_search_help_msg = """aioupnp [-h] [--debug_logging] m_search [--lan_address=<str>] [--gateway_address=<str>]
+  [--timeout=<int>] [--unicast] [--interface_name=<str>] [--<header key>=<header value>, ...]
+
+Perform a M-SEARCH for a upnp gateway.
+
+:param lan_address: (str) the local interface ipv4 address
+:param gateway_address: (str) the gateway ipv4 address
+:param timeout: (int) m search timeout
+:param unicast: (bool) use unicast
+:param interface_name: (str) name of the network interface
+:param igd_args: (dict) case sensitive M-SEARCH headers. if used all headers to be used must be provided.
+
+:return: {
+    'lan_address': (str) lan address,
+    'gateway_address': (str) gateway address,
+    'm_search_kwargs': (str) equivalent igd_args ,
+    'discover_reply': (dict) SSDP response datagram
+}\n
+"""
+
+expected_usage = """aioupnp [-h] [--debug_logging] [--interface=<interface>] [--gateway_address=<gateway_address>]
+  [--lan_address=<lan_address>] [--timeout=<timeout>] [(--<header_key>=<value>)...]
+
+If m-search headers are provided as keyword arguments all of the headers to be used must be provided,
+in the order they are to be used. For example:
+  aioupnp --HOST=239.255.255.250:1900 --MAN="ssdp:discover" --MX=1 --ST=upnp:rootdevice m_search
+
+Commands:
+  m_search | get_external_ip | add_port_mapping | get_port_mapping_by_index | get_redirects |
+  get_specific_port_mapping | delete_port_mapping | get_next_mapping
+
+For help with a specific command:  aioupnp help <command>
+"""
+
+expected_get_external_ip_usage = """aioupnp [-h] [--debug_logging] get_external_ip
+
+Get the external ip address from the gateway
+
+:return: (str) external ip
+
+"""
+
+expected_add_port_mapping_usage = """aioupnp [-h] [--debug_logging] add_port_mapping [--external_port=<int>] [--protocol=<str>]
+  [--internal_port=<int>] [--lan_address=<str>] [--description=<str>]
+
+Add a new port mapping
+
+:param external_port: (int) external port to map
+:param protocol: (str) UDP | TCP
+:param internal_port: (int) internal port
+:param lan_address: (str) internal lan address
+:param description: (str) mapping description
+:return: None
+
+"""
+
+expected_get_next_mapping_usage = """aioupnp [-h] [--debug_logging] get_next_mapping [--port=<int>] [--protocol=<str>]
+  [--description=<str>] [--internal_port=<typing.Union[int, NoneType]>]
+
+Get a new port mapping. If the requested port is not available, increment until the next free port is mapped
+
+:param port: (int) external port
+:param protocol: (str) UDP | TCP
+:param description: (str) mapping description
+:param internal_port: (int) internal port
+
+:return: (int) mapped port
+
+"""
+
+
+expected_delete_port_mapping_usage = """aioupnp [-h] [--debug_logging] delete_port_mapping [--external_port=<int>] [--protocol=<str>]
+
+Delete a port mapping
+
+:param external_port: (int) port number of mapping
+:param protocol: (str) TCP | UDP
+:return: None
+
+"""
+
+expected_get_specific_port_mapping_usage = """aioupnp [-h] [--debug_logging] get_specific_port_mapping [--external_port=<int>] [--protocol=<str>]
+
+Get information about a port mapping by port number and protocol
+
+:param external_port: (int) port number
+:param protocol: (str) UDP | TCP
+:return: NamedTuple[
+    internal_port: int
+    lan_address: str
+    enabled: bool
+    description: str
+    lease_time: int
+]
+
+"""
+expected_get_redirects_usage = """aioupnp [-h] [--debug_logging] get_redirects
+
+Get information about all mapped ports
+
+:return: List[
+    NamedTuple[
+        gateway_address: str
+        external_port: int
+        protocol: str
+        internal_port: int
+        lan_address: str
+        enabled: bool
+        description: str
+        lease_time: int
+    ]
+]
+
+"""
+expected_get_port_mapping_by_index_usage = """aioupnp [-h] [--debug_logging] get_port_mapping_by_index [--index=<int>]
+
+Get information about a port mapping by index number
+
+:param index: (int) mapping index number
+:return: NamedTuple[
+    gateway_address: str
+    external_port: int
+    protocol: str
+    internal_port: int
+    lan_address: str
+    enabled: bool
+    description: str
+    lease_time: int
+]
+
+"""
+
+
 class TestCLI(AsyncioTestCase):
     gateway_address = "10.0.0.1"
     soap_port = 49152
@@ -101,3 +234,117 @@ class TestCLI(AsyncioTestCase):
                     self.loop
                 )
         self.assertEqual(m_search_cli_result, actual_output.getvalue())
+
+    def test_usage(self):
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help'],
+                self.loop
+            )
+        self.assertEqual(expected_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'test'],
+                self.loop
+            )
+        self.assertEqual(expected_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'test', 'help'],
+                self.loop
+            )
+        self.assertEqual("aioupnp encountered an error: \"test\" is not a recognized command\n", actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'test'],
+                self.loop
+            )
+        self.assertEqual("aioupnp encountered an error: \"test\" is not a recognized command\n", actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None],
+                self.loop
+            )
+        self.assertEqual(expected_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, "--something=test"],
+                self.loop
+            )
+        self.assertEqual("no command given\n" + expected_usage, actual_output.getvalue())
+
+    def test_commands_help(self):
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'm-search'],
+                self.loop
+            )
+        self.assertEqual(m_search_help_msg, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'get-external-ip'],
+                self.loop
+            )
+
+        self.assertEqual(expected_get_external_ip_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'add-port-mapping'],
+                self.loop
+            )
+        self.assertEqual(expected_add_port_mapping_usage, actual_output.getvalue())
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'get-next-mapping'],
+                self.loop
+            )
+        self.assertEqual(expected_get_next_mapping_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'delete_port_mapping'],
+                self.loop
+            )
+        self.assertEqual(expected_delete_port_mapping_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'get_specific_port_mapping'],
+                self.loop
+            )
+        self.assertEqual(expected_get_specific_port_mapping_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'get_redirects'],
+                self.loop
+            )
+        self.assertEqual(expected_get_redirects_usage, actual_output.getvalue())
+
+        actual_output = StringIO()
+        with contextlib.redirect_stdout(actual_output):
+            main(
+                [None, 'help', 'get_port_mapping_by_index'],
+                self.loop
+            )
+        self.assertEqual(expected_get_port_mapping_by_index_usage, actual_output.getvalue())

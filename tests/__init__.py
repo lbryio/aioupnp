@@ -16,7 +16,7 @@ except ImportError:
 
 @contextlib.contextmanager
 def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_reply=0.0, sent_udp_packets=None,
-                     tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None):
+                     tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None, add_potato_datagrams=False):
     sent_udp_packets = sent_udp_packets if sent_udp_packets is not None else []
     udp_replies = udp_replies or {}
 
@@ -28,7 +28,11 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
             def _write(data):
                 sent_tcp_packets.append(data)
                 if data in tcp_replies:
-                    loop.call_later(tcp_delay_reply, p.data_received, tcp_replies[data])
+                    reply = tcp_replies[data]
+                    i = 0
+                    while i < len(reply):
+                        loop.call_later(tcp_delay_reply, p.data_received, reply[i:i+100])
+                        i += 100
                     return
                 else:
                     pass
@@ -46,6 +50,11 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
         def sendto(p: asyncio.DatagramProtocol):
             def _sendto(data, addr):
                 sent_udp_packets.append(data)
+                loop.call_later(udp_delay_reply, p.datagram_received, data,
+                                (p.bind_address, 1900))
+                if add_potato_datagrams:
+                    loop.call_soon(p.datagram_received, b'potato', ('?.?.?.?', 1900))
+
                 if (data, addr) in udp_replies:
                     loop.call_later(udp_delay_reply, p.datagram_received, udp_replies[(data, addr)],
                                     (udp_expected_addr, 1900))

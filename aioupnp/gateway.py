@@ -3,7 +3,7 @@ import logging
 import typing
 import asyncio
 from collections import OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, List
 from aioupnp.util import get_dict_val_case_insensitive
 from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands
@@ -103,74 +103,81 @@ class Gateway:
         self._registered_commands: Dict[str, str] = {}
         self.commands = SOAPCommands(self._loop, self.base_ip, self.port)
 
-    def gateway_descriptor(self) -> dict:
-        r = {
-            'server': self.server.decode(),
-            'urlBase': self.url_base,
-            'location': self.location.decode(),
-            "specVersion": self.spec_version,
-            'usn': self.usn.decode(),
-            'urn': self.urn.decode(),
-        }
-        return r
+    # def gateway_descriptor(self) -> dict:
+    #     r = {
+    #         'server': self.server.decode(),
+    #         'urlBase': self.url_base,
+    #         'location': self.location.decode(),
+    #         "specVersion": self.spec_version,
+    #         'usn': self.usn.decode(),
+    #         'urn': self.urn.decode(),
+    #     }
+    #     return r
 
     @property
     def manufacturer_string(self) -> str:
-        if not self.devices:
-            return "UNKNOWN GATEWAY"
-        devices: typing.List[Device] = list(self.devices.values())
-        device = devices[0]
-        return f"{device.manufacturer} {device.modelName}"
+        manufacturer_string = "UNKNOWN GATEWAY"
+        if self.devices:
+            devices: typing.List[Device] = list(self.devices.values())
+            device = devices[0]
+            manufacturer_string = f"{device.manufacturer} {device.modelName}"
+        return manufacturer_string
 
     @property
     def services(self) -> Dict[str, Service]:
-        if not self._device:
-            return {}
-        return {str(service.serviceType): service for service in self._services}
+        services: Dict[str, Service] = {}
+        if self._services:
+            for service in self._services:
+                if service.serviceType is not None:
+                    services[service.serviceType] = service
+        return services
 
     @property
-    def devices(self) -> Dict:
-        if not self._device:
-            return {}
-        return {device.udn: device for device in self._devices}
+    def devices(self) -> Dict[str, Device]:
+        devices: Dict[str, Device] = {}
+        if self._device:
+            for device in self._devices:
+                if device.udn is not None:
+                    devices[device.udn] = device
+        return devices
 
-    def get_service(self, service_type: str) -> typing.Optional[Service]:
-        for service in self._services:
-            if service.serviceType and service.serviceType.lower() == service_type.lower():
-                return service
-        return None
+    # def get_service(self, service_type: str) -> typing.Optional[Service]:
+    #     for service in self._services:
+    #         if service.serviceType and service.serviceType.lower() == service_type.lower():
+    #             return service
+    #     return None
 
-    @property
-    def soap_requests(self) -> typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                        typing.Optional[typing.Tuple],
-                                                        typing.Optional[Exception], float]]:
-        soap_call_infos: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                  typing.Optional[typing.Tuple],
-                                                  typing.Optional[Exception], float]] = []
-        soap_call_infos.extend([
-            (name, request_args, raw_response, decoded_response, soap_error, ts)
-            for (
-                name, request_args, raw_response, decoded_response, soap_error, ts
-            ) in self.commands._requests
-        ])
-        soap_call_infos.sort(key=lambda x: x[5])
-        return soap_call_infos
+    # @property
+    # def soap_requests(self) -> typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
+    #                                                     typing.Optional[typing.Tuple],
+    #                                                     typing.Optional[Exception], float]]:
+    #     soap_call_infos: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
+    #                                               typing.Optional[typing.Tuple],
+    #                                               typing.Optional[Exception], float]] = []
+    #     soap_call_infos.extend([
+    #         (name, request_args, raw_response, decoded_response, soap_error, ts)
+    #         for (
+    #             name, request_args, raw_response, decoded_response, soap_error, ts
+    #         ) in self.commands._requests
+    #     ])
+    #     soap_call_infos.sort(key=lambda x: x[5])
+    #     return soap_call_infos
 
-    def debug_gateway(self) -> Dict[str, Union[str, bytes, int, Dict, List]]:
-        return {
-            'manufacturer_string': self.manufacturer_string,
-            'gateway_address': self.base_ip,
-            'gateway_descriptor': self.gateway_descriptor(),
-            'gateway_xml': self._xml_response,
-            'services_xml': self._service_descriptors,
-            'services': {service.SCPDURL: service.as_dict() for service in self._services},
-            'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
-            'reply': self._ok_packet.as_dict(),
-            'soap_port': self.port,
-            'registered_soap_commands': self._registered_commands,
-            'unsupported_soap_commands': self._unsupported_actions,
-            'soap_requests': self.soap_requests
-        }
+    # def debug_gateway(self) -> Dict[str, Union[str, bytes, int, Dict, List]]:
+    #     return {
+    #         'manufacturer_string': self.manufacturer_string,
+    #         'gateway_address': self.base_ip,
+    #         'gateway_descriptor': self.gateway_descriptor(),
+    #         'gateway_xml': self._xml_response,
+    #         'services_xml': self._service_descriptors,
+    #         'services': {service.SCPDURL: service.as_dict() for service in self._services},
+    #         'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
+    #         'reply': self._ok_packet.as_dict(),
+    #         'soap_port': self.port,
+    #         'registered_soap_commands': self._registered_commands,
+    #         'unsupported_soap_commands': self._unsupported_actions,
+    #         'soap_requests': self.soap_requests
+    #     }
 
     @classmethod
     async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
@@ -206,7 +213,7 @@ class Gateway:
                     ignored.add(datagram.location)
                     continue
                 else:
-                    log.debug('found gateway device %s', datagram.location)
+                    log.debug('found gateway %s at %s', gateway.manufacturer_string or "device", datagram.location)
                     return gateway
             except (asyncio.TimeoutError, UPnPError) as err:
                 assert datagram.location is not None

@@ -4,17 +4,7 @@ from aioupnp.upnp import UPnP
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.serialization.ssdp import SSDPDatagram
-
-
-class TestGetAnnotations(AsyncioTestCase):
-    def test_get_annotations(self):
-        expected = {
-            'NewRemoteHost': str, 'NewExternalPort': int, 'NewProtocol': str, 'NewInternalPort': int,
-            'NewInternalClient': str, 'NewEnabled': int, 'NewPortMappingDescription': str,
-            'NewLeaseDuration': str, 'return': None
-        }
-
-        self.assertDictEqual(expected, UPnP.get_annotations('AddPortMapping'))
+from aioupnp.commands import GetSpecificPortMappingEntryResponse, GetGenericPortMappingEntryResponse
 
 
 class UPnPCommandTestCase(AsyncioTestCase):
@@ -76,7 +66,8 @@ class TestGetGenericPortMappingEntry(UPnPCommandTestCase):
             await gateway.discover_commands(self.loop)
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             result = await upnp.get_port_mapping_by_index(0)
-            self.assertEqual((None, 9308, 'UDP', 9308, "11.2.3.44", True, "11.2.3.44:9308 to 9308 (UDP)", 0), result)
+            self.assertEqual(GetGenericPortMappingEntryResponse(None, 9308, 'UDP', 9308, "11.2.3.44", True,
+                                                                "11.2.3.44:9308 to 9308 (UDP)", 0), result)
 
 
 class TestGetNextPortMapping(UPnPCommandTestCase):
@@ -120,6 +111,9 @@ class TestGetSpecificPortMapping(UPnPCommandTestCase):
                 await upnp.get_specific_port_mapping(1000, 'UDP')
             except UPnPError:
                 result = await upnp.get_specific_port_mapping(9308, 'UDP')
-                self.assertEqual((9308, '11.2.3.55', True, '11.2.3.55:9308 to 9308 (UDP)', 0), result)
+                self.assertEqual(
+                    GetSpecificPortMappingEntryResponse(9308, '11.2.3.55', True, '11.2.3.55:9308 to 9308 (UDP)', 0),
+                    result
+                )
             else:
                 self.assertTrue(False)
