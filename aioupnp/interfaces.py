@@ -2,6 +2,7 @@ import socket
 from collections import OrderedDict
 import typing
 import netifaces
+from aioupnp.fault import UPnPError
 
 
 def get_netifaces():
@@ -50,4 +51,4 @@ def get_gateway_and_lan_addresses(interface_name: str) -> typing.Tuple[str, str]
     for iface_name, (gateway, lan) in get_interfaces().items():
         if interface_name == iface_name:
             return gateway, lan
-    return '', ''
+    raise UPnPError(f'failed to get lan and gateway addresses for {interface_name}')

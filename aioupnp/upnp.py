@@ -47,10 +47,7 @@ class UPnP:
     async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
                        igd_args: Optional[Dict[str, Union[str, int]]] = None, interface_name: str = 'default',
                        loop: Optional[asyncio.AbstractEventLoop] = None) -> 'UPnP':
-        try:
-            lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
-        except Exception as err:
-            raise UPnPError("failed to get lan and gateway addresses: %s" % str(err))
+        lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
         gateway = await Gateway.discover_gateway(
             lan_address, gateway_address, timeout, igd_args, loop
         )
@@ -135,8 +132,14 @@ class UPnP:
 
     async def get_next_mapping(self, port: int, protocol: str, description: str,
                                internal_port: Optional[int] = None) -> int:
-        if protocol not in ["UDP", "TCP"]:
-            raise UPnPError("unsupported protocol: {}".format(protocol))
+        """
+        :param port:          (int) external port to redirect from
+        :param protocol:      (str) 'UDP' | 'TCP'
+        :param description:   (str) mapping description
+        :param internal_port: (int) internal port to redirect to
+
+        :return: (int) <mapped port>
+        """
         _internal_port = int(internal_port or port)
         requested_port = int(_internal_port)
         port = int(port)

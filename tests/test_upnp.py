@@ -1,8 +1,20 @@
 from tests import AsyncioTestCase, mock_tcp_and_udp
 from collections import OrderedDict
 from aioupnp.upnp import UPnP
+from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.serialization.ssdp import SSDPDatagram
+
+
+class TestGetAnnotations(AsyncioTestCase):
+    def test_get_annotations(self):
+        expected = {
+            'NewRemoteHost': str, 'NewExternalPort': int, 'NewProtocol': str, 'NewInternalPort': int,
+            'NewInternalClient': str, 'NewEnabled': int, 'NewPortMappingDescription': str,
+            'NewLeaseDuration': str, 'return': None
+        }
+
+        self.assertDictEqual(expected, UPnP.get_annotations('AddPortMapping'))
 
 
 class UPnPCommandTestCase(AsyncioTestCase):
@@ -88,3 +100,26 @@ class TestGetNextPortMapping(UPnPCommandTestCase):
             self.assertEqual(4567, ext_port)
             result = await upnp.delete_port_mapping(ext_port, "UDP")
             self.assertEqual(None, result)
+
+
+class TestGetSpecificPortMapping(UPnPCommandTestCase):
+    client_address = '11.2.3.4'
+
+    def setUp(self) -> None:
+        self.replies.update({
+            b'POST /soap.cgi?service=WANIPConn1 HTTP/1.1\r\nHost: 11.2.3.4\r\nUser-Agent: python3/aioupnp, UPnP/1.0, MiniUPnPc/1.9\r\nContent-Length: 399\r\nContent-Type: text/xml\r\nSOAPAction: "urn:schemas-upnp-org:service:WANIPConnection:1#GetSpecificPortMappingEntry"\r\nConnection: Close\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n\r\n<?xml version="1.0"?>\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetSpecificPortMappingEntry xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1"><NewRemoteHost></NewRemoteHost><NewExternalPort>1000</NewExternalPort><NewProtocol>UDP</NewProtocol></u:GetSpecificPortMappingEntry></s:Body></s:Envelope>\r\n': b'HTTP/1.1 500 Internal Server Error\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 06:48:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset="utf-8"\r\nCONTENT-LENGTH: 474 \r\nEXT:\r\n\r\n<?xml version="1.0"?>\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">\n\t<s:Body>\n\t\t<s:Fault>\n\t\t\t<faultcode>s:Client</faultcode>\n\t\t\t<faultstring>UPnPError</faultstring>\n\t\t\t<detail>\n\t\t\t\t<UPnPError xmlns="urn:schemas-upnp-org:control-1-0">\n\t\t\t\t\t<errorCode>714</errorCode>\n\t\t\t\t\t<errorDescription>NoSuchEntryInArray</errorDescription>\n\t\t\t\t</UPnPError>\n\t\t\t</detail>\n\t\t</s:Fault>\n\t</s:Body>\n</s:Envelope>\n',
+            b'POST /soap.cgi?service=WANIPConn1 HTTP/1.1\r\nHost: 11.2.3.4\r\nUser-Agent: python3/aioupnp, UPnP/1.0, MiniUPnPc/1.9\r\nContent-Length: 399\r\nContent-Type: text/xml\r\nSOAPAction: "urn:schemas-upnp-org:service:WANIPConnection:1#GetSpecificPortMappingEntry"\r\nConnection: Close\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n\r\n<?xml version="1.0"?>\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetSpecificPortMappingEntry xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1"><NewRemoteHost></NewRemoteHost><NewExternalPort>9308</NewExternalPort><NewProtocol>UDP</NewProtocol></u:GetSpecificPortMappingEntry></s:Body></s:Envelope>\r\n': b'HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 06:50:07 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset="utf-8"\r\nCONTENT-LENGTH: 562 \r\nEXT:\r\n\r\n<?xml version="1.0"?>\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">\n\t<s:Body>\n\t\t<u:GetSpecificPortMappingEntryResponse xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1">\n\n<NewInternalPort>9308</NewInternalPort>\n<NewInternalClient>11.2.3.55</NewInternalClient>\n<NewEnabled>1</NewEnabled>\n<NewPortMappingDescription>11.2.3.55:9308 to 9308 (UDP)</NewPortMappingDescription>\n<NewLeaseDuration>0</NewLeaseDuration>\n</u:GetSpecificPortMappingEntryResponse>\n\t</s:Body>\n</s:Envelope>\n'
+        })
+
+    async def test_get_specific_port_mapping(self):
+        with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
+            await gateway.discover_commands(self.loop)
+            upnp = UPnP(self.client_address, self.gateway_address, gateway)
+            try:
+                await upnp.get_specific_port_mapping(1000, 'UDP')
+            except UPnPError:
+                result = await upnp.get_specific_port_mapping(9308, 'UDP')
+                self.assertEqual((9308, '11.2.3.55', True, '11.2.3.55:9308 to 9308 (UDP)', 0), result)
+            else:
+                self.assertTrue(False)
