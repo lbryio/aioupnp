@@ -2,43 +2,64 @@ import asyncio
 import time
 import typing
 import logging
-from typing import Tuple
 from aioupnp.protocols.scpd import scpd_post
 from aioupnp.device import Service
 
 log = logging.getLogger(__name__)
 
 
-def soap_optional_str(x: typing.Optional[str]) -> typing.Optional[str]:
-    return x if x is not None and str(x).lower() not in ['none', 'nil'] else None
+def soap_optional_str(x: typing.Optional[typing.Union[str, int]]) -> typing.Optional[str]:
+    return str(x) if x is not None and str(x).lower() not in ['none', 'nil'] else None
 
 
-def soap_bool(x: typing.Optional[str]) -> bool:
+def soap_bool(x: typing.Optional[typing.Union[str, int]]) -> bool:
     return False if not x or str(x).lower() in ['false', 'False'] else True
 
 
-def recast_single_result(t: type, result: typing.Any) -> typing.Optional[typing.Union[str, int, float, bool]]:
-    if t is bool:
-        return soap_bool(result)
-    if t is str:
-        return soap_optional_str(result)
-    return t(result)
+class GetSpecificPortMappingEntryResponse(typing.NamedTuple):
+    internal_port: int
+    lan_address: str
+    enabled: bool
+    description: str
+    lease_time: int
+
+
+class GetGenericPortMappingEntryResponse(typing.NamedTuple):
+    gateway_address: str
+    external_port: int
+    protocol: str
+    internal_port: int
+    lan_address: str
+    enabled: bool
+    description: str
+    lease_time: int
 
 
 def recast_return(return_annotation, result: typing.Dict[str, typing.Union[int, str]],
-                  result_keys: typing.List[str]) -> typing.Tuple:
-    if return_annotation is None or len(result_keys) == 0:
-        return ()
+                  result_keys: typing.List[str]) -> typing.Optional[
+                typing.Union[str, int, bool, GetSpecificPortMappingEntryResponse, GetGenericPortMappingEntryResponse]]:
     if len(result_keys) == 1:
-        assert len(result_keys) == 1
         single_result = result[result_keys[0]]
-        return (recast_single_result(return_annotation, single_result), )
-    annotated_args: typing.List[type] = list(return_annotation.__args__)
-    assert len(annotated_args) == len(result_keys)
-    recast_results: typing.List[typing.Optional[typing.Union[str, int, float, bool]]] = []
-    for type_annotation, result_key in zip(annotated_args, result_keys):
-        recast_results.append(recast_single_result(type_annotation, result.get(result_key, None)))
-    return tuple(recast_results)
+        if return_annotation is bool:
+            return soap_bool(single_result)
+        if return_annotation is str:
+            return soap_optional_str(single_result)
+        return int(result[result_keys[0]]) if result_keys[0] in result else None
+    elif return_annotation in [GetGenericPortMappingEntryResponse, GetSpecificPortMappingEntryResponse]:
+        arg_types: typing.Dict[str, typing.Type[typing.Any]] = return_annotation._field_types
+        assert len(arg_types) == len(result_keys)
+        recast_results: typing.Dict[str, typing.Optional[typing.Union[str, int, bool]]] = {}
+        for i, (field_name, result_key) in enumerate(zip(arg_types, result_keys)):
+            result_field_name = result_keys[i]
+            field_type = arg_types[field_name]
+            if field_type is bool:
+                recast_results[field_name] = soap_bool(result.get(result_field_name, None))
+            elif field_type is str:
+                recast_results[field_name] = soap_optional_str(result.get(result_field_name, None))
+            elif field_type is int:
+                recast_results[field_name] = int(result[result_field_name]) if result_field_name in result else None
+        return return_annotation(**recast_results)
+    return None
 
 
 class SOAPCommands:
@@ -88,7 +109,10 @@ class SOAPCommands:
         self._base_address = base_address
         self._port = port
         self._requests: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                 typing.Tuple, typing.Optional[Exception], float]] = []
+                                                 typing.Optional[typing.Union[str, int, bool,
+                                                                              GetSpecificPortMappingEntryResponse,
+                                                                              GetGenericPortMappingEntryResponse]],
+                                    typing.Optional[Exception], float]] = []
 
     def is_registered(self, name: str) -> bool:
         if name not in self.SOAP_COMMANDS:
@@ -112,7 +136,8 @@ class SOAPCommands:
         input_names: typing.List[str] = self._registered[service][name][0]
         output_names: typing.List[str] = self._registered[service][name][1]
 
-        async def wrapper(**kwargs: typing.Any) -> typing.Tuple:
+        async def wrapper(**kwargs: typing.Any) -> typing.Optional[
+              typing.Union[str, int, bool, GetSpecificPortMappingEntryResponse, GetGenericPortMappingEntryResponse]]:
 
             assert service.controlURL is not None
             assert service.serviceType is not None
@@ -122,11 +147,10 @@ class SOAPCommands:
             )
             if err is not None:
                 assert isinstance(xml_bytes, bytes)
-                self._requests.append((name, kwargs, xml_bytes, (), err, time.time()))
+                self._requests.append((name, kwargs, xml_bytes, None, err, time.time()))
                 raise err
             assert 'return' in annotations
             result = recast_return(annotations['return'], response, output_names)
-
             self._requests.append((name, kwargs, xml_bytes, result, None, time.time()))
             return result
 
@@ -161,8 +185,7 @@ class SOAPCommands:
         )
         return None
 
-    async def GetGenericPortMappingEntry(self, NewPortMappingIndex: int) -> Tuple[str, int, str, int, str,
-                                                                            bool, str, int]:
+    async def GetGenericPortMappingEntry(self, NewPortMappingIndex: int) -> GetGenericPortMappingEntryResponse:
         """
         Returns (NewRemoteHost, NewExternalPort, NewProtocol, NewInternalPort, NewInternalClient, NewEnabled,
                  NewPortMappingDescription, NewLeaseDuration)
@@ -171,19 +194,19 @@ class SOAPCommands:
         if not self.is_registered(name):
             raise NotImplementedError()
         assert name in self._wrappers_kwargs
-        result: Tuple[str, int, str, int, str, bool, str, int] = await self._wrappers_kwargs[name](
+        result: GetGenericPortMappingEntryResponse = await self._wrappers_kwargs[name](
             NewPortMappingIndex=NewPortMappingIndex
         )
         return result
 
     async def GetSpecificPortMappingEntry(self, NewRemoteHost: str, NewExternalPort: int,
-                                          NewProtocol: str) -> Tuple[int, str, bool, str, int]:
+                                          NewProtocol: str) -> GetSpecificPortMappingEntryResponse:
         """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
         name = "GetSpecificPortMappingEntry"
         if not self.is_registered(name):
             raise NotImplementedError()
         assert name in self._wrappers_kwargs
-        result: Tuple[int, str, bool, str, int] = await self._wrappers_kwargs[name](
+        result: GetSpecificPortMappingEntryResponse = await self._wrappers_kwargs[name](
             NewRemoteHost=NewRemoteHost, NewExternalPort=NewExternalPort, NewProtocol=NewProtocol
         )
         return result
@@ -205,8 +228,8 @@ class SOAPCommands:
         if not self.is_registered(name):
             raise NotImplementedError()
         assert name in self._wrappers_no_args
-        result: Tuple[str] = await self._wrappers_no_args[name]()
-        return result[0]
+        result: str = await self._wrappers_no_args[name]()
+        return result
 
     # async def GetNATRSIPStatus(self) -> Tuple[bool, bool]:
     #     """Returns (NewRSIPAvailable, NewNATEnabled)"""
