@@ -85,7 +85,7 @@ class Gateway:
         self.urn: bytes = (ok_packet.st or '').encode()
 
         self._xml_response: bytes = b""
-        self._service_descriptors: Dict[str, bytes] = {}
+        self._service_descriptors: Dict[str, str] = {}
 
         self.base_address, self.port = parse_location(self.location)
         self.base_ip = self.base_address.lstrip(b"http://").split(b":")[0]
@@ -139,17 +139,17 @@ class Gateway:
     def debug_gateway(self) -> Dict[str, typing.Union[str, bytes, int, Dict, List]]:
         return {
             'manufacturer_string': self.manufacturer_string,
-            'gateway_address': self.base_ip,
+            'gateway_address': self.base_ip.decode(),
             'server': self.server.decode(),
             'urlBase': self.url_base or '',
             'location': self.location.decode(),
             "specVersion": self.spec_version or '',
             'usn': self.usn.decode(),
             'urn': self.urn.decode(),
-            'gateway_xml': self._xml_response,
+            'gateway_xml': self._xml_response.decode(),
             'services_xml': self._service_descriptors,
             'services': {service.SCPDURL: service.as_dict() for service in self._services},
-            'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
+            'm_search_args': OrderedDict(self._m_search_args),
             'reply': self._ok_packet.as_dict(),
             'soap_port': self.port,
             'registered_soap_commands': self._registered_commands,
@@ -179,7 +179,7 @@ class Gateway:
             try:
                 gateway = cls(datagram, m_search_args, lan_address, gateway_address, loop=loop)
                 log.debug('get gateway descriptor %s', datagram.location)
-                await gateway.discover_commands(loop)
+                await gateway.discover_commands()
                 requirements_met = all([gateway.commands.is_registered(required) for required in required_commands])
                 if not requirements_met:
                     not_met = [
@@ -227,8 +227,10 @@ class Gateway:
         results: typing.List['asyncio.Future[Gateway]'] = list(done)
         return results[0].result()
 
-    async def discover_commands(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
-        response, xml_bytes, get_err = await scpd_get(self.path.decode(), self.base_ip.decode(), self.port, loop=loop)
+    async def discover_commands(self) -> None:
+        response, xml_bytes, get_err = await scpd_get(
+            self.path.decode(), self.base_ip.decode(), self.port, loop=self._loop
+        )
         self._xml_response = xml_bytes
         if get_err is not None:
             raise get_err
@@ -264,7 +266,7 @@ class Gateway:
         else:
             self._device = Device(self._devices, self._services)
         for service_type in self.services.keys():
-            await self.register_commands(self.services[service_type], loop)
+            await self.register_commands(self.services[service_type], self._loop)
         return None
 
     async def register_commands(self, service: Service,
@@ -276,7 +278,7 @@ class Gateway:
 
         log.debug("get descriptor for %s from %s", service.serviceType, service.SCPDURL)
         service_dict, xml_bytes, get_err = await scpd_get(service.SCPDURL, self.base_ip.decode(), self.port, loop=loop)
-        self._service_descriptors[service.SCPDURL] = xml_bytes
+        self._service_descriptors[service.SCPDURL] = xml_bytes.decode()
 
         if get_err is not None:
             log.debug("failed to get descriptor for %s from %s", service.serviceType, service.SCPDURL)

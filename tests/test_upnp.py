@@ -44,8 +44,8 @@ class TestGetExternalIPAddress(UPnPCommandTestCase):
 
     async def test_get_external_ip(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
             self.assertEqual("11.222.3.44", external_ip)
@@ -60,8 +60,8 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"<derp>11.222.3.44</derp>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             with self.assertRaises(UPnPError):
                 await upnp.get_external_ip()
@@ -71,8 +71,8 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"<newexternalipaddress>11.222.3.44</newexternalipaddress>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
             self.assertEqual("11.222.3.44", external_ip)
@@ -82,11 +82,12 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"11.222.3.44\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
             self.assertEqual("11.222.3.44", external_ip)
+
 
 class TestGetGenericPortMappingEntry(UPnPCommandTestCase):
     def setUp(self) -> None:
@@ -99,8 +100,8 @@ class TestGetGenericPortMappingEntry(UPnPCommandTestCase):
 
     async def test_get_port_mapping_by_index(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             result = await upnp.get_port_mapping_by_index(0)
             self.assertEqual(GetGenericPortMappingEntryResponse(None, 9308, 'UDP', 9308, "11.2.3.44", True,
@@ -121,8 +122,8 @@ class TestGetNextPortMapping(UPnPCommandTestCase):
 
     async def test_get_next_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             ext_port = await upnp.get_next_mapping(4567, "UDP", "aioupnp test mapping")
             self.assertEqual(4567, ext_port)
@@ -141,8 +142,8 @@ class TestGetSpecificPortMapping(UPnPCommandTestCase):
 
     async def test_get_specific_port_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             try:
                 await upnp.get_specific_port_mapping(1000, 'UDP')
