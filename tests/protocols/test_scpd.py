@@ -126,7 +126,7 @@ class TestSCPDGet(AsyncioTestCase):
         with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertDictEqual({}, result)
-            self.assertEqual(self.bad_xml, raw)
+            self.assertEqual(self.bad_response, raw)
             self.assertTrue(isinstance(err, UPnPError))
             self.assertTrue(str(err).startswith('no element found'))
 
@@ -187,7 +187,7 @@ class TestSCPDPost(AsyncioTestCase):
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
             self.assertEqual(None, err)
-            self.assertEqual(self.envelope, raw)
+            self.assertEqual(self.post_response, raw)
             self.assertDictEqual({'NewExternalIPAddress': '11.22.33.44'}, result)
 
     async def test_scpd_post_timeout(self):
@@ -211,7 +211,7 @@ class TestSCPDPost(AsyncioTestCase):
             )
             self.assertTrue(isinstance(err, UPnPError))
             self.assertTrue(str(err).startswith('no element found'))
-            self.assertEqual(self.bad_envelope, raw)
+            self.assertEqual(self.bad_envelope_response, raw)
             self.assertDictEqual({}, result)
 
     async def test_scpd_post_overrun_response(self):

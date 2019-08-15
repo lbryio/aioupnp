@@ -44,8 +44,46 @@ class TestGetExternalIPAddress(UPnPCommandTestCase):
 
     async def test_get_external_ip(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
+            upnp = UPnP(self.client_address, self.gateway_address, gateway)
+            external_ip = await upnp.get_external_ip()
+            self.assertEqual("11.222.3.44", external_ip)
+
+
+class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
+    client_address = '11.2.3.222'
+    get_ip_request = b'POST /soap.cgi?service=WANIPConn1 HTTP/1.1\r\nHost: 11.2.3.4\r\nUser-Agent: python3/aioupnp, UPnP/1.0, MiniUPnPc/1.9\r\nContent-Length: 285\r\nContent-Type: text/xml\r\nSOAPAction: "urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress"\r\nConnection: Close\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n\r\n<?xml version="1.0"?>\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetExternalIPAddress xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1"></u:GetExternalIPAddress></s:Body></s:Envelope>\r\n'
+
+    async def test_response_key_mismatch(self):
+        self.replies.update({self.get_ip_request: b"HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 03:25:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nCONTENT-LENGTH: 333 \r\nEXT:\r\n\r\n<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\n"
+                                                  b"<derp>11.222.3.44</derp>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
+        self.addCleanup(self.replies.pop, self.get_ip_request)
+        with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
+            upnp = UPnP(self.client_address, self.gateway_address, gateway)
+            with self.assertRaises(UPnPError):
+                await upnp.get_external_ip()
+
+    async def test_response_key_case_sensitivity(self):
+        self.replies.update({self.get_ip_request: b"HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 03:25:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nCONTENT-LENGTH: 365 \r\nEXT:\r\n\r\n<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\n"
+                                                  b"<newexternalipaddress>11.222.3.44</newexternalipaddress>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
+        self.addCleanup(self.replies.pop, self.get_ip_request)
+        with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
+            upnp = UPnP(self.client_address, self.gateway_address, gateway)
+            external_ip = await upnp.get_external_ip()
+            self.assertEqual("11.222.3.44", external_ip)
+
+    async def test_non_encapsulated_single_field_response(self):
+        self.replies.update({self.get_ip_request: b"HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 03:25:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nCONTENT-LENGTH: 320 \r\nEXT:\r\n\r\n<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\n"
+                                                  b"11.222.3.44\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
+        self.addCleanup(self.replies.pop, self.get_ip_request)
+        with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
             self.assertEqual("11.222.3.44", external_ip)
@@ -62,8 +100,8 @@ class TestGetGenericPortMappingEntry(UPnPCommandTestCase):
 
     async def test_get_port_mapping_by_index(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             result = await upnp.get_port_mapping_by_index(0)
             self.assertEqual(GetGenericPortMappingEntryResponse(None, 9308, 'UDP', 9308, "11.2.3.44", True,
@@ -84,8 +122,8 @@ class TestGetNextPortMapping(UPnPCommandTestCase):
 
     async def test_get_next_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             ext_port = await upnp.get_next_mapping(4567, "UDP", "aioupnp test mapping")
             self.assertEqual(4567, ext_port)
@@ -104,8 +142,8 @@ class TestGetSpecificPortMapping(UPnPCommandTestCase):
 
     async def test_get_specific_port_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address)
-            await gateway.discover_commands(self.loop)
+            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             try:
                 await upnp.get_specific_port_mapping(1000, 'UDP')

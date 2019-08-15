@@ -58,6 +58,16 @@ class TestSOAPSerialization(unittest.TestCase):
                      b"\r\n" \
                      b"<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<s:Fault>\n\t\t\t<faultcode>s:Client</faultcode>\n\t\t\t<faultstring>UPnPError</faultstring>\n\t\t\t<detail>\n\t\t\t\t<UPnPError xmlns=\"urn:schemas-upnp-org:control-1-0\">\n\t\t\t\t\t<errorCode>713</errorCode>\n\t\t\t\t\t<errorDescription>SpecifiedArrayIndexInvalid</errorDescription>\n\t\t\t\t</UPnPError>\n\t\t\t</detail>\n\t\t</s:Fault>\n\t</s:Body>\n</s:Envelope>\n"
 
+    error_response_no_description = b"HTTP/1.1 500 Internal Server Error\r\n" \
+                                    b"Server: WebServer\r\n" \
+                                    b"Date: Thu, 11 Oct 2018 22:16:17 GMT\r\n" \
+                                    b"Connection: close\r\n" \
+                                    b"CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n" \
+                                    b"CONTENT-LENGTH: 429 \r\n" \
+                                    b"EXT:\r\n" \
+                                    b"\r\n" \
+                                    b"<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<s:Fault>\n\t\t\t<faultcode>s:Client</faultcode>\n\t\t\t<faultstring>UPnPError</faultstring>\n\t\t\t<detail>\n\t\t\t\t<UPnPError xmlns=\"urn:schemas-upnp-org:control-1-0\">\n\t\t\t\t\t<errorCode>713</errorCode>\n\t\t\t\t\t\n\t\t\t\t</UPnPError>\n\t\t\t</detail>\n\t\t</s:Fault>\n\t</s:Body>\n</s:Envelope>\n"
+
     def test_serialize_post(self):
         self.assertEqual(serialize_soap_post(
             self.method, self.param_names, self.st, self.gateway_address, self.path, **self.kwargs
@@ -93,4 +103,14 @@ class TestSOAPSerialization(unittest.TestCase):
         except UPnPError as err:
             raised = True
             self.assertTrue(str(err) == 'SpecifiedArrayIndexInvalid')
+        self.assertTrue(raised)
+
+    def test_raise_from_error_response_without_error_description(self):
+        raised = False
+        expected = 'Failed to decode error response: {"faultcode": "s:Client", "faultstring": "UPnPError", "detail": {"UPnPError": {"errorCode": "713"}}}'
+        try:
+            deserialize_soap_post_response(self.error_response_no_description, self.method, service_id=self.st.decode())
+        except UPnPError as err:
+            raised = True
+            self.assertTrue(str(err) == expected)
         self.assertTrue(raised)

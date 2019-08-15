@@ -1,5 +1,6 @@
 import re
 import typing
+import json
 from aioupnp.util import flatten_keys
 from aioupnp.fault import UPnPError
 from aioupnp.constants import XML_VERSION, ENVELOPE, BODY, FAULT, CONTROL
@@ -54,7 +55,10 @@ def deserialize_soap_post_response(response: bytes, method: str,
         fault: typing.Dict[str, typing.Dict[str, typing.Dict[str, str]]] = flatten_keys(
             response_body[FAULT], "{%s}" % CONTROL
         )
-        raise UPnPError(fault['detail']['UPnPError']['errorDescription'])
+        try:
+            raise UPnPError(fault['detail']['UPnPError']['errorDescription'])
+        except (KeyError, TypeError, ValueError):
+            raise UPnPError(f"Failed to decode error response: {json.dumps(fault)}")
     response_key = None
     for key in response_body:
         if method in key:
