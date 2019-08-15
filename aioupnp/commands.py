@@ -4,6 +4,7 @@ import typing
 import logging
 from aioupnp.protocols.scpd import scpd_post
 from aioupnp.device import Service
+from aioupnp.fault import UPnPError
 
 log = logging.getLogger(__name__)
 
@@ -45,17 +46,28 @@ class SCPDRequestDebuggingInfo(typing.NamedTuple):
     ts: float
 
 
-def recast_return(return_annotation, result: typing.Dict[str, typing.Union[int, str]],
+def recast_return(return_annotation, result: typing.Union[str, int, bool, typing.Dict[str, typing.Union[int, str]]],
                   result_keys: typing.List[str]) -> typing.Optional[
                 typing.Union[str, int, bool, GetSpecificPortMappingEntryResponse, GetGenericPortMappingEntryResponse]]:
     if len(result_keys) == 1:
-        single_result = result[result_keys[0]]
+        if isinstance(result, (str, int, bool)):
+            single_result = result
+        else:
+            if result_keys[0] in result:
+                single_result = result[result_keys[0]]
+            else:  # check for the field having incorrect capitalization
+                flattened = {k.lower(): v for k, v in result.items()}
+                if result_keys[0].lower() in flattened:
+                    single_result = flattened[result_keys[0].lower()]
+                else:
+                    raise UPnPError(f"expected response key {result_keys[0]}, got {list(result.keys())}")
         if return_annotation is bool:
             return soap_bool(single_result)
         if return_annotation is str:
             return soap_optional_str(single_result)
-        return int(result[result_keys[0]]) if result_keys[0] in result else None
+        return None if single_result is None else int(single_result)
     elif return_annotation in [GetGenericPortMappingEntryResponse, GetSpecificPortMappingEntryResponse]:
+        assert isinstance(result, dict)
         arg_types: typing.Dict[str, typing.Type[typing.Any]] = return_annotation._field_types
         assert len(arg_types) == len(result_keys)
         recast_results: typing.Dict[str, typing.Optional[typing.Union[str, int, bool]]] = {}
