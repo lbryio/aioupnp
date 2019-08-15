@@ -253,6 +253,8 @@ class SOAPCommands:
             raise NotImplementedError()
         assert name in self._wrappers_no_args
         result: str = await self._wrappers_no_args[name]()
+        if not result:
+            raise UPnPError("Got null external ip address")
         return result
 
     # async def GetNATRSIPStatus(self) -> Tuple[bool, bool]:
