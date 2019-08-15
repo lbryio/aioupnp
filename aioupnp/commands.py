@@ -35,6 +35,16 @@ class GetGenericPortMappingEntryResponse(typing.NamedTuple):
     lease_time: int
 
 
+class SCPDRequestDebuggingInfo(typing.NamedTuple):
+    method: str
+    kwargs: typing.Dict[str, typing.Union[str, int, bool]]
+    response_xml: bytes
+    result: typing.Optional[typing.Union[str, int, bool, GetSpecificPortMappingEntryResponse,
+                                         GetGenericPortMappingEntryResponse]]
+    err: typing.Optional[Exception]
+    ts: float
+
+
 def recast_return(return_annotation, result: typing.Dict[str, typing.Union[int, str]],
                   result_keys: typing.List[str]) -> typing.Optional[
                 typing.Union[str, int, bool, GetSpecificPortMappingEntryResponse, GetGenericPortMappingEntryResponse]]:
@@ -108,11 +118,7 @@ class SOAPCommands:
 
         self._base_address = base_address
         self._port = port
-        self._requests: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-                                                 typing.Optional[typing.Union[str, int, bool,
-                                                                              GetSpecificPortMappingEntryResponse,
-                                                                              GetGenericPortMappingEntryResponse]],
-                                    typing.Optional[Exception], float]] = []
+        self._request_debug_infos: typing.List[SCPDRequestDebuggingInfo] = []
 
     def is_registered(self, name: str) -> bool:
         if name not in self.SOAP_COMMANDS:
@@ -147,11 +153,17 @@ class SOAPCommands:
             )
             if err is not None:
                 assert isinstance(xml_bytes, bytes)
-                self._requests.append((name, kwargs, xml_bytes, None, err, time.time()))
+                self._request_debug_infos.append(SCPDRequestDebuggingInfo(name, kwargs, xml_bytes, None, err, time.time()))
                 raise err
             assert 'return' in annotations
-            result = recast_return(annotations['return'], response, output_names)
-            self._requests.append((name, kwargs, xml_bytes, result, None, time.time()))
+            try:
+                result = recast_return(annotations['return'], response, output_names)
+                self._request_debug_infos.append(SCPDRequestDebuggingInfo(name, kwargs, xml_bytes, result, None, time.time()))
+            except Exception as err:
+                if isinstance(err, asyncio.CancelledError):
+                    raise
+                self._request_debug_infos.append(SCPDRequestDebuggingInfo(name, kwargs, xml_bytes, None, err, time.time()))
+                raise UPnPError(f"Raised {str(type(err).__name__)}({str(err)}) parsing response for {name}")
             return result
 
         if not len(list(k for k in annotations if k != 'return')):

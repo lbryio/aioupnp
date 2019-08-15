@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import Dict, List
 from aioupnp.util import get_dict_val_case_insensitive
 from aioupnp.constants import SPEC_VERSION, SERVICE
-from aioupnp.commands import SOAPCommands
+from aioupnp.commands import SOAPCommands, SCPDRequestDebuggingInfo
 from aioupnp.device import Device, Service
 from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
 from aioupnp.protocols.scpd import scpd_get
@@ -103,17 +103,6 @@ class Gateway:
         self._registered_commands: Dict[str, str] = {}
         self.commands = SOAPCommands(self._loop, self.base_ip, self.port)
 
-    # def gateway_descriptor(self) -> dict:
-    #     r = {
-    #         'server': self.server.decode(),
-    #         'urlBase': self.url_base,
-    #         'location': self.location.decode(),
-    #         "specVersion": self.spec_version,
-    #         'usn': self.usn.decode(),
-    #         'urn': self.urn.decode(),
-    #     }
-    #     return r
-
     @property
     def manufacturer_string(self) -> str:
         manufacturer_string = "UNKNOWN GATEWAY"
@@ -147,37 +136,26 @@ class Gateway:
     #             return service
     #     return None
 
-    # @property
-    # def soap_requests(self) -> typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-    #                                                     typing.Optional[typing.Tuple],
-    #                                                     typing.Optional[Exception], float]]:
-    #     soap_call_infos: typing.List[typing.Tuple[str, typing.Dict[str, typing.Any], bytes,
-    #                                               typing.Optional[typing.Tuple],
-    #                                               typing.Optional[Exception], float]] = []
-    #     soap_call_infos.extend([
-    #         (name, request_args, raw_response, decoded_response, soap_error, ts)
-    #         for (
-    #             name, request_args, raw_response, decoded_response, soap_error, ts
-    #         ) in self.commands._requests
-    #     ])
-    #     soap_call_infos.sort(key=lambda x: x[5])
-    #     return soap_call_infos
-
-    # def debug_gateway(self) -> Dict[str, Union[str, bytes, int, Dict, List]]:
-    #     return {
-    #         'manufacturer_string': self.manufacturer_string,
-    #         'gateway_address': self.base_ip,
-    #         'gateway_descriptor': self.gateway_descriptor(),
-    #         'gateway_xml': self._xml_response,
-    #         'services_xml': self._service_descriptors,
-    #         'services': {service.SCPDURL: service.as_dict() for service in self._services},
-    #         'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
-    #         'reply': self._ok_packet.as_dict(),
-    #         'soap_port': self.port,
-    #         'registered_soap_commands': self._registered_commands,
-    #         'unsupported_soap_commands': self._unsupported_actions,
-    #         'soap_requests': self.soap_requests
-    #     }
+    def debug_gateway(self) -> Dict[str, typing.Union[str, bytes, int, Dict, List]]:
+        return {
+            'manufacturer_string': self.manufacturer_string,
+            'gateway_address': self.base_ip,
+            'server': self.server.decode(),
+            'urlBase': self.url_base or '',
+            'location': self.location.decode(),
+            "specVersion": self.spec_version or '',
+            'usn': self.usn.decode(),
+            'urn': self.urn.decode(),
+            'gateway_xml': self._xml_response,
+            'services_xml': self._service_descriptors,
+            'services': {service.SCPDURL: service.as_dict() for service in self._services},
+            'm_search_args': [(k, v) for (k, v) in self._m_search_args.items()],
+            'reply': self._ok_packet.as_dict(),
+            'soap_port': self.port,
+            'registered_soap_commands': self._registered_commands,
+            'unsupported_soap_commands': self._unsupported_actions,
+            'soap_requests': list(self.commands._request_debug_infos)
+        }
 
     @classmethod
     async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
