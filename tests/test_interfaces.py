@@ -67,4 +67,4 @@ class TestParseInterfaces(AsyncioTestCase):
                 checked.append(True)
             else:
                 self.assertTrue(False)
-        self.assertTrue(len(checked) == 1)
+        self.assertEqual(len(checked), 1)

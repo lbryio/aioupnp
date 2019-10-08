@@ -102,7 +102,7 @@ class TestSOAPSerialization(unittest.TestCase):
             deserialize_soap_post_response(self.error_response, self.method, service_id=self.st.decode())
         except UPnPError as err:
             raised = True
-            self.assertTrue(str(err) == 'SpecifiedArrayIndexInvalid')
+            self.assertEqual(str(err), 'SpecifiedArrayIndexInvalid')
         self.assertTrue(raised)
 
     def test_raise_from_error_response_without_error_description(self):
@@ -112,5 +112,5 @@ class TestSOAPSerialization(unittest.TestCase):
             deserialize_soap_post_response(self.error_response_no_description, self.method, service_id=self.st.decode())
         except UPnPError as err:
             raised = True
-            self.assertTrue(str(err) == expected)
+            self.assertEqual(str(err), expected)
         self.assertTrue(raised)
