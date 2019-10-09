@@ -108,7 +108,7 @@ class TestSCPDGet(AsyncioTestCase):
         replies = {self.get_request: self.response}
         with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
-            self.assertEqual(None, err)
+            self.assertIsNone(err)
             self.assertDictEqual(self.expected_parsed, result)
 
     async def test_scpd_get_timeout(self):
@@ -116,7 +116,7 @@ class TestSCPDGet(AsyncioTestCase):
         replies = {}
         with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertDictEqual({}, result)
             self.assertEqual(b'', raw)
 
@@ -127,7 +127,7 @@ class TestSCPDGet(AsyncioTestCase):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertDictEqual({}, result)
             self.assertEqual(self.bad_response, raw)
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('no element found'))
 
     async def test_scpd_get_overrun_content_length(self):
@@ -137,7 +137,7 @@ class TestSCPDGet(AsyncioTestCase):
             result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
             self.assertDictEqual({}, result)
             self.assertEqual(self.bad_response + b'\r\n', raw)
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('too many bytes written'))
 
 
@@ -186,7 +186,7 @@ class TestSCPDPost(AsyncioTestCase):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
-            self.assertEqual(None, err)
+            self.assertIsNone(err)
             self.assertEqual(self.post_response, raw)
             self.assertDictEqual({'NewExternalIPAddress': '11.22.33.44'}, result)
 
@@ -197,7 +197,7 @@ class TestSCPDPost(AsyncioTestCase):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('Timeout'))
             self.assertEqual(b'', raw)
             self.assertDictEqual({}, result)
@@ -209,7 +209,7 @@ class TestSCPDPost(AsyncioTestCase):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('no element found'))
             self.assertEqual(self.bad_envelope_response, raw)
             self.assertDictEqual({}, result)
@@ -221,7 +221,7 @@ class TestSCPDPost(AsyncioTestCase):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
             )
-            self.assertTrue(isinstance(err, UPnPError))
+            self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('too many bytes written'))
             self.assertEqual(self.post_response + b'\r\n', raw)
             self.assertDictEqual({}, result)

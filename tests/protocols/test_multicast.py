@@ -23,8 +23,8 @@ class TestMulticast(unittest.TestCase):
         protocol = MulticastProtocol('1.2.3.4', '1.2.3.4')
         transport = DatagramTransport()
         transport._extra = {'socket': mock_socket}
-        self.assertEqual(None, protocol.set_ttl(1))
+        self.assertIsNone(protocol.set_ttl(1))
         self.assertEqual(0, protocol.get_ttl())
         protocol.connection_made(transport)
-        self.assertEqual(None, protocol.set_ttl(1))
+        self.assertIsNone(protocol.set_ttl(1))
         self.assertEqual(1, protocol.get_ttl())

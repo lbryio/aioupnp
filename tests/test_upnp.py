@@ -141,7 +141,7 @@ class TestGetNextPortMapping(UPnPCommandTestCase):
             ext_port = await upnp.get_next_mapping(4567, "UDP", "aioupnp test mapping")
             self.assertEqual(4567, ext_port)
             result = await upnp.delete_port_mapping(ext_port, "UDP")
-            self.assertEqual(None, result)
+            self.assertIsNone(result)
 
 
 class TestGetSpecificPortMapping(UPnPCommandTestCase):
