@@ -83,7 +83,7 @@ class SSDPProtocol(MulticastProtocol):
             self._pending_searches.append(
                 (address, packet.st, fut, self.loop.call_soon(self._send_m_search, address, packet, fut))
             )
-        return await asyncio.wait_for(fut, timeout)
+        return await asyncio.wait_for(fut, timeout, loop=self.loop)
 
     def datagram_received(self, data: bytes, addr: Tuple[str, int]) -> None:  # type: ignore
         if addr[0] == self.bind_address:
@@ -146,7 +146,7 @@ async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict[s
     )
     try:
         return await protocol.m_search(address=gateway_address, timeout=timeout, datagrams=[datagram_args])
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except asyncio.TimeoutError:
         raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
     finally:
         protocol.disconnect()
