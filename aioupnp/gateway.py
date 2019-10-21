@@ -8,7 +8,7 @@ from aioupnp.util import get_dict_val_case_insensitive
 from aioupnp.constants import SPEC_VERSION, SERVICE
 from aioupnp.commands import SOAPCommands, SCPDRequestDebuggingInfo
 from aioupnp.device import Device, Service
-from aioupnp.protocols.ssdp import fuzzy_m_search, m_search
+from aioupnp.protocols.ssdp import fuzzy_m_search, m_search, multi_m_search
 from aioupnp.protocols.scpd import scpd_get
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.util import flatten_keys
@@ -69,12 +69,10 @@ def parse_location(location: bytes) -> typing.Tuple[bytes, int]:
 
 
 class Gateway:
-    def __init__(self, ok_packet: SSDPDatagram, m_search_args: typing.Dict[str, typing.Union[int, str]],
-                 lan_address: str, gateway_address: str,
+    def __init__(self, ok_packet: SSDPDatagram, lan_address: str, gateway_address: str,
                  loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
         self._loop = loop or asyncio.get_event_loop()
         self._ok_packet = ok_packet
-        self._m_search_args = m_search_args
         self._lan_address = lan_address
         self.usn: bytes = (ok_packet.usn or '').encode()
         self.ext: bytes = (ok_packet.ext or '').encode()
@@ -149,7 +147,6 @@ class Gateway:
             'gateway_xml': self._xml_response.decode(),
             'services_xml': self._service_descriptors,
             'services': {service.SCPDURL: service.as_dict() for service in self._services},
-            'm_search_args': OrderedDict(self._m_search_args),
             'reply': self._ok_packet.as_dict(),
             'soap_port': self.port,
             'registered_soap_commands': self._registered_commands,
@@ -170,14 +167,13 @@ class Gateway:
         ]
         while True:
             if not igd_args:
-                m_search_args, datagram = await fuzzy_m_search(
+                datagram = await multi_m_search(
                     lan_address, gateway_address, timeout, loop, ignored, unicast
                 )
             else:
-                m_search_args = OrderedDict(igd_args)
                 datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
             try:
-                gateway = cls(datagram, m_search_args, lan_address, gateway_address, loop=loop)
+                gateway = cls(datagram, lan_address, gateway_address, loop=loop)
                 log.debug('get gateway descriptor %s', datagram.location)
                 await gateway.discover_commands()
                 requirements_met = all([gateway.commands.is_registered(required) for required in required_commands])

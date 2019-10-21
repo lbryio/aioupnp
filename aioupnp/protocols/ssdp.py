@@ -152,6 +152,21 @@ async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict[s
         protocol.disconnect()
 
 
+async def multi_m_search(lan_address: str, gateway_address: str, timeout: int = 3,
+                         loop: Optional[asyncio.AbstractEventLoop] = None,
+                         ignored: Set[str] = None, unicast: bool = False) -> SSDPDatagram:
+    protocol, gateway_address, lan_address = await listen_ssdp(
+        lan_address, gateway_address, loop, ignored, unicast
+    )
+    datagram_args = list(packet_generator())
+    try:
+        return await protocol.m_search(address=gateway_address, timeout=timeout, datagrams=datagram_args)
+    except asyncio.TimeoutError:
+        raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
+    finally:
+        protocol.disconnect()
+
+
 async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30,
                           loop: Optional[asyncio.AbstractEventLoop] = None,
                           ignored: Set[str] = None,
