@@ -80,12 +80,10 @@ class SSDPProtocol(MulticastProtocol):
             if not fut.done():
                 fut.set_exception(UPnPError("SSDP transport not connected"))
             return
-        if fut.done():
-            return
+        assert packet.st is not None
         self._pending_searches.append(
             PendingSearch(address, packet.st, fut)
         )
-
         self.transport.sendto(packet.encode().encode(), (SSDP_IP_ADDRESS, SSDP_PORT))
 
         # also send unicast

@@ -184,9 +184,10 @@ class Gateway:
             return None
 
     @classmethod
-    async def _gateway_from_igd_args(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                                igd_args: Optional[typing.Dict[str, typing.Union[int, str]]] = None,
-                                loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
+    async def _gateway_from_igd_args(cls, lan_address: str, gateway_address: str,
+                                     igd_args: typing.Dict[str, typing.Union[int, str]],
+                                     timeout: int = 30,
+                                     loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
         datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, set())
         gateway = await cls._try_gateway_from_ssdp(datagram, lan_address, gateway_address, loop)
         if not gateway:
@@ -208,7 +209,7 @@ class Gateway:
                 gateway = await cls._try_gateway_from_ssdp(datagram, lan_address, gateway_address, loop)
                 if gateway:
                     return gateway
-                else:
+                elif datagram.location:
                     ignored.add(datagram.location)
         finally:
             ssdp_proto.disconnect()
@@ -219,7 +220,7 @@ class Gateway:
                                loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
         loop = loop or asyncio.get_event_loop()
         if igd_args:
-            return await cls._gateway_from_igd_args(lan_address, gateway_address, timeout, igd_args, loop)
+            return await cls._gateway_from_igd_args(lan_address, gateway_address, igd_args, timeout, loop)
         try:
             return await asyncio.wait_for(loop.create_task(
                 cls._discover_gateway(lan_address, gateway_address, timeout, loop)
