@@ -164,7 +164,12 @@ class SSDPDatagram:
 
     @classmethod
     def decode(cls, datagram: bytes) -> 'SSDPDatagram':
-        packet = cls._from_string(datagram.decode())
+        try:
+            packet = cls._from_string(datagram.decode())
+        except UnicodeDecodeError:
+            raise UPnPError(
+                f"failed to decode datagram: {binascii.hexlify(datagram).decode()}"
+            )
         if packet is None:
             raise UPnPError(
                 f"failed to decode datagram: {binascii.hexlify(datagram).decode()}"

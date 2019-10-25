@@ -16,7 +16,8 @@ except ImportError:
 
 @contextlib.contextmanager
 def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_reply=0.0, sent_udp_packets=None,
-                     tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None, add_potato_datagrams=False):
+                     tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None, add_potato_datagrams=False,
+                     raise_oserror_on_bind=False):
     sent_udp_packets = sent_udp_packets if sent_udp_packets is not None else []
     udp_replies = udp_replies or {}
 
@@ -72,7 +73,13 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
     with mock.patch('socket.socket') as mock_socket:
         mock_sock = mock.Mock(spec=socket.socket)
         mock_sock.setsockopt = lambda *_: None
-        mock_sock.bind = lambda *_: None
+
+        def bind(*_):
+            if raise_oserror_on_bind:
+                raise OSError()
+            return
+
+        mock_sock.bind = bind
         mock_sock.setblocking = lambda *_: None
         mock_sock.getsockname = lambda: "0.0.0.0"
         mock_sock.getpeername = lambda: ""

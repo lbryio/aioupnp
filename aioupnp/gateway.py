@@ -188,7 +188,7 @@ class Gateway:
                                      igd_args: typing.Dict[str, typing.Union[int, str]],
                                      timeout: int = 30,
                                      loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
-        datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, set())
+        datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop)
         gateway = await cls._try_gateway_from_ssdp(datagram, lan_address, gateway_address, loop)
         if not gateway:
             raise UPnPError("no gateway found for given args")
@@ -199,7 +199,7 @@ class Gateway:
                                 loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
         ignored: typing.Set[str] = set()
         ssdp_proto = await multi_m_search(
-            lan_address, gateway_address, timeout, loop, ignored
+            lan_address, gateway_address, timeout, loop
         )
         try:
             while True:

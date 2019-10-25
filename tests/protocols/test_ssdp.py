@@ -28,12 +28,27 @@ class TestSSDP(AsyncioTestCase):
     ])
     reply_packet = SSDPDatagram("OK", reply_args)
 
+    async def test_socket_setup_error(self):
+        with mock_tcp_and_udp(self.loop, raise_oserror_on_bind=True):
+            with self.assertRaises(UPnPError):
+                await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop)
+
     async def test_transport_not_connected_error(self):
         try:
             await SSDPProtocol('', '').m_search('1.2.3.4', 2,  [self.query_packet.as_dict()])
             self.assertTrue(False)
         except UPnPError as err:
             self.assertEqual(str(err), "SSDP transport not connected")
+
+    async def test_deadbeef_response(self):
+        replies = {
+            (self.query_packet.encode().encode(), ("10.0.0.1", 1900)): b'\xde\xad\xbe\xef'
+        }
+        sent = []
+
+        with mock_tcp_and_udp(self.loop, udp_replies=replies, udp_expected_addr="10.0.0.1", sent_udp_packets=sent):
+            with self.assertRaises(UPnPError):
+                await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop)
 
     async def test_m_search_reply_unicast(self):
         replies = {

@@ -24,12 +24,11 @@ class PendingSearch(typing.NamedTuple):
 
 
 class SSDPProtocol(MulticastProtocol):
-    def __init__(self, multicast_address: str, lan_address: str, ignored: Optional[Set[str]] = None,
+    def __init__(self, multicast_address: str, lan_address: str,
                  loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
         super().__init__(multicast_address, lan_address)
         self.loop: asyncio.AbstractEventLoop = loop or asyncio.get_event_loop()
         self.transport: Optional[DatagramTransport] = None
-        self._ignored: Set[str] = ignored or set()  # ignored locations
         self._pending_searches: List[PendingSearch] = []
         self.notifications: List[SSDPDatagram] = []
         self.connected = asyncio.Event(loop=self.loop)
@@ -52,9 +51,6 @@ class SSDPProtocol(MulticastProtocol):
         return None
 
     def _callback_m_search_ok(self, address: str, packet: SSDPDatagram) -> None:
-        if packet.location in self._ignored:
-            return
-
         futures: Set['asyncio.Future[SSDPDatagram]'] = set()
         replied: List[PendingSearch] = []
 
@@ -137,13 +133,13 @@ class SSDPProtocol(MulticastProtocol):
         #         return
 
 
-async def listen_ssdp(lan_address: str, gateway_address: str, loop: Optional[asyncio.AbstractEventLoop] = None,
-                      ignored: Optional[Set[str]] = None) -> Tuple[SSDPProtocol, str, str]:
+async def listen_ssdp(lan_address: str, gateway_address: str,
+                      loop: Optional[asyncio.AbstractEventLoop] = None) -> Tuple[SSDPProtocol, str, str]:
     loop = loop or asyncio.get_event_loop()
     try:
         sock: socket.socket = SSDPProtocol.create_multicast_socket(lan_address)
         listen_result: Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_datagram_endpoint(
-            lambda: SSDPProtocol(SSDP_IP_ADDRESS, lan_address, ignored), sock=sock
+            lambda: SSDPProtocol(SSDP_IP_ADDRESS, lan_address), sock=sock
         )
         protocol = listen_result[1]
         assert isinstance(protocol, SSDPProtocol)
@@ -156,10 +152,10 @@ async def listen_ssdp(lan_address: str, gateway_address: str, loop: Optional[asy
 
 
 async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict[str, typing.Union[int, str]],
-                   timeout: int = 1, loop: Optional[asyncio.AbstractEventLoop] = None,
-                   ignored: Set[str] = None) -> SSDPDatagram:
+                   timeout: int = 1,
+                   loop: Optional[asyncio.AbstractEventLoop] = None) -> SSDPDatagram:
     protocol, gateway_address, lan_address = await listen_ssdp(
-        lan_address, gateway_address, loop, ignored
+        lan_address, gateway_address, loop
     )
     try:
         return await protocol.m_search(address=gateway_address, timeout=timeout, datagrams=[datagram_args])
@@ -170,11 +166,10 @@ async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict[s
 
 
 async def multi_m_search(lan_address: str, gateway_address: str, timeout: int = 3,
-                         loop: Optional[asyncio.AbstractEventLoop] = None,
-                         ignored: Set[str] = None) -> SSDPProtocol:
+                         loop: Optional[asyncio.AbstractEventLoop] = None) -> SSDPProtocol:
     loop = loop or asyncio.get_event_loop()
     protocol, gateway_address, lan_address = await listen_ssdp(
-        lan_address, gateway_address, loop, ignored
+        lan_address, gateway_address, loop
     )
     fut = asyncio.ensure_future(protocol.send_m_searches(
         address=gateway_address, datagrams=list(packet_generator())
