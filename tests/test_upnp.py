@@ -45,7 +45,7 @@ class TestGetExternalIPAddress(UPnPCommandTestCase):
         self.replies.update({request: b"HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 03:25:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nCONTENT-LENGTH: 365 \r\nEXT:\r\n\r\n<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\n<NewExternalIPAddress>11.222.3.44</NewExternalIPAddress>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
@@ -57,7 +57,7 @@ class TestGetExternalIPAddress(UPnPCommandTestCase):
                                 request: b"HTTP/1.1 200 OK\r\nServer: WebServer\r\nDate: Wed, 22 May 2019 03:25:57 GMT\r\nConnection: close\r\nCONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nCONTENT-LENGTH: 354 \r\nEXT:\r\n\r\n<?xml version=\"1.0\"?>\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n\t<s:Body>\n\t\t<u:GetExternalIPAddressResponse xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\n<NewExternalIPAddress></NewExternalIPAddress>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             with self.assertRaises(UPnPError):
@@ -73,7 +73,7 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"<derp>11.222.3.44</derp>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             with self.assertRaises(UPnPError):
@@ -84,7 +84,7 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"<newexternalipaddress>11.222.3.44</newexternalipaddress>\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
@@ -95,7 +95,7 @@ class TestMalformedGetExternalIPAddressResponse(UPnPCommandTestCase):
                                                   b"11.222.3.44\n</u:GetExternalIPAddressResponse>\n\t</s:Body>\n</s:Envelope>\n"})
         self.addCleanup(self.replies.pop, self.get_ip_request)
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             external_ip = await upnp.get_external_ip()
@@ -113,7 +113,7 @@ class TestGetGenericPortMappingEntry(UPnPCommandTestCase):
 
     async def test_get_port_mapping_by_index(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             result = await upnp.get_port_mapping_by_index(0)
@@ -135,7 +135,7 @@ class TestGetNextPortMapping(UPnPCommandTestCase):
 
     async def test_get_next_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             ext_port = await upnp.get_next_mapping(4567, "UDP", "aioupnp test mapping")
@@ -155,7 +155,7 @@ class TestGetSpecificPortMapping(UPnPCommandTestCase):
 
     async def test_get_specific_port_mapping(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
-            gateway = Gateway(self.reply, self.m_search_args, self.client_address, self.gateway_address, loop=self.loop)
+            gateway = Gateway(self.reply, self.client_address, self.gateway_address, loop=self.loop)
             await gateway.discover_commands()
             upnp = UPnP(self.client_address, self.gateway_address, gateway)
             try:

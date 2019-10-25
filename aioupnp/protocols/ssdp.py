@@ -4,6 +4,7 @@ import asyncio
 import logging
 import typing
 import socket
+from typing import List, Set, Dict, Tuple, Optional
 from asyncio.transports import DatagramTransport
 from aioupnp.fault import UPnPError
 from aioupnp.serialization.ssdp import SSDPDatagram
@@ -16,17 +17,22 @@ ADDRESS_REGEX = re.compile("^http:\/\/(\d+\.\d+\.\d+\.\d+)\:(\d*)(\/[\w|\/|\:|\-
 log = logging.getLogger(__name__)
 
 
+class PendingSearch(typing.NamedTuple):
+    address: str
+    st: str
+    fut: 'asyncio.Future[SSDPDatagram]'
+
+
 class SSDPProtocol(MulticastProtocol):
-    def __init__(self, multicast_address: str, lan_address: str, ignored: typing.Optional[typing.Set[str]] = None,
-                 unicast: bool = False, loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
+    def __init__(self, multicast_address: str, lan_address: str,
+                 loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
         super().__init__(multicast_address, lan_address)
         self.loop: asyncio.AbstractEventLoop = loop or asyncio.get_event_loop()
-        self.transport: typing.Optional[DatagramTransport] = None
-        self._unicast = unicast
-        self._ignored: typing.Set[str] = ignored or set()  # ignored locations
-        self._pending_searches: typing.List[typing.Tuple[str, str, 'asyncio.Future[SSDPDatagram]', asyncio.Handle]] = []
-        self.notifications: typing.List[SSDPDatagram] = []
+        self.transport: Optional[DatagramTransport] = None
+        self._pending_searches: List[PendingSearch] = []
+        self.notifications: List[SSDPDatagram] = []
         self.connected = asyncio.Event(loop=self.loop)
+        self.devices: 'asyncio.Queue[SSDPDatagram]' = asyncio.Queue(loop=self.loop)
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:  # type: ignore
         super().connection_made(transport)
@@ -45,46 +51,56 @@ class SSDPProtocol(MulticastProtocol):
         return None
 
     def _callback_m_search_ok(self, address: str, packet: SSDPDatagram) -> None:
-        if packet.location not in self._ignored:
-            # TODO: fix this
-            tmp: typing.List[typing.Tuple[str, str, 'asyncio.Future[SSDPDatagram]', asyncio.Handle]] = []
-            set_futures: typing.List['asyncio.Future[SSDPDatagram]'] = []
-            while len(self._pending_searches):
-                t = self._pending_searches.pop()
-                if (address == t[0]) and (t[1] in [packet.st, "upnp:rootdevice"]):
-                    f = t[2]
-                    if f not in set_futures:
-                        set_futures.append(f)
-                        if not f.done():
-                            f.set_result(packet)
-                elif t[2] not in set_futures:
-                    tmp.append(t)
-            while tmp:
-                self._pending_searches.append(tmp.pop())
-        return None
+        futures: Set['asyncio.Future[SSDPDatagram]'] = set()
+        replied: List[PendingSearch] = []
+
+        for pending in self._pending_searches:
+            # if pending.address == address and pending.st in (packet.st, "upnp:rootdevice"):
+            if pending.address == address and pending.st == packet.st:
+                replied.append(pending)
+                if pending.fut not in futures:
+                    futures.add(pending.fut)
+        if replied:
+            self.devices.put_nowait(packet)
+
+        while replied:
+            self._pending_searches.remove(replied.pop())
+
+        while futures:
+            fut = futures.pop()
+            if not fut.done():
+                fut.set_result(packet)
 
     def _send_m_search(self, address: str, packet: SSDPDatagram, fut: 'asyncio.Future[SSDPDatagram]') -> None:
-        dest = address if self._unicast else SSDP_IP_ADDRESS
         if not self.transport:
             if not fut.done():
                 fut.set_exception(UPnPError("SSDP transport not connected"))
-            return None
-        log.debug("send m search to %s: %s", dest, packet.st)
-        self.transport.sendto(packet.encode().encode(), (dest, SSDP_PORT))
-        return None
+            return
+        assert packet.st is not None
+        self._pending_searches.append(
+            PendingSearch(address, packet.st, fut)
+        )
+        self.transport.sendto(packet.encode().encode(), (SSDP_IP_ADDRESS, SSDP_PORT))
 
-    async def m_search(self, address: str, timeout: float,
-                       datagrams: typing.List[typing.Dict[str, typing.Union[str, int]]]) -> SSDPDatagram:
-        fut: 'asyncio.Future[SSDPDatagram]' = asyncio.Future(loop=self.loop)
+        # also send unicast
+        log.debug("send m search to %s: %s", address, packet.st)
+        self.transport.sendto(packet.encode().encode(), (address, SSDP_PORT))
+
+    def send_m_searches(self, address: str,
+                        datagrams: List[Dict[str, typing.Union[str, int]]]) -> 'asyncio.Future[SSDPDatagram]':
+        fut: 'asyncio.Future[SSDPDatagram]' = self.loop.create_future()
         for datagram in datagrams:
             packet = SSDPDatagram("M-SEARCH", datagram)
             assert packet.st is not None
-            self._pending_searches.append(
-                (address, packet.st, fut, self.loop.call_soon(self._send_m_search, address, packet, fut))
-            )
-        return await asyncio.wait_for(fut, timeout)
+            self._send_m_search(address, packet, fut)
+        return fut
 
-    def datagram_received(self, data: bytes, addr: typing.Tuple[str, int]) -> None:  # type: ignore
+    async def m_search(self, address: str, timeout: float,
+                       datagrams: List[Dict[str, typing.Union[str, int]]]) -> SSDPDatagram:
+        fut = self.send_m_searches(address, datagrams)
+        return await asyncio.wait_for(fut, timeout, loop=self.loop)
+
+    def datagram_received(self, data: bytes, addr: Tuple[str, int]) -> None:  # type: ignore
         if addr[0] == self.bind_address:
             return None
         try:
@@ -94,7 +110,6 @@ class SSDPProtocol(MulticastProtocol):
             log.warning("failed to decode SSDP packet from %s:%i (%s): %s", addr[0], addr[1], err,
                         binascii.hexlify(data))
             return None
-
         if packet._packet_type == packet._OK:
             self._callback_m_search_ok(addr[0], packet)
             return None
@@ -118,14 +133,13 @@ class SSDPProtocol(MulticastProtocol):
         #         return
 
 
-async def listen_ssdp(lan_address: str, gateway_address: str, loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                      ignored: typing.Optional[typing.Set[str]] = None,
-                      unicast: bool = False) -> typing.Tuple[SSDPProtocol, str, str]:
+async def listen_ssdp(lan_address: str, gateway_address: str,
+                      loop: Optional[asyncio.AbstractEventLoop] = None) -> Tuple[SSDPProtocol, str, str]:
     loop = loop or asyncio.get_event_loop()
     try:
         sock: socket.socket = SSDPProtocol.create_multicast_socket(lan_address)
-        listen_result: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_datagram_endpoint(
-            lambda: SSDPProtocol(SSDP_IP_ADDRESS, lan_address, ignored, unicast), sock=sock
+        listen_result: Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_datagram_endpoint(
+            lambda: SSDPProtocol(SSDP_IP_ADDRESS, lan_address), sock=sock
         )
         protocol = listen_result[1]
         assert isinstance(protocol, SSDPProtocol)
@@ -137,58 +151,28 @@ async def listen_ssdp(lan_address: str, gateway_address: str, loop: typing.Optio
     return protocol, gateway_address, lan_address
 
 
-async def m_search(lan_address: str, gateway_address: str, datagram_args: typing.Dict[str, typing.Union[int, str]],
-                   timeout: int = 1, loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                   ignored: typing.Set[str] = None, unicast: bool = False) -> SSDPDatagram:
+async def m_search(lan_address: str, gateway_address: str, datagram_args: Dict[str, typing.Union[int, str]],
+                   timeout: int = 1,
+                   loop: Optional[asyncio.AbstractEventLoop] = None) -> SSDPDatagram:
     protocol, gateway_address, lan_address = await listen_ssdp(
-        lan_address, gateway_address, loop, ignored, unicast
+        lan_address, gateway_address, loop
     )
     try:
         return await protocol.m_search(address=gateway_address, timeout=timeout, datagrams=[datagram_args])
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except asyncio.TimeoutError:
         raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
     finally:
         protocol.disconnect()
 
 
-async def _fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30,
-                          loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                          ignored: typing.Set[str] = None,
-                          unicast: bool = False) -> typing.List[typing.Dict[str, typing.Union[int, str]]]:
+async def multi_m_search(lan_address: str, gateway_address: str, timeout: int = 3,
+                         loop: Optional[asyncio.AbstractEventLoop] = None) -> SSDPProtocol:
+    loop = loop or asyncio.get_event_loop()
     protocol, gateway_address, lan_address = await listen_ssdp(
-        lan_address, gateway_address, loop, ignored, unicast
+        lan_address, gateway_address, loop
     )
-    await protocol.connected.wait()
-    packet_args = list(packet_generator())
-    batch_size = 2
-    batch_timeout = float(timeout) / float(len(packet_args))
-    while packet_args:
-        args = packet_args[:batch_size]
-        packet_args = packet_args[batch_size:]
-        log.debug("sending batch of %i M-SEARCH attempts", batch_size)
-        try:
-            await protocol.m_search(gateway_address, batch_timeout, args)
-        except asyncio.TimeoutError:
-            continue
-        else:
-            protocol.disconnect()
-            return args
-    protocol.disconnect()
-    raise UPnPError("M-SEARCH for {}:{} timed out".format(gateway_address, SSDP_PORT))
-
-
-async def fuzzy_m_search(lan_address: str, gateway_address: str, timeout: int = 30,
-                         loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                         ignored: typing.Set[str] = None,
-                         unicast: bool = False) -> typing.Tuple[typing.Dict[str,
-                                                                            typing.Union[int, str]], SSDPDatagram]:
-    # we don't know which packet the gateway replies to, so send small batches at a time
-    args_to_try = await _fuzzy_m_search(lan_address, gateway_address, timeout, loop, ignored, unicast)
-    # check the args in the batch that got a reply one at a time to see which one worked
-    for args in args_to_try:
-        try:
-            packet = await m_search(lan_address, gateway_address, args, 3, loop=loop, ignored=ignored, unicast=unicast)
-            return args, packet
-        except UPnPError:
-            continue
-    raise UPnPError("failed to discover gateway")
+    fut = asyncio.ensure_future(protocol.send_m_searches(
+        address=gateway_address, datagrams=list(packet_generator())
+    ), loop=loop)
+    loop.call_later(timeout, lambda: None if not fut or fut.done() else fut.cancel())
+    return protocol

@@ -4,12 +4,10 @@
 import logging
 import json
 import asyncio
-from collections import OrderedDict
 from typing import Tuple, Dict, List, Union, Optional, Any
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.interfaces import get_gateway_and_lan_addresses
-from aioupnp.protocols.ssdp import m_search, fuzzy_m_search
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.commands import GetGenericPortMappingEntryResponse, GetSpecificPortMappingEntryResponse
 
@@ -61,7 +59,7 @@ class UPnP:
         return lan_address, gateway_address
 
     @classmethod
-    async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 30,
+    async def discover(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 3,
                        igd_args: Optional[Dict[str, Union[str, int]]] = None, interface_name: str = 'default',
                        loop: Optional[asyncio.AbstractEventLoop] = None) -> 'UPnP':
         lan_address, gateway_address = cls.get_lan_and_gateway(lan_address, gateway_address, interface_name)
@@ -72,7 +70,7 @@ class UPnP:
 
     @classmethod
     async def m_search(cls, lan_address: str = '', gateway_address: str = '', timeout: int = 1,
-                       unicast: bool = True, interface_name: str = 'default',
+                       interface_name: str = 'default',
                        igd_args: Optional[Dict[str, Union[str, int]]] = None,
                        loop: Optional[asyncio.AbstractEventLoop] = None
                        ) -> Dict[str, Union[str, Dict[str, Union[str, int]]]]:
@@ -82,7 +80,6 @@ class UPnP:
         :param lan_address: (str) the local interface ipv4 address
         :param gateway_address: (str) the gateway ipv4 address
         :param timeout: (int) m search timeout
-        :param unicast: (bool) use unicast
         :param interface_name: (str) name of the network interface
         :param igd_args: (dict) case sensitive M-SEARCH headers. if used all headers to be used must be provided.
 
@@ -101,16 +98,14 @@ class UPnP:
             except Exception as err:
                 raise UPnPError("failed to get lan and gateway addresses for interface \"%s\": %s" % (interface_name,
                                                                                                       str(err)))
-        if not igd_args:
-            igd_args, datagram = await fuzzy_m_search(lan_address, gateway_address, timeout, loop, unicast=unicast)
-        else:
-            igd_args = OrderedDict(igd_args)
-            datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, unicast=unicast)
+        gateway = await Gateway.discover_gateway(
+            lan_address, gateway_address, timeout, igd_args, loop
+        )
         return {
             'lan_address': lan_address,
             'gateway_address': gateway_address,
-            'm_search_kwargs': SSDPDatagram("M-SEARCH", igd_args).get_cli_igd_kwargs(),
-            'discover_reply': datagram.as_dict()
+            # 'm_search_kwargs': SSDPDatagram("M-SEARCH", igd_args).get_cli_igd_kwargs(),
+            'discover_reply': gateway._ok_packet.as_dict()
         }
 
     async def get_external_ip(self) -> str:
@@ -372,20 +367,20 @@ cli_commands = [
 
 
 def run_cli(method: str, igd_args: Dict[str, Union[bool, str, int]], lan_address: str = '',
-            gateway_address: str = '', timeout: int = 30, interface_name: str = 'default',
-            unicast: bool = True, kwargs: Optional[Dict[str, str]] = None,
+            gateway_address: str = '', timeout: int = 3, interface_name: str = 'default',
+            kwargs: Optional[Dict[str, str]] = None,
             loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
 
     kwargs = kwargs or {}
     igd_args = igd_args
     timeout = int(timeout)
     loop = loop or asyncio.get_event_loop()
-    fut: 'asyncio.Future' = asyncio.Future(loop=loop)
+    fut: 'asyncio.Future' = loop.create_future()
 
     async def wrapper():  # wrap the upnp setup and call of the command in a coroutine
         if method == 'm_search':  # if we're only m_searching don't do any device discovery
             fn = lambda *_a, **_kw: UPnP.m_search(
-                lan_address, gateway_address, timeout, unicast, interface_name, igd_args, loop
+                lan_address, gateway_address, timeout, interface_name, igd_args, loop
             )
         else:  # automatically discover the gateway
             try:

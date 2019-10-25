@@ -176,8 +176,7 @@ class TestDiscoverDLinkDIR890L(AsyncioTestCase):
                  [('serviceType', 'urn:schemas-upnp-org:service:WANIPConnection:1'),
                   ('serviceId', 'urn:upnp-org:serviceId:WANIPConn1'), ('controlURL', '/soap.cgi?service=WANIPConn1'),
                   ('eventSubURL', '/gena.cgi?service=WANIPConn1'), ('SCPDURL', '/WANIPConnection.xml')])},
-         'm_search_args': OrderedDict([('HOST', '239.255.255.250:1900'), ('MAN', 'ssdp:discover'), ('MX', 1),
-                                       ('ST', 'urn:schemas-upnp-org:device:WANDevice:1')]), 'reply': OrderedDict(
+         'reply': OrderedDict(
             [('CACHE_CONTROL', 'max-age=1800'), ('LOCATION', 'http://10.0.0.1:49152/InternetGatewayDevice.xml'),
              ('SERVER', 'Linux, UPnP/1.0, DIR-890L Ver 1.20'), ('ST', 'urn:schemas-upnp-org:device:WANDevice:1'),
              ('USN', 'uuid:11111111-2222-3333-4444-555555555555::urn:schemas-upnp-org:device:WANDevice:1')]),
@@ -232,14 +231,14 @@ class TestDiscoverDLinkDIR890L(AsyncioTestCase):
         with self.assertRaises(UPnPError) as e2:
             with mock_tcp_and_udp(self.loop):
                 await Gateway.discover_gateway(self.client_address, self.gateway_info['gateway_address'], 2,
-                                               unicast=False, loop=self.loop)
+                                               loop=self.loop)
         self.assertEqual(str(e1.exception), f"M-SEARCH for {self.gateway_info['gateway_address']}:1900 timed out")
         self.assertEqual(str(e2.exception), f"M-SEARCH for {self.gateway_info['gateway_address']}:1900 timed out")
 
     async def test_discover_commands(self):
         with mock_tcp_and_udp(self.loop, tcp_replies=self.replies):
             gateway = Gateway(
-                SSDPDatagram("OK", self.gateway_info['reply']), self.gateway_info['m_search_args'],
+                SSDPDatagram("OK", self.gateway_info['reply']),
                 self.client_address, self.gateway_info['gateway_address'], loop=self.loop
             )
             await gateway.discover_commands()
@@ -274,9 +273,7 @@ class TestDiscoverNetgearNighthawkAC2350(TestDiscoverDLinkDIR890L):
                             [('serviceType', 'urn:schemas-upnp-org:service:WANIPConnection:1'),
                              ('serviceId', 'urn:upnp-org:serviceId:WANIPConn1'), ('controlURL', '/ctl/IPConn'),
                              ('eventSubURL', '/evt/IPConn'), ('SCPDURL', '/WANIPCn.xml')])},
-                    'm_search_args': OrderedDict(
-                        [('HOST', '239.255.255.250:1900'), ('MAN', '"ssdp:discover"'), ('MX', 1),
-                         ('ST', 'upnp:rootdevice')]), 'reply': OrderedDict(
+                    'reply': OrderedDict(
             [('CACHE_CONTROL', 'max-age=1800'), ('ST', 'upnp:rootdevice'),
              ('USN', 'uuid:11111111-2222-3333-4444-555555555555::upnp:rootdevice'),
              ('Server', 'R7500v2 UPnP/1.0 miniupnpd/1.0'), ('Location', 'http://192.168.0.1:5555/rootDesc.xml')]),
