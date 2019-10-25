@@ -2,6 +2,7 @@ import asyncio
 import unittest
 import contextlib
 import socket
+from typing import Tuple, Optional, Any
 from unittest import mock
 from unittest.case import _Outcome
 
@@ -25,7 +26,7 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
     tcp_replies = tcp_replies or {}
 
     async def create_connection(protocol_factory, host=None, port=None):
-        def write(p: asyncio.Protocol):
+        def get_write(p: asyncio.Protocol):
             def _write(data):
                 sent_tcp_packets.append(data)
                 if data in tcp_replies:
@@ -41,14 +42,21 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
             return _write
 
         protocol = protocol_factory()
-        transport = asyncio.Transport(extra={'socket': mock.Mock(spec=socket.socket)})
-        transport.close = lambda: None
-        transport.write = write(protocol)
+        write = get_write(protocol)
+
+        class MockTransport(asyncio.Transport):
+            def close(self):
+                return
+
+            def write(self, data):
+                write(data)
+
+        transport = MockTransport(extra={'socket': mock.Mock(spec=socket.socket)})
         protocol.connection_made(transport)
         return transport, protocol
 
     async def create_datagram_endpoint(proto_lam, sock=None):
-        def sendto(p: asyncio.DatagramProtocol):
+        def get_sendto(p: asyncio.DatagramProtocol):
             def _sendto(data, addr):
                 sent_udp_packets.append(data)
                 loop.call_later(udp_delay_reply, p.datagram_received, data,
@@ -63,10 +71,21 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
             return _sendto
 
         protocol = proto_lam()
-        transport = asyncio.DatagramTransport(extra={'socket': mock_sock})
-        transport.close = lambda: mock_sock.close()
-        mock_sock.sendto = sendto(protocol)
-        transport.sendto = mock_sock.sendto
+        sendto = get_sendto(protocol)
+
+        class MockDatagramTransport(asyncio.DatagramTransport):
+            def __init__(self, sock):
+                super().__init__(extra={'socket': sock})
+                self._sock = sock
+
+            def close(self):
+                self._sock.close()
+                return
+
+            def sendto(self, data: Any, addr: Optional[Tuple[str, int]] = ...) -> None:
+                sendto(data, addr)
+
+        transport = MockDatagramTransport(mock_sock)
         protocol.connection_made(transport)
         return transport, protocol
 
