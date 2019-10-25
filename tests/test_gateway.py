@@ -231,7 +231,7 @@ class TestDiscoverDLinkDIR890L(AsyncioTestCase):
         with self.assertRaises(UPnPError) as e2:
             with mock_tcp_and_udp(self.loop):
                 await Gateway.discover_gateway(self.client_address, self.gateway_info['gateway_address'], 2,
-                                               unicast=False, loop=self.loop)
+                                               loop=self.loop)
         self.assertEqual(str(e1.exception), f"M-SEARCH for {self.gateway_info['gateway_address']}:1900 timed out")
         self.assertEqual(str(e2.exception), f"M-SEARCH for {self.gateway_info['gateway_address']}:1900 timed out")
 
