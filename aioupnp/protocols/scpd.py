@@ -105,7 +105,7 @@ async def scpd_get(control_url: str, address: str, port: int,
                                                      typing.Dict[str, typing.Any], bytes, typing.Optional[Exception]]:
     loop = loop or asyncio.get_event_loop()
     packet = serialize_scpd_get(control_url, address)
-    finished: 'asyncio.Future[typing.Tuple[bytes, bytes, int, bytes]]' = asyncio.Future(loop=loop)
+    finished: 'asyncio.Future[typing.Tuple[bytes, bytes, int, bytes]]' = loop.create_future()
     proto_factory: typing.Callable[[], SCPDHTTPClientProtocol] = lambda: SCPDHTTPClientProtocol(packet, finished)
     connect_tup: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_connection(
         proto_factory, address, port
@@ -141,7 +141,7 @@ async def scpd_post(control_url: str, address: str, port: int, method: str, para
                     **kwargs: typing.Dict[str, typing.Any]
                     ) -> typing.Tuple[typing.Dict, bytes, typing.Optional[Exception]]:
     loop = loop or asyncio.get_event_loop()
-    finished: 'asyncio.Future[typing.Tuple[bytes, bytes, int, bytes]]' = asyncio.Future(loop=loop)
+    finished: 'asyncio.Future[typing.Tuple[bytes, bytes, int, bytes]]' = loop.create_future()
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     proto_factory: typing.Callable[[], SCPDHTTPClientProtocol] = lambda:\
         SCPDHTTPClientProtocol(packet, finished, soap_method=method, soap_service_id=service_id.decode())

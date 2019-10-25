@@ -2,13 +2,12 @@ import re
 import logging
 import typing
 import asyncio
-from collections import OrderedDict
-from typing import Dict, List
+from typing import Dict, List, Optional
 from aioupnp.util import get_dict_val_case_insensitive
 from aioupnp.constants import SPEC_VERSION, SERVICE
-from aioupnp.commands import SOAPCommands, SCPDRequestDebuggingInfo
+from aioupnp.commands import SOAPCommands
 from aioupnp.device import Device, Service
-from aioupnp.protocols.ssdp import fuzzy_m_search, m_search, multi_m_search
+from aioupnp.protocols.ssdp import m_search, multi_m_search
 from aioupnp.protocols.scpd import scpd_get
 from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.util import flatten_keys
@@ -70,7 +69,7 @@ def parse_location(location: bytes) -> typing.Tuple[bytes, int]:
 
 class Gateway:
     def __init__(self, ok_packet: SSDPDatagram, lan_address: str, gateway_address: str,
-                 loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
+                 loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
         self._loop = loop or asyncio.get_event_loop()
         self._ok_packet = ok_packet
         self._lan_address = lan_address
@@ -90,10 +89,10 @@ class Gateway:
         assert self.base_ip == gateway_address.encode()
         self.path = self.location.split(b"%s:%i/" % (self.base_ip, self.port))[1]
 
-        self.spec_version: typing.Optional[str] = None
-        self.url_base: typing.Optional[str] = None
+        self.spec_version: Optional[str] = None
+        self.url_base: Optional[str] = None
 
-        self._device: typing.Optional[Device] = None
+        self._device: Optional[Device] = None
         self._devices: List[Device] = []
         self._services: List[Service] = []
 
@@ -128,7 +127,7 @@ class Gateway:
                     devices[device.udn] = device
         return devices
 
-    # def get_service(self, service_type: str) -> typing.Optional[Service]:
+    # def get_service(self, service_type: str) -> Optional[Service]:
     #     for service in self._services:
     #         if service.serviceType and service.serviceType.lower() == service_type.lower():
     #             return service
@@ -155,73 +154,78 @@ class Gateway:
         }
 
     @classmethod
-    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                                igd_args: typing.Optional[typing.Dict[str, typing.Union[int, str]]] = None,
-                                loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                                unicast: bool = False) -> 'Gateway':
-        ignored: typing.Set[str] = set()
+    async def _try_gateway_from_ssdp(cls, datagram: SSDPDatagram, lan_address: str,
+                                     gateway_address: str, 
+                                     loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional['Gateway']:
         required_commands: typing.List[str] = [
             'AddPortMapping',
             'DeletePortMapping',
             'GetExternalIPAddress'
         ]
-        while True:
-            if not igd_args:
-                datagram = await multi_m_search(
-                    lan_address, gateway_address, timeout, loop, ignored, unicast
-                )
-            else:
-                datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, ignored, unicast)
-            try:
-                gateway = cls(datagram, lan_address, gateway_address, loop=loop)
-                log.debug('get gateway descriptor %s', datagram.location)
-                await gateway.discover_commands()
-                requirements_met = all([gateway.commands.is_registered(required) for required in required_commands])
-                if not requirements_met:
-                    not_met = [
-                        required for required in required_commands if not gateway.commands.is_registered(required)
-                    ]
-                    assert datagram.location is not None
-                    log.debug("found gateway %s at %s, but it does not implement required soap commands: %s",
-                              gateway.manufacturer_string, gateway.location, not_met)
-                    ignored.add(datagram.location)
-                    continue
-                else:
-                    log.debug('found gateway %s at %s', gateway.manufacturer_string or "device", datagram.location)
-                    return gateway
-            except (asyncio.TimeoutError, UPnPError) as err:
+        try:
+            gateway = cls(datagram, lan_address, gateway_address, loop=loop)
+            log.debug('get gateway descriptor %s', datagram.location)
+            await gateway.discover_commands()
+            requirements_met = all([gateway.commands.is_registered(required) for required in required_commands])
+            if not requirements_met:
+                not_met = [
+                    required for required in required_commands if not gateway.commands.is_registered(required)
+                ]
                 assert datagram.location is not None
-                log.debug("get %s failed (%s), looking for other devices", datagram.location, str(err))
-                ignored.add(datagram.location)
-                continue
+                log.debug("found gateway %s at %s, but it does not implement required soap commands: %s",
+                          gateway.manufacturer_string, gateway.location, not_met)
+                return None
+            else:
+                log.debug('found gateway %s at %s', gateway.manufacturer_string or "device", datagram.location)
+                return gateway
+        except (asyncio.TimeoutError, UPnPError) as err:
+            assert datagram.location is not None
+            log.debug("get %s failed (%s), looking for other devices", datagram.location, str(err))
+            return None
 
     @classmethod
-    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 30,
-                               igd_args: typing.Optional[typing.Dict[str, typing.Union[int, str]]] = None,
-                               loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                               unicast: typing.Optional[bool] = None) -> 'Gateway':
+    async def _gateway_from_igd_args(cls, lan_address: str, gateway_address: str, timeout: int = 30,
+                                igd_args: Optional[typing.Dict[str, typing.Union[int, str]]] = None,
+                                loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
+        datagram = await m_search(lan_address, gateway_address, igd_args, timeout, loop, set())
+        gateway = await cls._try_gateway_from_ssdp(datagram, lan_address, gateway_address, loop)
+        if not gateway:
+            raise UPnPError("no gateway found for given args")
+        return gateway
+
+    @classmethod
+    async def _discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 3,
+                                loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
+        ignored: typing.Set[str] = set()
+        ssdp_proto = await multi_m_search(
+            lan_address, gateway_address, timeout, loop, ignored
+        )
+        try:
+            while True:
+                datagram = await ssdp_proto.devices.get()
+                if datagram.location in ignored:
+                    continue
+                gateway = await cls._try_gateway_from_ssdp(datagram, lan_address, gateway_address, loop)
+                if gateway:
+                    return gateway
+                else:
+                    ignored.add(datagram.location)
+        finally:
+            ssdp_proto.disconnect()
+
+    @classmethod
+    async def discover_gateway(cls, lan_address: str, gateway_address: str, timeout: int = 3,
+                               igd_args: Optional[typing.Dict[str, typing.Union[int, str]]] = None,
+                               loop: Optional[asyncio.AbstractEventLoop] = None) -> 'Gateway':
         loop = loop or asyncio.get_event_loop()
-        if unicast is not None:
-            return await cls._discover_gateway(lan_address, gateway_address, timeout, igd_args, loop, unicast)
-
-        done, pending = await asyncio.wait([
-            cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, loop, unicast=True
-            ),
-            cls._discover_gateway(
-                lan_address, gateway_address, timeout, igd_args, loop, unicast=False
-            )
-        ], return_when=asyncio.tasks.FIRST_COMPLETED, loop=loop)
-
-        for task in pending:
-            task.cancel()
-        for task in done:
-            try:
-                task.exception()
-            except asyncio.CancelledError:
-                pass
-        results: typing.List['asyncio.Future[Gateway]'] = list(done)
-        return results[0].result()
+        if igd_args:
+            return await cls._gateway_from_igd_args(lan_address, gateway_address, timeout, igd_args, loop)
+        try:
+            return await asyncio.wait_for(loop.create_task(
+                cls._discover_gateway(lan_address, gateway_address, timeout, loop)
+            ), timeout, loop=loop)
+        except asyncio.TimeoutError:
+            raise UPnPError(f"M-SEARCH for {gateway_address}:1900 timed out")
 
     async def discover_commands(self) -> None:
         response, xml_bytes, get_err = await scpd_get(
@@ -266,7 +270,7 @@ class Gateway:
         return None
 
     async def register_commands(self, service: Service,
-                                loop: typing.Optional[asyncio.AbstractEventLoop] = None) -> None:
+                                loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
         if not service.SCPDURL:
             raise UPnPError("no scpd url")
         if not service.serviceType:

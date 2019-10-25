@@ -75,8 +75,7 @@ def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
         'interface': 'default',
         'gateway_address': '',
         'lan_address': '',
-        'timeout': 30,
-        'unicast': False
+        'timeout': 3,
     }
 
     options: typing.Dict[str, typing.Union[bool, str, int]] = OrderedDict()
@@ -114,10 +113,9 @@ def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
     gateway_address: str = str(options.pop('gateway_address'))
     timeout: int = int(options.pop('timeout'))
     interface: str = str(options.pop('interface'))
-    unicast: bool = bool(options.pop('unicast'))
 
     run_cli(
-        command.replace('-', '_'), options, lan_address, gateway_address, timeout, interface, unicast, kwargs, loop
+        command.replace('-', '_'), options, lan_address, gateway_address, timeout, interface, kwargs, loop
     )
     return 0
 
