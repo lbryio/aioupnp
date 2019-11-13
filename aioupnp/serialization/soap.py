@@ -7,7 +7,7 @@ from aioupnp.constants import XML_VERSION, ENVELOPE, BODY, FAULT, CONTROL
 from aioupnp.serialization.xml import xml_to_dict
 
 CONTENT_NO_XML_VERSION_PATTERN = re.compile(
-    "(\<s\:Envelope xmlns\:s=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)".encode()
+    b"(\<([^:>]*)\:Envelope xmlns\:[^:>]*=\"http\:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/\"(\s*.)*\>)"
 )
 
 
