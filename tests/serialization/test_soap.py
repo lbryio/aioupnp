@@ -114,3 +114,11 @@ class TestSOAPSerialization(unittest.TestCase):
             raised = True
             self.assertEqual(str(err), expected)
         self.assertTrue(raised)
+
+    def test_soap_env_namespace_response(self):
+        # tp link devices use `SOAP-ENV` namespace rather than the normal `s`
+        response = b'HTTP/1.1 200 OK\r\nCONNECTION: close\r\nSERVER: ipos/7.0 UPnP/1.0 TL-WR940N/TL-WR941ND/3.0\r\nCONTENT-LENGTH: 404\r\nCONTENT-TYPE: text/xml; charset="utf-8"\r\n\r\n<?xml version="1.0"?>\n<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">\n<SOAP-ENV:Body>\n<u:GetExternalIPAddressResponse xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1"><NewExternalIPAddress>100.100.100.100</NewExternalIPAddress></u:GetExternalIPAddressResponse></SOAP-ENV:Body>\n</SOAP-ENV:Envelope>\n'
+        self.assertDictEqual(
+            deserialize_soap_post_response(response, 'GetExternalIPAddress', self.st.decode()),
+            {'NewExternalIPAddress': '100.100.100.100'}
+        )
