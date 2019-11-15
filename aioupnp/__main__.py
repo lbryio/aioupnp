@@ -86,7 +86,7 @@ def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
                 k, v = arg.split("=")
                 options[k.lstrip('--')] = v
             else:
-                options[arg.lstrip('--')] = True
+                options[arg.lstrip('--').replace("-", "_")] = True
         else:
             command = arg
             break
