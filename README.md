@@ -10,19 +10,27 @@
 `aioupnp` is a python 3.6-8 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
 
 ## Supported devices
+    Actiontec
+    Airlive
+    ARRIS
+    ASUS
+    Belkin
+    Broadcom
+    Cisco
     DD-WRT
+    D-Link
+    Huawei
+    libupnp
+    Linksys
     miniupnpd
-    Actiontec GT784WN
-    D-Link DIR-890L
-    Cisco CGA4131COM
-    Linksys WRT1200AC
-    Netgear Nighthawk X4 AC2350
-    ASUS RT-N66U
+    Netgear
+    TP-Link
+    ZyXEL
+
 
 ## Installation
 
-Verify the default python is python 3.6 or 3.7
-
+Verify python is version 3.6-8
 ```
 python --version
 ```
@@ -53,9 +61,18 @@ in the order they are to be used. For example:
 
 aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search
 ```
-
+cli_commands = [
+    'm_search',
+    'get_external_ip',
+    'add_port_mapping',
+    'get_port_mapping_by_index',
+    'get_redirects',
+    'get_specific_port_mapping',
+    'delete_port_mapping',
+    'get_next_mapping'
+]
 ### Commands
-    add_port_mapping | delete_port_mapping | get_external_ip | get_next_mapping | get_port_mapping_by_index | get_redirects | debug_gateway | generate_test_data | get_specific_port_mapping | m_search
+    m_search | m_search | add_port_mapping | get_port_mapping_by_index | get_redirects | get_specific_port_mapping | delete_port_mapping | get_next_mapping
 
 
 ### Examples
@@ -67,10 +84,6 @@ aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:roo
 #### To list the active port mappings on the gateway
 
     aioupnp get_redirects
-
-#### To debug the default gateway (very verbose)
-
-    aioupnp --debug_logging debug_gateway
 
 #### To debug the gateway discovery
 
@@ -90,4 +103,4 @@ This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
 
 ## Contact
 
-The primary contact for this project is [@jackrobison](mailto:jack@lbry.io)
+The primary contact for this project is [@jackrobison](mailto:jackrobison@lbry.com)
