@@ -72,7 +72,7 @@ cli_commands = [
     'get_next_mapping'
 ]
 ### Commands
-    m_search | m_search | add_port_mapping | get_port_mapping_by_index | get_redirects | get_specific_port_mapping | delete_port_mapping | get_next_mapping
+    m_search | add_port_mapping | get_port_mapping_by_index | get_redirects | get_specific_port_mapping | delete_port_mapping | get_next_mapping
 
 
 ### Examples
