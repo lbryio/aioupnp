@@ -202,6 +202,18 @@ class TestSCPDPost(AsyncioTestCase):
             self.assertEqual(b'', raw)
             self.assertDictEqual({}, result)
 
+    async def test_scpd_post_connection_error(self):
+        sent = []
+        replies = {}
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent, raise_connectionerror=True):
+            result, raw, err = await scpd_post(
+                self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
+            )
+            self.assertIsInstance(err, UPnPError)
+            self.assertEqual('ConnectionRefusedError()', str(err))
+            self.assertEqual(b'', raw)
+            self.assertDictEqual({}, result)
+
     async def test_scpd_post_bad_xml_response(self):
         sent = []
         replies = {self.post_bytes: self.bad_envelope_response}

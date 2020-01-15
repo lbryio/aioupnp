@@ -18,7 +18,7 @@ except ImportError:
 @contextlib.contextmanager
 def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_reply=0.0, sent_udp_packets=None,
                      tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None, add_potato_datagrams=False,
-                     raise_oserror_on_bind=False):
+                     raise_oserror_on_bind=False, raise_connectionerror=False):
     sent_udp_packets = sent_udp_packets if sent_udp_packets is not None else []
     udp_replies = udp_replies or {}
 
@@ -26,6 +26,9 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
     tcp_replies = tcp_replies or {}
 
     async def create_connection(protocol_factory, host=None, port=None):
+        if raise_connectionerror:
+            raise ConnectionRefusedError()
+
         def get_write(p: asyncio.Protocol):
             def _write(data):
                 sent_tcp_packets.append(data)

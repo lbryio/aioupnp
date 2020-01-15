@@ -38,10 +38,5 @@ setup(
     install_requires=[
         'netifaces',
         'defusedxml'
-    ],
-    extras_require={
-        'test': (
-            'mock',
-        )
-    }
+    ]
 )
