@@ -7,7 +7,7 @@ from aioupnp.util import flatten_keys
 
 
 CONTENT_PATTERN = re.compile(
-    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)".encode()
+    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)"
 )
 
 XML_ROOT_SANITY_PATTERN = re.compile(
@@ -39,8 +39,8 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
 
 def deserialize_scpd_get_response(content: bytes) -> Dict[str, Any]:
     if XML_VERSION.encode() in content:
-        parsed: List[Tuple[bytes, bytes]] = CONTENT_PATTERN.findall(content)
-        xml_dict = xml_to_dict((b'' if not parsed else parsed[0][0]).decode())
+        parsed: List[Tuple[bytes, bytes]] = CONTENT_PATTERN.findall(content.decode())
+        xml_dict = xml_to_dict('' if not parsed else parsed[0][0])
         return parse_device_dict(xml_dict)
     return {}
 
