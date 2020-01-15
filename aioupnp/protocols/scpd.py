@@ -107,9 +107,12 @@ async def scpd_get(control_url: str, address: str, port: int,
     packet = serialize_scpd_get(control_url, address)
     finished: 'asyncio.Future[typing.Tuple[bytes, bytes, int, bytes]]' = loop.create_future()
     proto_factory: typing.Callable[[], SCPDHTTPClientProtocol] = lambda: SCPDHTTPClientProtocol(packet, finished)
-    connect_tup: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_connection(
-        proto_factory, address, port
-    )
+    try:
+        connect_tup: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_connection(
+            proto_factory, address, port
+        )
+    except ConnectionError as err:
+        return {}, b'', UPnPError(f"{err.__class__.__name__}({str(err)})")
     protocol = connect_tup[1]
     transport = connect_tup[0]
     assert isinstance(protocol, SCPDHTTPClientProtocol)
@@ -145,9 +148,12 @@ async def scpd_post(control_url: str, address: str, port: int, method: str, para
     packet = serialize_soap_post(method, param_names, service_id, address.encode(), control_url.encode(), **kwargs)
     proto_factory: typing.Callable[[], SCPDHTTPClientProtocol] = lambda:\
         SCPDHTTPClientProtocol(packet, finished, soap_method=method, soap_service_id=service_id.decode())
-    connect_tup: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_connection(
-        proto_factory, address, port
-    )
+    try:
+        connect_tup: typing.Tuple[asyncio.BaseTransport, asyncio.BaseProtocol] = await loop.create_connection(
+            proto_factory, address, port
+        )
+    except ConnectionError as err:
+        return {}, b'', UPnPError(f"{err.__class__.__name__}({str(err)})")
     protocol = connect_tup[1]
     transport = connect_tup[0]
     assert isinstance(protocol, SCPDHTTPClientProtocol)
