@@ -7,7 +7,7 @@
 
 # UPnP for asyncio
 
-`aioupnp` is a python 3.6-8 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` module.
+`aioupnp` is a python 3.6-8 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` and `defusedxml` modules.
 
 ## Supported devices
     Actiontec
