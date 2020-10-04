@@ -10,23 +10,7 @@
 `aioupnp` is a python 3.6-8 library and command line tool to interact with UPnP gateways using asyncio. `aioupnp` requires the `netifaces` and `defusedxml` modules.
 
 ## Supported devices
-    Actiontec
-    Airlive
-    ARRIS
-    ASUS
-    Belkin
-    Broadcom
-    Cisco
-    DD-WRT
-    D-Link
-    Huawei
-    libupnp
-    Linksys
-    miniupnpd
-    Netgear
-    TP-Link
-    ZyXEL
-
+![img](https://i.imgur.com/JtO4glP.png)
 
 ## Installation
 
@@ -61,16 +45,7 @@ in the order they are to be used. For example:
 
 aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search
 ```
-cli_commands = [
-    'm_search',
-    'get_external_ip',
-    'add_port_mapping',
-    'get_port_mapping_by_index',
-    'get_redirects',
-    'get_specific_port_mapping',
-    'delete_port_mapping',
-    'get_next_mapping'
-]
+
 ### Commands
     m_search | add_port_mapping | get_port_mapping_by_index | get_redirects | get_specific_port_mapping | delete_port_mapping | get_next_mapping
 
@@ -80,6 +55,10 @@ cli_commands = [
 #### To get the external ip address from the UPnP gateway
     
     aioupnp get_external_ip
+    
+#### To set up a TCP port redirect
+    
+    aioupnp add_port_mapping --external_port=1234 --internal_port=1234 --lan_address=<lan_addr> --description=test --protocol=TCP
     
 #### To list the active port mappings on the gateway
 
