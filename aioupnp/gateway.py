@@ -155,7 +155,7 @@ class Gateway:
 
     @classmethod
     async def _try_gateway_from_ssdp(cls, datagram: SSDPDatagram, lan_address: str,
-                                     gateway_address: str, 
+                                     gateway_address: str,
                                      loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional['Gateway']:
         required_commands: typing.List[str] = [
             'AddPortMapping',

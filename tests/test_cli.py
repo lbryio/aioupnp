@@ -48,7 +48,7 @@ in the order they are to be used. For example:
 
 Commands:
   m_search | get_external_ip | add_port_mapping | get_port_mapping_by_index | get_redirects |
-  get_specific_port_mapping | delete_port_mapping | get_next_mapping
+  get_specific_port_mapping | delete_port_mapping | get_next_mapping | gather_debug_info
 
 For help with a specific command:  aioupnp help <command>
 """

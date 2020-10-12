@@ -1,6 +1,5 @@
-# import os
-# import zlib
-# import base64
+import zlib
+import base64
 import logging
 import json
 import asyncio
@@ -8,19 +7,18 @@ from typing import Tuple, Dict, List, Union, Optional, Any
 from aioupnp.fault import UPnPError
 from aioupnp.gateway import Gateway
 from aioupnp.interfaces import get_gateway_and_lan_addresses
-from aioupnp.serialization.ssdp import SSDPDatagram
 from aioupnp.commands import GetGenericPortMappingEntryResponse, GetSpecificPortMappingEntryResponse
 
 
 log = logging.getLogger(__name__)
 
 
-# def _encode(x):
-#     if isinstance(x, bytes):
-#         return x.decode()
-#     elif isinstance(x, Exception):
-#         return str(x)
-#     return x
+def _encode(x):
+    if isinstance(x, bytes):
+        return x.decode()
+    elif isinstance(x, Exception):
+        return str(x)
+    return x
 
 
 class UPnP:
@@ -248,22 +246,45 @@ class UPnP:
         await self.add_port_mapping(port, protocol, _internal_port, self.lan_address, description)
         return port
 
-    # @cli
-    # async def debug_gateway(self) -> str:
-    #     return json.dumps({
-    #         "gateway": self.gateway.debug_gateway(),
-    #         "client_address": self.lan_address,
-    #     }, default=_encode, indent=2)
-    #
-    # @property
-    # def zipped_debugging_info(self) -> str:
-    #     return base64.b64encode(zlib.compress(
-    #         json.dumps({
-    #             "gateway": self.gateway.debug_gateway(),
-    #             "client_address": self.lan_address,
-    #         }, default=_encode, indent=2).encode()
-    #     )).decode()
-    #
+    async def gather_debug_info(self) -> str:
+        """
+        Gather debugging information for this gateway, used for generating test cases for devices with errors.
+
+        :return: (str) compressed debugging information
+        """
+
+        try:
+            await self.get_external_ip()
+        except UPnPError:
+            pass
+        try:
+            await self.get_redirects()
+        except UPnPError:
+            pass
+        try:
+            external_port = await self.get_next_mapping(1234, 'TCP', 'aioupnp testing')
+        except UPnPError:
+            external_port = None
+        try:
+            await self.get_redirects()
+        except UPnPError:
+            pass
+        if external_port:
+            try:
+                await self.delete_port_mapping(external_port, 'TCP')
+            except UPnPError:
+                pass
+            try:
+                await self.get_redirects()
+            except UPnPError:
+                pass
+        return base64.b64encode(zlib.compress(
+            json.dumps({
+                "gateway": self.gateway.debug_gateway(),
+                "client_address": self.lan_address,
+            }, default=_encode, indent=2).encode()
+        )).decode()
+
     # @cli
     # async def get_natrsip_status(self) -> Tuple[bool, bool]:
     #     """Returns (NewRSIPAvailable, NewNATEnabled)"""
@@ -362,7 +383,8 @@ cli_commands = [
     'get_redirects',
     'get_specific_port_mapping',
     'delete_port_mapping',
-    'get_next_mapping'
+    'get_next_mapping',
+    'gather_debug_info'
 ]
 
 
@@ -372,7 +394,6 @@ def run_cli(method: str, igd_args: Dict[str, Union[bool, str, int]], lan_address
             loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
 
     kwargs = kwargs or {}
-    igd_args = igd_args
     timeout = int(timeout)
     loop = loop or asyncio.get_event_loop()
     fut: 'asyncio.Future' = loop.create_future()
