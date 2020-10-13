@@ -13,14 +13,6 @@ from aioupnp.commands import GetGenericPortMappingEntryResponse, GetSpecificPort
 log = logging.getLogger(__name__)
 
 
-def _encode(x):
-    if isinstance(x, bytes):
-        return x.decode()
-    elif isinstance(x, Exception):
-        return str(x)
-    return x
-
-
 class UPnP:
     def __init__(self, lan_address: str, gateway_address: str, gateway: Gateway) -> None:
         self.lan_address = lan_address
@@ -246,12 +238,19 @@ class UPnP:
         await self.add_port_mapping(port, protocol, _internal_port, self.lan_address, description)
         return port
 
-    async def gather_debug_info(self) -> str:
+    async def gather_debug_info(self) -> str:  # pragma: no cover
         """
         Gather debugging information for this gateway, used for generating test cases for devices with errors.
 
         :return: (str) compressed debugging information
         """
+
+        def _encode(x):
+            if isinstance(x, bytes):
+                return x.decode()
+            elif isinstance(x, Exception):
+                return str(x)
+            return x
 
         try:
             await self.get_external_ip()
