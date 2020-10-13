@@ -39,43 +39,65 @@ aioupnp [-h] [--debug_logging] [--interface=<interface>] [--gateway_address=<gat
         [--lan_address=<lan_address>] [--timeout=<timeout>]
         [(--<case sensitive m-search header>=<value>)...]
         command [--<arg name>=<arg>]...
-
-If m-search headers are provided as keyword arguments all of the headers to be used must be provided,
-in the order they are to be used. For example:
-
-aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search
 ```
 
-### Commands
-    m_search | add_port_mapping | get_port_mapping_by_index | get_redirects | get_specific_port_mapping | delete_port_mapping | get_next_mapping
 
+#### Commands
+* `help`
+* `get_external_ip`
+* `m_search`
+* `add_port_mapping`
+* `get_port_mapping_by_index`
+* `get_redirects`
+* `get_specific_port_mapping`
+* `delete_port_mapping`
+* `get_next_mapping`
+* `gather_debug_info`
 
-### Examples
+#### To get the documentation for a command
 
-#### To get the external ip address from the UPnP gateway
-    
+    aioupnp help get_external_ip
+
+#### To get the external ip address
+
     aioupnp get_external_ip
-    
-#### To set up a TCP port redirect
-    
-    aioupnp add_port_mapping --external_port=1234 --internal_port=1234 --lan_address=<lan_addr> --description=test --protocol=TCP
-    
+
 #### To list the active port mappings on the gateway
 
     aioupnp get_redirects
 
-#### To debug the gateway discovery
+#### To set up a TCP port mapping
+    
+    aioupnp add_port_mapping --external_port=1234 --internal_port=1234 --lan_address=<lan_addr> --description=test --protocol=TCP
+
+#### To delete a TCP port mapping
+
+    aioupnp delete_port_mapping --external_port=1234 --protocol=TCP
+
+#### M-Search headers
+UPnP uses multicast protocol - SSDP - to locate the gateway. Gateway discovery is automatic by default, but you may provide specific headers for the search to use to override automatic discovery.
+
+If m-search headers are provided as keyword arguments then all of the headers to be used must be provided, in the order they are to be used. For example:
+
+    aioupnp --HOST=239.255.255.250:1900 --MAN=\"ssdp:discover\" --MX=1 --ST=upnp:rootdevice m_search
+
+#### Using non-default network interfaces
+By default, the network device will be automatically discovered. The interface may instead be specified with the `--interface`, provided before the command to be run. The gateway used on the interface network may be specified with the `--gateway_address` argument.
+
+    aioupnp --interface=wlp4s0 --gateway_address=192.168.1.6 m_search
+
+## Troubleshooting
+
+#### Debug logging
+To enable verbose debug logging, add the `--debug_logging` argument before the command
 
     aioupnp --debug_logging m_search
 
-#### To debug a gateway on a non default network interface
+#### It really doesn't work
+If aioupnp doesn't work with a device, a debugging report can be collected with `aioupnp gather_debug_info`.
 
-    aioupnp --interface=vmnet1 --debug_logging m_search
+This will attempt to discover the UPnP gateway, and then perform a functionality check where it will request the external address and existing port mappings before attempting to make and remove a port mapping. The final result is the zipped packet dump of these attempts, which allows writing tests replaying it.
 
-#### To debug a gateway on a non default network interface that isn't the router
-
-    aioupnp --interface=vmnet1 --gateway_address=192.168.1.106 --debug_logging m_search
-    
 ## License
 
 This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
