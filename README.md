@@ -86,6 +86,28 @@ By default, the network device will be automatically discovered. The interface m
 
     aioupnp --interface=wlp4s0 --gateway_address=192.168.1.6 m_search
 
+
+#### Example usage from python
+
+    from aioupnp.upnp import UPnP
+
+    async def main():
+        upnp = await UPnP.discover()
+        print(await upnp.get_external_ip())
+        print(await upnp.get_redirects())
+
+        print("adding a port mapping")
+        await upnp.add_port_mapping(1234, 'TCP', 1234, upnp.lan_address, 'test mapping')
+        print(await upnp.get_redirects())
+
+        print("deleting the port mapping")
+        await upnp.delete_port_mapping(1234, 'TCP')
+        print(await upnp.get_redirects())
+
+
+    asyncio.run(main())
+
+
 ## Troubleshooting
 
 #### Debug logging
