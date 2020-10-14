@@ -75,7 +75,7 @@ aioupnp [-h] [--debug_logging] [--interface=<interface>] [--gateway_address=<gat
     aioupnp delete_port_mapping --external_port=1234 --protocol=TCP
 
 #### M-Search headers
-UPnP uses multicast protocol - SSDP - to locate the gateway. Gateway discovery is automatic by default, but you may provide specific headers for the search to use to override automatic discovery.
+UPnP uses a multicast protocol (SSDP) to locate the gateway. Gateway discovery is automatic by default, but you may provide specific headers for the search to use to override automatic discovery.
 
 If m-search headers are provided as keyword arguments then all of the headers to be used must be provided, in the order they are to be used. For example:
 
