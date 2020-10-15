@@ -1,13 +1,13 @@
 import re
 from typing import Dict, Any, List, Tuple
 from aioupnp.fault import UPnPError
-from aioupnp.constants import XML_VERSION
+from aioupnp.constants import XML_VERSION_PREFIX
 from aioupnp.serialization.xml import xml_to_dict
 from aioupnp.util import flatten_keys
 
 
 CONTENT_PATTERN = re.compile(
-    "(\<\?xml version=\"1\.0\"\?\>(\s*.)*|\>)"
+    "(\<\?xml version=\"1\.0\"[^>]*\?\>(\s*.)*|\>)"
 )
 
 XML_ROOT_SANITY_PATTERN = re.compile(
@@ -38,7 +38,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
 
 
 def deserialize_scpd_get_response(content: bytes) -> Dict[str, Any]:
-    if XML_VERSION.encode() in content:
+    if XML_VERSION_PREFIX.encode() in content:
         parsed: List[Tuple[bytes, bytes]] = CONTENT_PATTERN.findall(content.decode())
         xml_dict = xml_to_dict('' if not parsed else parsed[0][0])
         return parse_device_dict(xml_dict)
