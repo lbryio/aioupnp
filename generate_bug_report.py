@@ -474,7 +474,7 @@ async def main():
             purpose=ssl.Purpose.CLIENT_AUTH, capath=certifi.where()
         )
         auth = aiohttp.BasicAuth(
-            base64.b64decode(codecs.encode('nJ1bp3yfoxLlG3MaA3WHrwA1pIWInx9CpyOYA3S2ZKp=', 'rot_13')).decode(), ''
+            base64.b64decode(codecs.encode('Ax5LZzR1o3q3Z3WjATASDwR5rKyHH0qOIRIbLmMXn2H=', 'rot_13')).decode(), ''
         )
         report_id = base64.b64encode(os.urandom(16)).decode()
         async with aiohttp.ClientSession() as session:
