@@ -1,6 +1,6 @@
 import os
+import sys
 import socket
-import typing
 import ctypes
 import contextlib
 import struct
@@ -9,12 +9,20 @@ import enum
 import re
 import time
 import base64
+import ssl
+import asyncio
+import codecs
+import typing
+import json
 from ctypes import c_char, c_short
 from typing import Tuple
-import asyncio
+import aioupnp
 from aioupnp.upnp import UPnP, UPnPError, get_gateway_and_lan_addresses
 from aioupnp.constants import SSDP_IP_ADDRESS
+import certifi
+import aiohttp
 import miniupnpc
+
 
 
 _IFF_PROMISC  = 0x0100
@@ -365,34 +373,44 @@ async def main():
 
     def discover_aioupnp():
         async def _discover():
-            print("test aioupnp")
+            print("testing aioupnp")
             try:
                 u = await UPnP.discover()
+                print("successfully detected router with aioupnp")
                 try:
                     await u.get_external_ip()
+                    print("successfully detected external ip with aioupnp")
                 except UPnPError:
-                    pass
+                    print("failed to detect external ip with aioupnp")
                 try:
                     await u.get_redirects()
+                    print("successfully detected redirects with aioupnp")
                 except UPnPError:
-                    pass
+                    print("failed to get redirects with aioupnp")
                 try:
                     external_port = await u.get_next_mapping(1234, 'TCP', 'aioupnp testing')
+                    print("successfully set redirect with aioupnp")
                 except UPnPError:
+                    print("failed to set redirect with aioupnp")
                     external_port = None
                 try:
                     await u.get_redirects()
+                    print("successfully detected redirects with aioupnp")
                 except UPnPError:
-                    pass
+                    print("failed to get redirects with aioupnp")
                 if external_port:
                     try:
+                        print("successfully removed redirect with aioupnp")
                         await u.delete_port_mapping(external_port, 'TCP')
                     except UPnPError:
-                        pass
+                        print("failed to delete redirect with aioupnp")
                     try:
                         await u.get_redirects()
+                        print("successfully detected redirects with aioupnp")
                     except UPnPError:
-                        pass
+                        print("failed to get redirects with aioupnp")
+            except UPnPError:
+                print("failed to discover router with aioupnp")
             finally:
                 print("done with aioupnp test")
         asyncio.create_task(_discover())
@@ -402,22 +420,28 @@ async def main():
             try:
                 u = miniupnpc.UPnP()
             except:
+                print("failed to create upnp object with miniupnpc")
                 return
             try:
                 u.discover()
             except:
+                print("failed to detect router with miniupnpc")
                 return
             try:
                 u.selectigd()
+                print("successfully detected router with miniupnpc")
             except:
+                print("failed to detect router with miniupnpc")
                 return
             try:
                 u.externalipaddress()
+                print("successfully detected external ip with miniupnpc")
             except:
+                print("failed to detect external ip with miniupnpc")
                 return
 
         async def _discover():
-            print("test miniupnpc")
+            print("testing miniupnpc")
             try:
                 await loop.run_in_executor(None, _miniupnpc_discover)
             finally:
@@ -426,10 +450,10 @@ async def main():
 
         asyncio.create_task(_discover())
 
-    loop.call_later(2, discover_aioupnp)
-    loop.call_later(10, discover_miniupnpc)
+    loop.call_later(0, discover_aioupnp)
+    loop.call_later(8, discover_miniupnpc)
     start = time.perf_counter()
-    f = open("upnp_packet_cap.txt", "w")
+    packets = []
     try:
         async for (ts, ipv4_packet) in sniff_ipv4([
                 make_filter(l3_protocol=Layer3.UDP, src=SSDP_IP_ADDRESS),
@@ -438,14 +462,46 @@ async def main():
                 make_filter(l3_protocol=Layer3.UDP, src=gateway, dst=lan),
                 make_filter(l3_protocol=Layer3.TCP, src=lan, dst=gateway),
                 make_filter(l3_protocol=Layer3.TCP, src=gateway, dst=lan)], done):
-            f.write(f"{time.perf_counter() - start},{ipv4_packet.packet_type.name},{ipv4_packet.source},{ipv4_packet.destination},{base64.b64encode(ipv4_packet.data).decode()}\n")
-            print(ts, ipv4_packet)
-            print(ipv4_packet.printable_data)
-            print()
+            packets.append(
+                (time.perf_counter() - start, ipv4_packet.packet_type.name,
+                 ipv4_packet.source, ipv4_packet.destination, base64.b64encode(ipv4_packet.data).decode())
+            )
     except KeyboardInterrupt:
         print("stopping")
     finally:
-        f.close()
+        print("Sending bug report")
+        ssl_ctx = ssl.create_default_context(
+            purpose=ssl.Purpose.CLIENT_AUTH, capath=certifi.where()
+        )
+        auth = aiohttp.BasicAuth(
+            base64.b64decode(codecs.encode('nJ1bp3yfoxLlG3MaA3WHrwA1pIWInx9CpyOYA3S2ZKp=', 'rot_13')).decode(), ''
+        )
+        report_id = base64.b64encode(os.urandom(16)).decode()
+        async with aiohttp.ClientSession() as session:
+            for i, (ts, direction, source, destination, packet) in enumerate(packets):
+                post = {
+                    'userId': report_id,
+                    'event': 'aioupnp bug report',
+                    'context': {
+                        'library': {
+                            'name': 'aioupnp',
+                            'version': aioupnp.__version__
+                        }
+                    },
+                    'properties': {
+                        'sequence': i,
+                        'ts': ts,
+                        'direction': direction,
+                        'source': source,
+                        'destination': destination,
+                        'packet': base64.b64encode(json.dumps(packet).encode()).decode()
+                    },
+                }
+                async with session.request(method='POST', url='https://api.segment.io/v1/track',
+                                           headers={'Connection': 'Close'}, auth=auth, json=post, ssl=ssl_ctx):
+                    sys.stdout.write(f"\r{'.' * i}")
+        sys.stdout.write("\n")
+        print("Successfully sent bug report, thanks for your contribution!")
 
 
 if __name__ == "__main__":

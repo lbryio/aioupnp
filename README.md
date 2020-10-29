@@ -19,12 +19,12 @@ Verify python is version 3.6-8
 python --version
 ```
 
-Installation for normal usage
+#### Installation for normal usage
 ```
 pip install aioupnp
 ```
 
-Installation for development
+#### Installation for development
 ```
 git clone https://github.com/lbryio/aioupnp.git
 cd aioupnp
@@ -111,14 +111,18 @@ By default, the network device will be automatically discovered. The interface m
 ## Troubleshooting
 
 #### Debug logging
-To enable verbose debug logging, add the `--debug_logging` argument before the command
+To enable verbose debug logging, add the `--debug_logging` argument before the command being run
 
     aioupnp --debug_logging m_search
 
-#### It really doesn't work
-If aioupnp doesn't work with a device, a debugging report can be collected with `aioupnp gather_debug_info`.
+#### Is it turned on?
+Check that UPnP is turned on in the web gui for your router.
 
-This will attempt to discover the UPnP gateway, and then perform a functionality check where it will request the external address and existing port mappings before attempting to make and remove a port mapping. The final result is the zipped packet dump of these attempts, which allows writing tests replaying it.
+#### It really doesn't work
+
+If it always fails with an m-search error, or the UPnP device is found but making a port mapping or getting the external address fails, a bug report can be generated and automatically sent using the `generate_bug_report.py` script. This script will run a packet capture while attempting to find the device and add/remove a mapping using `miniupnpc` and `aioupnp`. Once complete, it will submit a bug report of the packets sent/recieved by aioupnp/miniupnpc.
+
+To run the bug report script, first `pip install certifi aiohttp miniupnpc`. You'll also need `aioupnp` installed. Then generate and send the bug report with `sudo /full/path/to/your/python generate_bug_report.py`.
 
 ## License
 
