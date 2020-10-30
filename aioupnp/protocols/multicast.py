@@ -3,6 +3,7 @@ import socket
 import typing
 from asyncio.protocols import DatagramProtocol
 from asyncio.transports import DatagramTransport
+from asyncio.trsock import TransportSocket
 from unittest import mock
 
 
@@ -10,7 +11,7 @@ def _get_sock(transport: typing.Optional[DatagramTransport]) -> typing.Optional[
     if transport is None or not hasattr(transport, "_extra"):
         return None
     sock: typing.Optional[socket.socket] = transport.get_extra_info('socket', None)
-    assert sock is None or isinstance(sock, (socket.SocketType, mock.MagicMock))
+    assert sock is None or isinstance(sock, (socket.SocketType, TransportSocket, mock.MagicMock))
     return sock
 
 
