@@ -1,17 +1,24 @@
+import sys
 import struct
 import socket
 import typing
 from asyncio.protocols import DatagramProtocol
 from asyncio.transports import DatagramTransport
-from asyncio.trsock import TransportSocket
 from unittest import mock
+
+
+if sys.version_info >= (3, 8):
+    from asyncio.trsock import TransportSocket
+    SOCKET_TYPES = (socket.SocketType, TransportSocket, mock.MagicMock)
+else:
+    SOCKET_TYPES = (socket.SocketType, mock.MagicMock)
 
 
 def _get_sock(transport: typing.Optional[DatagramTransport]) -> typing.Optional[socket.socket]:
     if transport is None or not hasattr(transport, "_extra"):
         return None
     sock: typing.Optional[socket.socket] = transport.get_extra_info('socket', None)
-    assert sock is None or isinstance(sock, (socket.SocketType, TransportSocket, mock.MagicMock))
+    assert sock is None or isinstance(sock, SOCKET_TYPES)
     return sock
 
 
