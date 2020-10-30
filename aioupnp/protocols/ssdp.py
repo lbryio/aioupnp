@@ -171,8 +171,8 @@ async def multi_m_search(lan_address: str, gateway_address: str, timeout: int = 
     protocol, gateway_address, lan_address = await listen_ssdp(
         lan_address, gateway_address, loop
     )
-    fut = asyncio.ensure_future(protocol.send_m_searches(
+    fut = protocol.send_m_searches(
         address=gateway_address, datagrams=list(packet_generator())
-    ), loop=loop)
+    )
     loop.call_later(timeout, lambda: None if not fut or fut.done() else fut.cancel())
     return protocol

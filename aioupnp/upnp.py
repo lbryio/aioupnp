@@ -260,15 +260,18 @@ class UPnP:
             await self.get_redirects()
         except UPnPError:
             pass
+        external_port = 0
+        made_mapping = False
         try:
             external_port = await self.get_next_mapping(1234, 'TCP', 'aioupnp testing')
+            made_mapping = True
         except UPnPError:
-            external_port = None
+            pass
         try:
             await self.get_redirects()
         except UPnPError:
             pass
-        if external_port:
+        if made_mapping:
             try:
                 await self.delete_port_mapping(external_port, 'TCP')
             except UPnPError:

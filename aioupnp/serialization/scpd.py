@@ -39,7 +39,7 @@ def serialize_scpd_get(path: str, address: str) -> bytes:
 
 def deserialize_scpd_get_response(content: bytes) -> Dict[str, Any]:
     if XML_VERSION_PREFIX.encode() in content:
-        parsed: List[Tuple[bytes, bytes]] = CONTENT_PATTERN.findall(content.decode())
+        parsed: List[Tuple[str, str]] = CONTENT_PATTERN.findall(content.decode())
         xml_dict = xml_to_dict('' if not parsed else parsed[0][0])
         return parse_device_dict(xml_dict)
     return {}
