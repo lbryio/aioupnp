@@ -200,7 +200,7 @@ class SOAPCommands:
         """Returns None"""
         name = "AddPortMapping"
         if not self.is_registered(name):
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_kwargs
         await self._wrappers_kwargs[name](
             NewRemoteHost=NewRemoteHost, NewExternalPort=NewExternalPort, NewProtocol=NewProtocol,
@@ -216,7 +216,7 @@ class SOAPCommands:
         """
         name = "GetGenericPortMappingEntry"
         if not self.is_registered(name):
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_kwargs
         result: GetGenericPortMappingEntryResponse = await self._wrappers_kwargs[name](
             NewPortMappingIndex=NewPortMappingIndex
@@ -228,7 +228,7 @@ class SOAPCommands:
         """Returns (NewInternalPort, NewInternalClient, NewEnabled, NewPortMappingDescription, NewLeaseDuration)"""
         name = "GetSpecificPortMappingEntry"
         if not self.is_registered(name):
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_kwargs
         result: GetSpecificPortMappingEntryResponse = await self._wrappers_kwargs[name](
             NewRemoteHost=NewRemoteHost, NewExternalPort=NewExternalPort, NewProtocol=NewProtocol
@@ -239,7 +239,7 @@ class SOAPCommands:
         """Returns None"""
         name = "DeletePortMapping"
         if not self.is_registered(name):
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_kwargs
         await self._wrappers_kwargs[name](
             NewRemoteHost=NewRemoteHost, NewExternalPort=NewExternalPort, NewProtocol=NewProtocol
@@ -250,7 +250,7 @@ class SOAPCommands:
         """Returns (NewExternalIPAddress)"""
         name = "GetExternalIPAddress"
         if not self.is_registered(name):
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_no_args
         result: str = await self._wrappers_no_args[name]()
         if not result:
@@ -261,7 +261,7 @@ class SOAPCommands:
     #     """Returns (NewRSIPAvailable, NewNATEnabled)"""
     #     name = "GetNATRSIPStatus"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[bool, bool] = await self._wrappers_no_args[name]()
     #     return result[0], result[1]
@@ -270,7 +270,7 @@ class SOAPCommands:
     #     """Returns None"""
     #     name = "SetConnectionType"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_kwargs
     #     await self._wrappers_kwargs[name](NewConnectionType=NewConnectionType)
     #     return None
@@ -279,7 +279,7 @@ class SOAPCommands:
     #     """Returns (NewConnectionType, NewPossibleConnectionTypes)"""
     #     name = "GetConnectionTypeInfo"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[str, str] = await self._wrappers_no_args[name]()
     #     return result
@@ -288,7 +288,7 @@ class SOAPCommands:
     #     """Returns (NewConnectionStatus, NewLastConnectionError, NewUptime)"""
     #     name = "GetStatusInfo"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[str, str, int] = await self._wrappers_no_args[name]()
     #     return result
@@ -297,7 +297,7 @@ class SOAPCommands:
     #     """Returns None"""
     #     name = "ForceTermination"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     await self._wrappers_no_args[name]()
     #     return None
@@ -306,7 +306,7 @@ class SOAPCommands:
     #     """Returns None"""
     #     name = "RequestConnection"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     await self._wrappers_no_args[name]()
     #     return None
@@ -316,7 +316,7 @@ class SOAPCommands:
     #      NewPhysicalLinkStatus)"""
     #     name = "GetCommonLinkProperties"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[str, int, int, str] = await self._wrappers_no_args[name]()
     #     return result
@@ -325,7 +325,7 @@ class SOAPCommands:
     #     """Returns (NewTotalBytesSent)"""
     #     name = "GetTotalBytesSent"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[int] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -334,7 +334,7 @@ class SOAPCommands:
     #     """Returns (NewTotalBytesReceived)"""
     #     name = "GetTotalBytesReceived"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[int] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -343,7 +343,7 @@ class SOAPCommands:
     #     """Returns (NewTotalPacketsSent)"""
     #     name = "GetTotalPacketsSent"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[int] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -352,7 +352,7 @@ class SOAPCommands:
     #     """Returns (NewTotalPacketsReceived)"""
     #     name = "GetTotalPacketsReceived"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[int] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -362,7 +362,7 @@ class SOAPCommands:
     #     Layer1DownstreamMaxBitRate, Uptime)"""
     #     name = "X_GetICSStatistics"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[int, int, int, int, str, str] = await self._wrappers_no_args[name]()
     #     return result
@@ -371,7 +371,7 @@ class SOAPCommands:
     #     """Returns (NewDefaultConnectionService)"""
     #     name = "GetDefaultConnectionService"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[str] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -380,7 +380,7 @@ class SOAPCommands:
     #     """Returns (None)"""
     #     name = "SetDefaultConnectionService"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_kwargs
     #     await self._wrappers_kwargs[name](NewDefaultConnectionService=NewDefaultConnectionService)
     #     return None
@@ -388,7 +388,7 @@ class SOAPCommands:
     # async def SetEnabledForInternet(self, NewEnabledForInternet: bool) -> None:
     #     name = "SetEnabledForInternet"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_kwargs
     #     await self._wrappers_kwargs[name](NewEnabledForInternet=NewEnabledForInternet)
     #     return None
@@ -396,7 +396,7 @@ class SOAPCommands:
     # async def GetEnabledForInternet(self) -> bool:
     #     name = "GetEnabledForInternet"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[bool] = await self._wrappers_no_args[name]()
     #     return result[0]
@@ -404,7 +404,7 @@ class SOAPCommands:
     # async def GetMaximumActiveConnections(self, NewActiveConnectionIndex: int) -> None:
     #     name = "GetMaximumActiveConnections"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_kwargs
     #     await self._wrappers_kwargs[name](NewActiveConnectionIndex=NewActiveConnectionIndex)
     #     return None
@@ -413,7 +413,7 @@ class SOAPCommands:
     #     """Returns (NewActiveConnDeviceContainer, NewActiveConnectionServiceID"""
     #     name = "GetActiveConnections"
     #     if not self.is_registered(name):
-    #         raise NotImplementedError()
+    #         raise NotImplementedError()  # pragma: no cover
     #     assert name in self._wrappers_no_args
     #     result: Tuple[str, str] = await self._wrappers_no_args[name]()
     #     return result

@@ -7,11 +7,10 @@ from asyncio.transports import DatagramTransport
 from unittest import mock
 
 
-if sys.version_info >= (3, 8):
+SOCKET_TYPES = (socket.SocketType, mock.MagicMock)
+if sys.version_info >= (3, 8):  # pragma: no cover
     from asyncio.trsock import TransportSocket
     SOCKET_TYPES = (socket.SocketType, TransportSocket, mock.MagicMock)
-else:
-    SOCKET_TYPES = (socket.SocketType, mock.MagicMock)
 
 
 def _get_sock(transport: typing.Optional[DatagramTransport]) -> typing.Optional[socket.socket]:

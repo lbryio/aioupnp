@@ -37,7 +37,7 @@ class UPnP:
             return cls.delete_port_mapping.__annotations__, cls.delete_port_mapping.__doc__
         if command == "get_next_mapping":
             return cls.get_next_mapping.__annotations__, cls.get_next_mapping.__doc__
-        raise AttributeError(command)
+        raise AttributeError(command)  # pragma: no cover
 
     @staticmethod
     def get_lan_and_gateway(lan_address: str = '', gateway_address: str = '',

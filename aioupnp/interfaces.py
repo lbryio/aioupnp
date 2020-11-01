@@ -5,7 +5,7 @@ import netifaces
 from aioupnp.fault import UPnPError
 
 
-def get_netifaces():
+def get_netifaces():  # pragma: no cover
     return netifaces
 
 

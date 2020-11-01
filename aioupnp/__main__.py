@@ -121,4 +121,4 @@ def main(argv: typing.Optional[typing.List[typing.Optional[str]]] = None,
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main())   # pragma: no cover
