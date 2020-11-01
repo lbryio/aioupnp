@@ -1,8 +1,12 @@
+import os
+import json
+from collections import OrderedDict
 from aioupnp.fault import UPnPError
 from tests import AsyncioTestCase, mock_tcp_and_udp
-from collections import OrderedDict
 from aioupnp.gateway import Gateway, get_action_list
 from aioupnp.serialization.ssdp import SSDPDatagram
+from aioupnp.serialization.soap import serialize_soap_post
+from aioupnp.upnp import UPnP
 
 
 def gen_get_bytes(location: str, host: str) -> bytes:
@@ -296,3 +300,71 @@ class TestDiscoverNetgearNighthawkAC2350(TestDiscoverDLinkDIR890L):
                                                                            'RequestConnection', 'ForceTermination',
                                                                            'GetStatusInfo', 'GetNATRSIPStatus']},
                     'soap_requests': []}
+
+
+class TestActiontec(AsyncioTestCase):
+    name = "Actiontec GT784WN"
+    _location_key = 'Location'
+
+    @property
+    def data_path(self):
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "replays", self.name)
+
+    def _get_location(self):
+        # return self.gateway_info['reply']['Location'].split(self.gateway_address)[-1]
+        return self.gateway_info['reply'][self._location_key].split(f"{self.gateway_address}:{self.gateway_info['soap_port']}")[-1]
+
+    def setUp(self) -> None:
+        with open(self.data_path, 'r') as f:
+            data = json.loads(f.read())
+            self.gateway_info = data['gateway']
+            self.client_address = data['client_address']
+        self.gateway_address = self.gateway_info['gateway_address']
+        self.udp_replies = {
+            (SSDPDatagram('M-SEARCH', self.gateway_info['m_search_args']).encode().encode(), ("239.255.255.250", 1900)): SSDPDatagram("OK", self.gateway_info['reply']).encode().encode()
+        }
+        self.tcp_replies = {
+            (
+                f"GET {path} HTTP/1.1\r\n"
+                f"Accept-Encoding: gzip\r\n"
+                f"Host: {self.gateway_info['gateway_address']}\r\n"
+                f"Connection: Close\r\n"
+                f"\r\n"
+            ).encode(): xml_bytes.encode()
+            for path, xml_bytes in self.gateway_info['service_descriptors'].items()
+        }
+        self.tcp_replies.update({
+            (
+                f"GET {self._get_location()} HTTP/1.1\r\n"
+                f"Accept-Encoding: gzip\r\n"
+                f"Host: {self.gateway_info['gateway_address']}\r\n"
+                f"Connection: Close\r\n"
+                f"\r\n"
+            ).encode(): self.gateway_info['gateway_xml'].encode()
+        })
+        self.registered_soap_commands = self.gateway_info['registered_soap_commands']
+        super().setUp()
+
+    async def setup_request_replay(self, u: UPnP):
+        for method, reqs in self.gateway_info['soap_requests'].items():
+            if not reqs:
+                continue
+            self.tcp_replies.update({
+                serialize_soap_post(
+                    method, list(args.keys()), self.registered_soap_commands[method].encode(),
+                    self.gateway_address.encode(), u.gateway.services[self.registered_soap_commands[method]].controlURL.encode()
+                ): response.encode() for args, response in reqs
+            })
+
+    async def replay(self, u: UPnP):
+        self.assertEqual('11.222.33.111', await u.get_external_ip())
+
+    async def test_replay(self):
+        with mock_tcp_and_udp(self.loop, udp_replies=self.udp_replies, tcp_replies=self.tcp_replies, udp_expected_addr=self.gateway_address, tcp_chunk_size=1450):
+            u = await UPnP.discover(lan_address=self.client_address, gateway_address=self.gateway_address, loop=self.loop)
+            await self.setup_request_replay(u)
+            await self.replay(u)
+
+
+class TestNewMediaNet(TestActiontec):
+    name = "NewMedia-NET GmbH Generic X86"

@@ -18,7 +18,7 @@ except ImportError:
 @contextlib.contextmanager
 def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_reply=0.0, sent_udp_packets=None,
                      tcp_replies=None, tcp_delay_reply=0.0, sent_tcp_packets=None, add_potato_datagrams=False,
-                     raise_oserror_on_bind=False, raise_connectionerror=False):
+                     raise_oserror_on_bind=False, raise_connectionerror=False, tcp_chunk_size=100):
     sent_udp_packets = sent_udp_packets if sent_udp_packets is not None else []
     udp_replies = udp_replies or {}
 
@@ -36,8 +36,8 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
                     reply = tcp_replies[data]
                     i = 0
                     while i < len(reply):
-                        loop.call_later(tcp_delay_reply, p.data_received, reply[i:i+100])
-                        i += 100
+                        loop.call_later(tcp_delay_reply, p.data_received, reply[i:i+tcp_chunk_size])
+                        i += tcp_chunk_size
                     return
                 else:
                     pass
@@ -70,6 +70,7 @@ def mock_tcp_and_udp(loop, udp_expected_addr=None, udp_replies=None, udp_delay_r
                 if (data, addr) in udp_replies:
                     loop.call_later(udp_delay_reply, p.datagram_received, udp_replies[(data, addr)],
                                     (udp_expected_addr, 1900))
+
 
             return _sendto
 

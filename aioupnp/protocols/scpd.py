@@ -56,6 +56,7 @@ class SCPDHTTPClientProtocol(Protocol):
         self._response_msg = b""
         self._content_length = 0
         self._got_headers = False
+        self._has_content_length = True
         self._headers: typing.Dict[bytes, bytes] = {}
         self._body = b""
         self.transport: typing.Optional[asyncio.WriteTransport] = None
@@ -67,35 +68,57 @@ class SCPDHTTPClientProtocol(Protocol):
         return None
 
     def data_received(self, data: bytes) -> None:
+        if self.finished.done():  # possible to hit during tests
+            return
         self.response_buff += data
         for i, line in enumerate(self.response_buff.split(b'\r\n')):
             if not line:  # we hit the blank line between the headers and the body
                 if i == (len(self.response_buff.split(b'\r\n')) - 1):
                     return None  # the body is still yet to be written
                 if not self._got_headers:
-                    self._headers, self._response_code, self._response_msg = parse_headers(
-                        b'\r\n'.join(self.response_buff.split(b'\r\n')[:i])
-                    )
+                    try:
+                        self._headers, self._response_code, self._response_msg = parse_headers(
+                            b'\r\n'.join(self.response_buff.split(b'\r\n')[:i])
+                        )
+                    except ValueError as err:
+                        self.finished.set_exception(UPnPError(str(err)))
+                        return
                     content_length = get_dict_val_case_insensitive(
                         self._headers, b'Content-Length'
                     )
-                    if content_length is None:
-                        return None
-                    self._content_length = int(content_length or 0)
+                    if content_length is not None:
+                        self._content_length = int(content_length)
+                    else:
+                        self._has_content_length = False
                     self._got_headers = True
-                body = b'\r\n'.join(self.response_buff.split(b'\r\n')[i+1:])
-                if self._content_length == len(body):
-                    self.finished.set_result((self.response_buff, body, self._response_code, self._response_msg))
-                elif self._content_length > len(body):
-                    pass
-                else:
-                    self.finished.set_exception(
-                        UPnPError(
-                            "too many bytes written to response (%i vs %i expected)" % (
-                                len(body), self._content_length
+                if self._got_headers and self._has_content_length:
+                    body = b'\r\n'.join(self.response_buff.split(b'\r\n')[i+1:])
+                    if self._content_length == len(body):
+                        self.finished.set_result((self.response_buff, body, self._response_code, self._response_msg))
+                    elif self._content_length > len(body):
+                        pass
+                    else:
+                        self.finished.set_exception(
+                            UPnPError(
+                                "too many bytes written to response (%i vs %i expected)" % (
+                                    len(body), self._content_length
+                                )
                             )
                         )
-                    )
+                elif any(map(self.response_buff.endswith, (b"</root>\r\n", b"</scpd>\r\n"))):
+                    # Actiontec has a router that doesn't give a Content-Length for the gateway xml
+                    body = b'\r\n'.join(self.response_buff.split(b'\r\n')[i+1:])
+                    self.finished.set_result((self.response_buff, body, self._response_code, self._response_msg))
+                elif len(self.response_buff) >= 65535:
+                    self.finished.set_exception(
+                        UPnPError(
+                            "too many bytes written to response (%i) with unspecified content length" % len(self.response_buff)
+                            )
+                        )
+                    return
+                else:
+                    # needed for the actiontec case
+                    pass
                 return None
         return None
 
