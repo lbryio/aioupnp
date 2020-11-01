@@ -3,23 +3,13 @@ import logging
 import binascii
 import json
 from collections import OrderedDict
-from typing import List, Optional, Dict, Union, Tuple, Callable
+from typing import List, Optional, Dict, Union, Callable
 from aioupnp.fault import UPnPError
 from aioupnp.constants import line_separator
 
 log = logging.getLogger(__name__)
 
 _template = "(?i)^(%s):[ ]*(.*)$"
-vendor_pattern = re.compile("^([\w|\d]*)\.([\w|\d]*\.com):([ \"|\w|\d\:]*)$")
-
-
-def match_vendor(line: str) -> Optional[Tuple[str, str]]:
-    match: List[Tuple[str, str, str]] = vendor_pattern.findall(line)
-    if match:
-        vendor_key: str = match[-1][0].lstrip(" ").rstrip(" ")
-        vendor_value: str = match[-1][2].lstrip(" ").rstrip(" ")
-        return vendor_key, vendor_value
-    return None
 
 
 def compile_find(pattern: str) -> Callable[[str], Optional[str]]:
@@ -68,8 +58,6 @@ class SSDPDatagram:
         _NOTIFY: "notify",
         _OK: "m-search response"
     }
-
-    _vendor_field_pattern = vendor_pattern
 
     _required_fields: Dict[str, List[str]] = {
         _M_SEARCH: [
@@ -130,10 +118,7 @@ class SSDPDatagram:
     def get_cli_igd_kwargs(self) -> str:
         fields = []
         for field in self._field_order:
-            v = getattr(self, field, None)
-            if v is None:
-                raise UPnPError("missing required field %s" % field)
-            fields.append("--%s=%s" % (self._case_mappings.get(field, field), v))
+            fields.append("--%s=%s" % (self._case_mappings.get(field, field), getattr(self, field, None)))
         return " ".join(fields)
 
     def __repr__(self) -> str:
@@ -174,11 +159,6 @@ class SSDPDatagram:
             raise UPnPError(
                 f"failed to decode datagram: {binascii.hexlify(datagram).decode()}"
             )
-        for attr_name in packet._required_fields[packet._packet_type]:
-            if getattr(packet, attr_name, None) is None:
-                raise UPnPError(
-                    "required field for {} is missing from m-search response: {}".format(packet._packet_type, attr_name)
-                )
         return packet
 
     @classmethod
@@ -206,10 +186,6 @@ class SSDPDatagram:
                             matched = True
                             matched_keys.append(name)
                             break
-            if not matched:
-                matched_vendor = match_vendor(line)
-                if matched_vendor and matched_vendor[0] not in result:
-                    result[matched_vendor[0]] = matched_vendor[1]
         return result
 
     @classmethod
