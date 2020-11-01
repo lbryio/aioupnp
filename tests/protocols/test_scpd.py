@@ -31,6 +31,28 @@ class TestSCPDGet(AsyncioTestCase):
                    b"\r\n" \
                    b"%s" % bad_xml
 
+
+    bad_response2 = b"HTTP/1.1 200 OK\r\n" \
+                   b"CONTENT-TYPE: text/xml\r\n" \
+                   b"DATE: Thu, 18 Oct 2018 01:20:23 GMT\r\n" \
+                   b"LAST-MODIFIED: Fri, 28 Sep 2018 18:35:48 GMT\r\n" \
+                   b"SERVER: Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22\r\n" \
+                   b"X-User-Agent: redsonic\r\n" \
+                   b"CONNECTION: close\r\n" \
+                   b"\r\n" \
+                   b"%s" % (b'.' * 65300)
+
+    bad_response3 = b"HTTP/1.1 200 OK\r\n" \
+                   b"CONTENT-TYPE: text/xml\r\n" \
+                   b"DATE: Thu, 18 Oct 2018 01:20:23 GMT\r\n" \
+                   b"LAST-MODIFIED: Fri, 28 Sep 2018 18:35:48 GMT\r\n" \
+                   b"CONTENT-TYPE: text/xml\r\n" \
+                   b"SERVER: Linux/3.14.28-Prod_17.2, UPnP/1.0, Portable SDK for UPnP devices/1.6.22\r\n" \
+                   b"X-User-Agent: redsonic\r\n" \
+                   b"CONNECTION: close\r\n" \
+                   b"\r\n" \
+                   b"<?xml version=\"1.0\"?>\n<root xmlns=\"urn:schemas-upnp-org:device-1-0\">\n<specVersion>\n<major>1</major>\n<minor>0</minor>\n</specVersion>\n<device>\n<deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:1</deviceType>\n<friendlyName>CGA4131COM</friendlyName>\n<manufacturer>Cisco</manufacturer>\n<manufacturerURL>http://www.cisco.com/</manufacturerURL>\n<modelDescription>CGA4131COM</modelDescription>\n<modelName>CGA4131COM</modelName>\n<modelNumber>CGA4131COM</modelNumber>\n<modelURL>http://www.cisco.com</modelURL>\n<serialNumber></serialNumber>\n<UDN>uuid:11111111-2222-3333-4444-555555555556</UDN>\n<UPC>CGA4131COM</UPC>\n<serviceList>\n<service>\n<serviceType>urn:schemas-upnp-org:service:Layer3Forwarding:1</serviceType>\n<serviceId>urn:upnp-org:serviceId:L3Forwarding1</serviceId>\n<SCPDURL>/Layer3ForwardingSCPD.xml</SCPDURL>\n<controlURL>/upnp/control/Layer3Forwarding</controlURL>\n<eventSubURL>/upnp/event/Layer3Forwarding</eventSubURL>\n</service>\n</serviceList>\n<deviceList>\n<device>\n<deviceType>urn:schemas-upnp-org:device:WANDevice:1</deviceType>\n<friendlyName>WANDevice:1</friendlyName>\n<manufacturer>Cisco</manufacturer>\n<manufacturerURL>http://www.cisco.com/</manufacturerURL>\n<modelDescription>CGA4131COM</modelDescription>\n<modelName>CGA4131COM</modelName>\n<modelNumber>CGA4131COM</modelNumber>\n<modelURL>http://www.cisco.com</modelURL>\n<serialNumber></serialNumber>\n<UDN>uuid:ebf5a0a0-1dd1-11b2-a92f-603d266f9915</UDN>\n<UPC>CGA4131COM</UPC>\n<serviceList>\n<service>\n<serviceType>urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1</serviceType>\n<serviceId>urn:upnp-org:serviceId:WANCommonIFC1</serviceId>\n<SCPDURL>/WANCommonInterfaceConfigSCPD.xml</SCPDURL>\n<controlURL>/upnp/control/WANCommonInterfaceConfig0</controlURL>\n<eventSubURL>/upnp/event/WANCommonInterfaceConfig0</eventSubURL>\n</service>\n</serviceList>\n<deviceList>\n    <device>\n        <deviceType>urn:schemas-upnp-org:device:WANConnectionDevice:1</deviceType>\n        <friendlyName>WANConnectionDevice:1</friendlyName>\n        <manufacturer>Cisco</manufacturer>\n        <manufacturerURL>http://www.cisco.com/</manufacturerURL>\n        <modelDescription>CGA4131COM</modelDescription>\n        <modelName>CGA4131COM</modelName>\n        <modelNumber>CGA4131COM</modelNumber>\n        <modelURL>http://www.cisco.com</modelURL>\n        <serialNumber></serialNumber>\n        <UDN>uuid:11111111-2222-3333-4444-555555555555</UDN>\n        <UPC>CGA4131COM</UPC>\n        <serviceList>\n       <service>\n           <serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>\n           <serviceId>urn:upnp-org:serviceId:WANIPConn1</serviceId>\n           <SCPDURL>/WANIPConnectionServiceSCPD.xml</SCPDURL>\n           <controlURL>/upnp/control/WANIPConnection0</controlURL>\n           <eventSubURL>/upnp/event/WANIPConnection0</eventSubURL>\n       </service>\n        </serviceList>\n    </device>\n</deviceList>\n</device>\n</deviceList>\n<presentationURL>http://10.1.10.1/</presentationURL></device>\n</root>\n"
+
     expected_parsed = {
         'specVersion': {'major': '1', 'minor': '0'},
         'device': {
@@ -140,6 +162,26 @@ class TestSCPDGet(AsyncioTestCase):
             self.assertIsInstance(err, UPnPError)
             self.assertTrue(str(err).startswith('too many bytes written'))
 
+    async def test_scpd_get_overrun_unspecified_content_length(self):
+        sent = []
+        replies = {self.get_request: self.bad_response2}
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
+            result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
+            self.assertDictEqual({}, result)
+            self.assertEqual(self.bad_response2.decode(), raw.decode())
+            self.assertIsInstance(err, UPnPError)
+            self.assertTrue(str(err).endswith('with unspecified content length'))
+
+    async def test_scpd_duplicate_header(self):
+        sent = []
+        replies = {self.get_request: self.bad_response3}
+        with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent):
+            result, raw, err = await scpd_get(self.path, self.lan_address, self.port, self.loop)
+            self.assertDictEqual({}, result)
+            self.assertTrue(self.bad_response3.startswith(raw))
+            self.assertIsInstance(err, UPnPError)
+            self.assertEqual("duplicate headers", str(err))
+
 
 class TestSCPDPost(AsyncioTestCase):
     param_names: list = []
@@ -202,12 +244,20 @@ class TestSCPDPost(AsyncioTestCase):
             self.assertEqual(b'', raw)
             self.assertDictEqual({}, result)
 
-    async def test_scpd_post_connection_error(self):
+    async def test_scpd_connection_error(self):
         sent = []
         replies = {}
         with mock_tcp_and_udp(self.loop, tcp_replies=replies, sent_tcp_packets=sent, raise_connectionerror=True):
             result, raw, err = await scpd_post(
                 self.path, self.gateway_address, self.port, self.method, self.param_names, self.st, self.loop
+            )
+            self.assertIsInstance(err, UPnPError)
+            self.assertEqual('ConnectionRefusedError()', str(err))
+            self.assertEqual(b'', raw)
+            self.assertDictEqual({}, result)
+
+            result, raw, err = await scpd_get(
+                self.path, self.gateway_address, self.port
             )
             self.assertIsInstance(err, UPnPError)
             self.assertEqual('ConnectionRefusedError()', str(err))

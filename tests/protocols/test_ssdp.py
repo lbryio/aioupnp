@@ -1,3 +1,4 @@
+import json
 from collections import OrderedDict
 from aioupnp.fault import UPnPError
 from aioupnp.protocols.m_search_patterns import packet_generator
@@ -49,6 +50,16 @@ class TestSSDP(AsyncioTestCase):
         with mock_tcp_and_udp(self.loop, udp_replies=replies, udp_expected_addr="10.0.0.1", sent_udp_packets=sent):
             with self.assertRaises(UPnPError):
                 await m_search("10.0.0.2", "10.0.0.1", self.successful_args, timeout=1, loop=self.loop)
+
+    async def test_ssdp_pretty_print(self):
+        self.assertEqual(
+            json.dumps({
+                "HOST": "239.255.255.250:1900",
+                "MAN": "ssdp:discover",
+                "MX": 1,
+                "ST": "urn:schemas-upnp-org:device:WANDevice:1"
+            }, indent=2), str(self.query_packet)
+        )
 
     async def test_m_search_reply_unicast(self):
         replies = {

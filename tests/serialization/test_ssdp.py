@@ -28,6 +28,15 @@ class TestSSDPDatagram(unittest.TestCase):
         with self.assertRaises(UPnPError):
             SSDPDatagram.decode(packet)
 
+        packet = \
+        b'M-SEARCH * HTTP/1.1\r\n' \
+        b'Host: 239.255.255.250:1900\r\n' \
+        b'MX: 5\r\n' \
+        b'\r\n'
+
+        with self.assertRaises(UPnPError):
+            SSDPDatagram.decode(packet)
+
     def test_fail_to_decode_blank(self):
         packet = b''
 
