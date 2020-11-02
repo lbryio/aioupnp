@@ -469,6 +469,9 @@ async def main():
     except KeyboardInterrupt:
         print("stopping")
     finally:
+        with open("aioupnp-bug-report.json", "w") as cap_file:
+            cap_file.write(json.dumps(packets))
+        print(f"Wrote bug report: {os.path.abspath('aioupnp-bug-report.json')}")
         print("Sending bug report")
         ssl_ctx = ssl.create_default_context(
             purpose=ssl.Purpose.CLIENT_AUTH, capath=certifi.where()
@@ -494,7 +497,7 @@ async def main():
                         'direction': direction,
                         'source': source,
                         'destination': destination,
-                        'packet': base64.b64encode(json.dumps(packet).encode()).decode()
+                        'packet': packet
                     },
                 }
                 async with session.request(method='POST', url='https://api.segment.io/v1/track',

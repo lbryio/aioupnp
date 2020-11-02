@@ -109,20 +109,33 @@ By default, the network device will be automatically discovered. The interface m
 
 
 ## Troubleshooting
-
-#### Debug logging
-To enable verbose debug logging, add the `--debug_logging` argument before the command being run
+If `aioupnp` is failing with m-search timeouts this means the UPnP gateway (the router) isn't being found at all. To see if this error is expected try running m_search with debug logging, which will print out the packets sent and received:
 
     aioupnp --debug_logging m_search
 
-#### Is it turned on?
-Check that UPnP is turned on in the web gui for your router.
+If you only see packets being sent or the replies are only from devices that aren't your router (smart devices, speakers, etc), then there are three options:
+* your router does not support UPnP (this is unlikely)
+* UPnP is turned off in the web gui for your router (more likely)
+* `aioupnp` has a bug (very likely if you don't see your router manufacturer doing well in the supported devices table)
 
-#### It really doesn't work
+If you see replies from the router but it still fails, then it's likely a bug in aioupnp.
 
-If it always fails with an m-search error, or the UPnP device is found but making a port mapping or getting the external address fails, a bug report can be generated and automatically sent using the `generate_bug_report.py` script. This script will run a packet capture while attempting to find the device and add/remove a mapping using `miniupnpc` and `aioupnp`. Once complete, it will submit a bug report of the packets sent/recieved by aioupnp/miniupnpc.
+If there are no replies and UPnP is certainly turned on, then a local firewall is the likely culprit.
 
-To run the bug report script, first `pip install certifi aiohttp miniupnpc`. You'll also need `aioupnp` installed. Then generate and send the bug report with `sudo /full/path/to/your/python generate_bug_report.py`.
+
+## Sending a bug report
+
+If it still doesn't work, you can send a bug report using an included script. This script will try finding the UPnP gateway using `aioupnp` as well as `miniupnpc` and then try add and remove a port mapping using each library. The script does this while capturing the packets sent/received, which makes figuring out what went wrong possible. The script will create a file with this packet capture (`aioupnp-bug-report.json`) and automatically send it.
+
+Note: the bug report script currently does not work on MacOS
+```
+git clone https://github.com/lbryio/aioupnp.git
+cd aioupnp
+python3 -m pip install -e .
+
+python3 -m pip install --user certifi aiohttp miniupnpc
+sudo -E python3 generate_bug_report.py
+```
 
 ## License
 
