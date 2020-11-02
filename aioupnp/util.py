@@ -1,3 +1,4 @@
+import sys
 import ipaddress
 import typing
 from collections import OrderedDict
@@ -62,7 +63,7 @@ def is_valid_public_ipv4(address):
                 parsed_ip.is_multicast, parsed_ip.is_reserved, parsed_ip.is_private, parsed_ip.is_reserved)):
             return False
         else:
-            return not any((CARRIER_GRADE_NAT_SUBNET.supernet_of(ipaddress.ip_network(f"{address}/32")),
-                            IPV4_TO_6_RELAY_SUBNET.supernet_of(ipaddress.ip_network(f"{address}/32"))))
+            return not any((CARRIER_GRADE_NAT_SUBNET.overlaps(ipaddress.ip_network(f"{address}/32")),
+                            IPV4_TO_6_RELAY_SUBNET.overlaps(ipaddress.ip_network(f"{address}/32"))))
     except (ipaddress.AddressValueError, ValueError):
         return False
