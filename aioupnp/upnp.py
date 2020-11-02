@@ -410,12 +410,12 @@ def run_cli(method: str, igd_args: Dict[str, Union[bool, str, int]], lan_address
                 u = await UPnP.discover(
                     lan_address, gateway_address, timeout, igd_args, interface_name, loop=loop
                 )
-            except UPnPError as err:
+            except UPnPError as err:  # pragma: no cover
                 fut.set_exception(err)
                 return
             if method not in cli_commands:
-                fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))
-                return
+                fut.set_exception(UPnPError("\"%s\" is not a recognized command" % method))  # pragma: no cover
+                return  # pragma: no cover
             else:
                 fn = getattr(u, method)
 
@@ -424,8 +424,7 @@ def run_cli(method: str, igd_args: Dict[str, Union[bool, str, int]], lan_address
             fut.set_result(result)
         except UPnPError as err:
             fut.set_exception(err)
-
-        except Exception as err:
+        except Exception as err:  # pragma: no cover
             log.exception("uncaught error")
             fut.set_exception(UPnPError("uncaught error: %s" % str(err)))
 

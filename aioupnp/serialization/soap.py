@@ -13,7 +13,7 @@ CONTENT_NO_XML_VERSION_PATTERN = re.compile(
 
 def serialize_soap_post(method: str, param_names: typing.List[str], service_id: bytes, gateway_address: bytes,
                         control_url: bytes, **kwargs: typing.Dict[str, str]) -> bytes:
-    args = "".join(f"<{n}>{kwargs.get(n)}</{n}>" for n in param_names)
+    args = "".join(f"<{param_name}>{kwargs.get(param_name, '')}</{param_name}>" for param_name in param_names)
     soap_body = (f'\r\n{XML_VERSION}\r\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
                  f's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
                  f'<u:{method} xmlns:u="{service_id.decode()}">{args}</u:{method}></s:Body></s:Envelope>')

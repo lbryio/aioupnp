@@ -368,3 +368,8 @@ class TestActiontec(AsyncioTestCase):
 
 class TestNewMediaNet(TestActiontec):
     name = "NewMedia-NET GmbH Generic X86"
+
+    async def replay(self, u: UPnP):
+        self.assertEqual('11.222.33.111', await u.get_external_ip())
+        await u.get_redirects()
+        # print(await u.get_next_mapping(4567, 'UDP', 'aioupnp test mapping'))

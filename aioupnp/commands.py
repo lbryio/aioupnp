@@ -134,7 +134,7 @@ class SOAPCommands:
 
     def is_registered(self, name: str) -> bool:
         if name not in self.SOAP_COMMANDS:
-            raise ValueError("unknown command")
+            raise ValueError("unknown command")  # pragma: no cover
         for service in self._registered.values():
             if name in service:
                 return True
@@ -142,11 +142,11 @@ class SOAPCommands:
 
     def get_service(self, name: str) -> Service:
         if name not in self.SOAP_COMMANDS:
-            raise ValueError("unknown command")
+            raise ValueError("unknown command")  # pragma: no cover
         for service, commands in self._registered.items():
             if name in commands:
                 return service
-        raise ValueError(name)
+        raise ValueError(name)  # pragma: no cover
 
     def _register_soap_wrapper(self, name: str) -> None:
         annotations: typing.Dict[str, typing.Any] = typing.get_type_hints(getattr(self, name))
@@ -173,7 +173,7 @@ class SOAPCommands:
                 self._request_debug_infos.append(SCPDRequestDebuggingInfo(name, kwargs, xml_bytes, result, None, time.time()))
             except Exception as err:
                 if isinstance(err, asyncio.CancelledError):
-                    raise
+                    raise  # pragma: no cover
                 self._request_debug_infos.append(SCPDRequestDebuggingInfo(name, kwargs, xml_bytes, None, err, time.time()))
                 raise UPnPError(f"Raised {str(type(err).__name__)}({str(err)}) parsing response for {name}")
             return result
@@ -253,8 +253,8 @@ class SOAPCommands:
             raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_no_args
         result: str = await self._wrappers_no_args[name]()
-        if not result:
-            raise UPnPError("Got null external ip address")
+        # if not result:
+        #     raise UPnPError("Got null external ip address")
         return result
 
     # async def GetNATRSIPStatus(self) -> Tuple[bool, bool]:

@@ -1,4 +1,6 @@
 from unittest import mock
+from collections import OrderedDict
+from aioupnp import interfaces
 from aioupnp.fault import UPnPError
 from aioupnp.upnp import UPnP
 from tests import AsyncioTestCase
@@ -29,22 +31,26 @@ class mock_netifaces:
     @staticmethod
     def ifaddresses(interface):
         return {
-            "test0": {
-                17: [
-                    {
-                        "addr": "01:02:03:04:05:06",
-                        "broadcast": "ff:ff:ff:ff:ff:ff"
-                    }
-                ],
-                2: [
-                    {
-                        "addr": "192.168.1.2",
-                        "netmask": "255.255.255.0",
-                        "broadcast": "192.168.1.255"
-                    }
-                ],
-            },
-        }[interface]
+            17: [
+                {
+                    "addr": "01:02:03:04:05:06",
+                    "broadcast": "ff:ff:ff:ff:ff:ff"
+                }
+            ],
+            2: [
+                {
+                    "addr": "192.168.1.2",
+                    "netmask": "255.255.255.0",
+                    "broadcast": "192.168.1.255"
+                }
+            ],
+        }
+
+
+class mock_netifaces_extra_interface(mock_netifaces):
+    @staticmethod
+    def interfaces():
+        return ['lo', 'test0', 'test1']
 
 
 class TestParseInterfaces(AsyncioTestCase):
@@ -68,3 +74,16 @@ class TestParseInterfaces(AsyncioTestCase):
             else:
                 self.assertTrue(False)
         self.assertEqual(len(checked), 1)
+
+    def test_guess_gateway(self):
+        # handle edge case where netifaces gives more interfaces than it does gateways
+        with mock.patch('aioupnp.interfaces.get_netifaces') as patch:
+            patch.return_value = mock_netifaces_extra_interface
+            self.assertDictEqual(
+                OrderedDict(
+                    [
+                        ('test0', ('192.168.1.1', '192.168.1.2')),
+                        ('test1', ('192.168.1.1', '192.168.1.2')),
+                        ('default', ('192.168.1.1', '192.168.1.2'))
+                    ]), interfaces.get_interfaces()
+            )
