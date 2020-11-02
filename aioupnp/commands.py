@@ -5,6 +5,7 @@ import logging
 from aioupnp.protocols.scpd import scpd_post
 from aioupnp.device import Service
 from aioupnp.fault import UPnPError
+from aioupnp.util import is_valid_public_ipv4
 
 log = logging.getLogger(__name__)
 
@@ -252,10 +253,10 @@ class SOAPCommands:
         if not self.is_registered(name):
             raise NotImplementedError()  # pragma: no cover
         assert name in self._wrappers_no_args
-        result: str = await self._wrappers_no_args[name]()
-        # if not result:
-        #     raise UPnPError("Got null external ip address")
-        return result
+        external_ip: str = await self._wrappers_no_args[name]()
+        if not is_valid_public_ipv4(external_ip):
+            raise UPnPError(f"Got invalid external ipv4 address: {external_ip}")
+        return external_ip
 
     # async def GetNATRSIPStatus(self) -> Tuple[bool, bool]:
     #     """Returns (NewRSIPAvailable, NewNATEnabled)"""

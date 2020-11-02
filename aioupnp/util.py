@@ -1,3 +1,4 @@
+import ipaddress
 import typing
 from collections import OrderedDict
 
@@ -47,3 +48,21 @@ def get_dict_val_case_insensitive(source: typing.Dict[typing.AnyStr, typing.AnyS
         matched_key: typing.AnyStr = match[0]
         return source[matched_key]
     raise KeyError("overlapping keys")
+
+
+# the ipaddress module does not show these subnets as reserved
+CARRIER_GRADE_NAT_SUBNET = ipaddress.ip_network('100.64.0.0/10')
+IPV4_TO_6_RELAY_SUBNET = ipaddress.ip_network('192.88.99.0/24')
+
+
+def is_valid_public_ipv4(address):
+    try:
+        parsed_ip = ipaddress.ip_address(address)
+        if any((parsed_ip.version != 4, parsed_ip.is_unspecified, parsed_ip.is_link_local, parsed_ip.is_loopback,
+                parsed_ip.is_multicast, parsed_ip.is_reserved, parsed_ip.is_private, parsed_ip.is_reserved)):
+            return False
+        else:
+            return not any((CARRIER_GRADE_NAT_SUBNET.supernet_of(ipaddress.ip_network(f"{address}/32")),
+                            IPV4_TO_6_RELAY_SUBNET.supernet_of(ipaddress.ip_network(f"{address}/32"))))
+    except (ipaddress.AddressValueError, ValueError):
+        return False
