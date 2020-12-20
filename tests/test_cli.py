@@ -62,7 +62,7 @@ Get the external ip address from the gateway
 """
 
 expected_add_port_mapping_usage = """aioupnp [-h] [--debug_logging] add_port_mapping [--external_port=<int>] [--protocol=<str>]
-  [--internal_port=<int>] [--lan_address=<str>] [--description=<str>]
+  [--internal_port=<int>] [--lan_address=<str>] [--description=<str>] [--lease_time=<int>]
 
 Add a new port mapping
 
@@ -71,12 +71,13 @@ Add a new port mapping
 :param internal_port: (int) internal port
 :param lan_address: (str) internal lan address
 :param description: (str) mapping description
+:param lease_time: (int) lease time in seconds
 :return: None
 
 """
 
 expected_get_next_mapping_usage = """aioupnp [-h] [--debug_logging] get_next_mapping [--port=<int>] [--protocol=<str>]
-  [--description=<str>] [--internal_port=<typing.Union[int, NoneType]>]
+  [--description=<str>] [--internal_port=<typing.Union[int, NoneType]>] [--lease_time=<int>]
 
 Get a new port mapping. If the requested port is not available, increment until the next free port is mapped
 
@@ -84,6 +85,7 @@ Get a new port mapping. If the requested port is not available, increment until 
 :param protocol: (str) UDP | TCP
 :param description: (str) mapping description
 :param internal_port: (int) internal port
+:param lease_time: (int) lease time in seconds
 
 :return: (int) mapped port
 

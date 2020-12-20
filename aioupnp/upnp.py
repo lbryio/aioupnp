@@ -122,7 +122,7 @@ class UPnP:
         await self.gateway.commands.AddPortMapping(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=lease_time
+            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=str(lease_time)
         )
         return None
 
