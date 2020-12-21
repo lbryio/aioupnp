@@ -107,7 +107,7 @@ class UPnP:
         return await self.gateway.commands.GetExternalIPAddress()
 
     async def add_port_mapping(self, external_port: int, protocol: str, internal_port: int, lan_address: str,
-                               description: str) -> None:
+                               description: str, lease_time: int = 0) -> None:
         """
         Add a new port mapping
 
@@ -116,12 +116,13 @@ class UPnP:
         :param internal_port: (int) internal port
         :param lan_address: (str) internal lan address
         :param description: (str) mapping description
+        :param lease_time: (int) lease time in seconds
         :return: None
         """
         await self.gateway.commands.AddPortMapping(
             NewRemoteHost='', NewExternalPort=external_port, NewProtocol=protocol,
             NewInternalPort=internal_port, NewInternalClient=lan_address,
-            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration='0'
+            NewEnabled=1, NewPortMappingDescription=description, NewLeaseDuration=str(lease_time)
         )
         return None
 
@@ -208,7 +209,7 @@ class UPnP:
         return None
 
     async def get_next_mapping(self, port: int, protocol: str, description: str,
-                               internal_port: Optional[int] = None) -> int:
+                               internal_port: Optional[int] = None, lease_time: int = 0) -> int:
         """
         Get a new port mapping. If the requested port is not available, increment until the next free port is mapped
 
@@ -216,6 +217,7 @@ class UPnP:
         :param protocol: (str) UDP | TCP
         :param description: (str) mapping description
         :param internal_port: (int) internal port
+        :param lease_time: (int) lease time in seconds
 
         :return: (int) mapped port
         """
@@ -235,7 +237,7 @@ class UPnP:
             if int_host == self.lan_address and int_port == requested_port and desc == description:
                 return port
             port += 1
-        await self.add_port_mapping(port, protocol, _internal_port, self.lan_address, description)
+        await self.add_port_mapping(port, protocol, _internal_port, self.lan_address, description, lease_time)
         return port
 
     async def gather_debug_info(self) -> str:  # pragma: no cover
