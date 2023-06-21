@@ -141,7 +141,7 @@ async def scpd_get(control_url: str, address: str, port: int,
     assert isinstance(protocol, SCPDHTTPClientProtocol)
 
     error = None
-    wait_task: typing.Awaitable[typing.Tuple[bytes, bytes, int, bytes]] = asyncio.wait_for(protocol.finished, 1.0, loop=loop)
+    wait_task: typing.Awaitable[typing.Tuple[bytes, bytes, int, bytes]] = asyncio.wait_for(protocol.finished, 1.0)
     body = b''
     raw_response = b''
     try:
@@ -182,7 +182,7 @@ async def scpd_post(control_url: str, address: str, port: int, method: str, para
     assert isinstance(protocol, SCPDHTTPClientProtocol)
 
     try:
-        wait_task: typing.Awaitable[typing.Tuple[bytes, bytes, int, bytes]] = asyncio.wait_for(finished, 1.0, loop=loop)
+        wait_task: typing.Awaitable[typing.Tuple[bytes, bytes, int, bytes]] = asyncio.wait_for(finished, 1.0)
         raw_response, body, response_code, response_msg = await wait_task
     except asyncio.TimeoutError:
         return {}, b'', UPnPError("Timeout")

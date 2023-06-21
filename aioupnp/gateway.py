@@ -224,7 +224,7 @@ class Gateway:
         try:
             return await asyncio.wait_for(loop.create_task(
                 cls._discover_gateway(lan_address, gateway_address, timeout, loop)
-            ), timeout, loop=loop)
+            ), timeout)
         except asyncio.TimeoutError:
             raise UPnPError(f"M-SEARCH for {gateway_address}:1900 timed out")
 
