@@ -31,8 +31,8 @@ class SSDPProtocol(MulticastProtocol):
         self.transport: Optional[DatagramTransport] = None
         self._pending_searches: List[PendingSearch] = []
         self.notifications: List[SSDPDatagram] = []
-        self.connected = asyncio.Event(loop=self.loop)
-        self.devices: 'asyncio.Queue[SSDPDatagram]' = asyncio.Queue(loop=self.loop)
+        self.connected = asyncio.Event()
+        self.devices: 'asyncio.Queue[SSDPDatagram]' = asyncio.Queue()
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:  # type: ignore
         super().connection_made(transport)
@@ -98,7 +98,7 @@ class SSDPProtocol(MulticastProtocol):
     async def m_search(self, address: str, timeout: float,
                        datagrams: List[Dict[str, typing.Union[str, int]]]) -> SSDPDatagram:
         fut = self.send_m_searches(address, datagrams)
-        return await asyncio.wait_for(fut, timeout, loop=self.loop)
+        return await asyncio.wait_for(fut, timeout)
 
     def datagram_received(self, data: bytes, addr: Tuple[str, int]) -> None:  # type: ignore
         if addr[0] == self.bind_address:
